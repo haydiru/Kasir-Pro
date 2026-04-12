@@ -111,8 +111,8 @@ export async function registerStore(prevState: string | undefined, formData: For
     });
 
     return "SUCCESS";
-  } catch (error) {
-    console.error(error);
-    return "Terjadi kesalahan sistem saat mendaftarkan toko.";
+  } catch (error: any) {
+    console.error("Registration Error:", error);
+    return "Gagal daftar: " + (error.message || "Kesalahan sistem");
   }
 }
