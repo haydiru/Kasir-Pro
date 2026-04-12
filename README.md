@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kasir-App: Mini Market Shift Report System
 
-## Getting Started
+Sistem manajemen shift dan pelaporan harian untuk minimarket modern. Dibangun dengan Next.js 15, Prisma, dan PostgreSQL.
 
-First, run the development server:
+## 🚀 Fitur Utama
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Dashboard Admin Premium**: Kelola identitas toko dan pengaturan shift dengan antarmuka modern (Glassmorphism UI).
+- **Sistem Shift Dinamis**: Konfigurasi jam kerja (Pagi/Malam) dan dukungan jadwal khusus untuk hari tertentu (misal: Hari Minggu).
+- **Presensi Karyawan**: Sistem Clock-In/Clock-Out yang sinkron dengan jadwal toko.
+- **Laporan Shift Otomatis**: Rekapitulasi transaksi, pengeluaran, dan kas awal/akhir per shift.
+- **Manajemen User**: Pengaturan peran Kasir, Pramuniaga, dan Admin.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 15 (App Router)
+- **Database**: PostgreSQL (via Supabase/Prisma)
+- **Styling**: Tailwind CSS & Shadcn UI
+- **Auth**: NextAuth.js (Auth.js)
+- **ORM**: Prisma
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Instalasi
 
-## Learn More
+1. Clone repositori ini:
+   ```bash
+   git clone [URL_REPOSITORI]
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Instal dependensi:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Atur environment variables (`.env`):
+   ```env
+   DATABASE_URL="your_postgresql_url"
+   NEXTAUTH_SECRET="your_secret"
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Jalankan migrasi database:
+   ```bash
+   npx prisma db push
+   ```
 
-## Deploy on Vercel
+5. Jalankan project:
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📝 Lisensi
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
