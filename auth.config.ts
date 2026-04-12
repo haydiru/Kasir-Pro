@@ -56,12 +56,16 @@ export const authConfig = {
       if (token.storeId && session.user) {
         session.user.storeId = token.storeId as string;
       }
+      if (token.storeName && session.user) {
+        session.user.storeName = token.storeName as string;
+      }
       return session;
     },
     jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role;
         token.storeId = user.storeId;
+        token.storeName = user.storeName;
       }
       // If we update session later (e.g., override role to act as cashier)
       if (trigger === "update" && session?.role) {

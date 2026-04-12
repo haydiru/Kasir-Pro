@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { serialize, ActionResponse } from "@/lib/serialize";
 
 /**
  * Determines current shift based on store settings and server time.
@@ -37,282 +38,187 @@ async function getCurrentShift(storeId: string) {
   return "Pagi"; // Default fallback
 }
 
-export async function getOrCreateActiveReport() {
-  const session = await auth();
-  if (!session?.user?.storeId) throw new Error("Unauthorized");
+export async function getActiveReport(): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
-  const shiftType = await getCurrentShift(session.user.storeId);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Find existing draft
-  let report = await prisma.shiftReport.findFirst({
-    where: {
-      storeId: session.user.storeId,
-      shiftType: shiftType,
-      date: {
-        gte: today,
-        lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-      },
-      status: "Draft",
-    },
-    include: {
-      digitalTransactions: { include: { creator: true, updater: true } },
-      expenditures: { include: { creator: true, updater: true } },
-    },
-  });
-
-  if (!report) {
-    // Check if any report at all for today/shift (maybe already submitted?)
-    const existingSubmitted = await prisma.shiftReport.findFirst({
+    // 1. Get current active attendance
+    const attendance = await prisma.attendance.findFirst({
         where: {
-          storeId: session.user.storeId,
-          shiftType: shiftType,
-          date: {
-            gte: today,
-            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-          },
-        },
-        include: {
-          digitalTransactions: { include: { creator: true, updater: true } },
-          expenditures: { include: { creator: true, updater: true } },
-        },
+            userId: session.user.id,
+            clockOut: null
+        }
     });
-    
-    if (existingSubmitted) return { report: existingSubmitted, isReadOnly: true };
 
-    // Create new Draft
-    report = await prisma.shiftReport.create({
-      data: {
+    if (!attendance) {
+        return { success: false, error: "AttendanceRequired" };
+    }
+
+    const shiftType = attendance.shiftType;
+    const reportDate = attendance.clockIn;
+    const todayStart = new Date(reportDate);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    // 2. Find existing report for this USER + STORE + SHIFT + ATTENDANCE DATE
+    const report = await prisma.shiftReport.findFirst({
+      where: {
         userId: session.user.id,
         storeId: session.user.storeId,
         shiftType: shiftType,
-        status: "Draft",
-        startingCash: 500000, // Default starting cash
+        date: {
+          gte: todayStart,
+          lt: todayEnd,
+        },
       },
       include: {
+        user: true,
         digitalTransactions: { include: { creator: true, updater: true } },
         expenditures: { include: { creator: true, updater: true } },
       },
-    });
-  }
-
-  return { report, isReadOnly: false };
-}
-
-export async function addShiftEntries(data: {
-  digitalTx: any[];
-  expenditures: any[];
-}) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-
-  const { report, isReadOnly } = await getOrCreateActiveReport();
-  if (isReadOnly) return { error: "Laporan untuk shift ini sudah di-submit dan tidak bisa diubah." };
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Add digital transactions
-      if (data.digitalTx.length > 0) {
-        await tx.digitalTransaction.createMany({
-          data: data.digitalTx.map((t) => ({
-            reportId: report.id,
-            createdBy: session.user.id,
-            serviceType: t.serviceType,
-            grossAmount: t.grossAmount,
-            profitAmount: t.profitAmount,
-            detailContact: t.detailContact,
-            flipId: t.flipId,
-            isNonCash: t.isNonCash,
-            paymentMethod: t.paymentMethod,
-          })),
-        });
-      }
-
-      // Add expenditures
-      if (data.expenditures.length > 0) {
-        await tx.expenditure.createMany({
-          data: data.expenditures.map((e) => ({
-            reportId: report.id,
-            createdBy: session.user.id,
-            supplierName: e.supplierName,
-            amountFromBill: e.amountFromBill,
-            amountFromCashier: e.amountFromCashier,
-            amountFromTransfer: e.amountFromTransfer,
-            receiptUrl: e.receiptUrl,
-          })),
-        });
-      }
+      orderBy: { createdAt: 'desc' }
     });
 
-    revalidatePath("/cashier/report");
-    revalidatePath("/pramuniaga/entries");
-    return { success: true };
-  } catch (error) {
-    console.error(error);
-    return { error: "Gagal menyinkronkan data." };
+    if (!report) {
+      return { 
+        success: false, 
+        error: "NoActiveReport",
+        data: { shiftType, date: reportDate } 
+      };
+    }
+
+    return { 
+      success: true, 
+      data: { report: serialize(report), isReadOnly: false } 
+    };
+  } catch (error: any) {
+    console.error("getActiveReport error:", error);
+    return { success: false, error: "Gagal memuat laporan" };
   }
 }
 
-export async function updateDigitalEntry(id: string, data: any) {
-    const session = await auth();
-    if (!session?.user) throw new Error("Unauthorized");
+export async function createShiftReport(): Promise<ActionResponse> {
+    try {
+        const session = await auth();
+        if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
-    const existing = await prisma.digitalTransaction.findUnique({
-        where: { id }
-    });
+        const attendance = await prisma.attendance.findFirst({
+            where: {
+                userId: session.user.id,
+                clockOut: null
+            }
+        });
 
-    if (!existing) throw new Error("Data tidak ditemukan");
-    
-    // Permission check: Creator or Cashier/Admin can edit
-    const isCreator = existing.createdBy === session.user.id;
-    const isManager = session.user.role === "cashier" || session.user.role === "admin" || session.user.role === "super_admin";
-    
-    if (!isCreator && !isManager) throw new Error("Tidak memiliki izin untuk mengubah data ini");
+        if (!attendance) return { success: false, error: "Harap lakukan absensi terlebih dahulu." };
 
-    await prisma.digitalTransaction.update({
-        where: { id },
-        data: {
-            serviceType: data.serviceType,
-            grossAmount: data.grossAmount,
-            profitAmount: data.profitAmount,
-            detailContact: data.detailContact,
-            flipId: data.flipId,
-            isNonCash: data.isNonCash,
-            paymentMethod: data.paymentMethod,
-            lastUpdatedBy: !isCreator ? session.user.id : existing.lastUpdatedBy
-        }
-    });
+        const reportDate = attendance.clockIn;
+        
+        // Double check if report already exists to avoid duplicates
+        const existing = await prisma.shiftReport.findFirst({
+            where: {
+                userId: session.user.id,
+                storeId: session.user.storeId,
+                shiftType: attendance.shiftType,
+                date: {
+                    gte: new Date(new Date(reportDate).setHours(0,0,0,0)),
+                    lt: new Date(new Date(reportDate).setHours(23,59,59,999))
+                }
+            }
+        });
 
-    revalidatePath("/cashier/report");
-    revalidatePath("/pramuniaga/entries");
-    return { success: true };
-}
+        if (existing) return { success: true, data: { report: serialize(existing) } };
 
-export async function updateExpenditureEntry(id: string, data: any) {
-    const session = await auth();
-    if (!session?.user) throw new Error("Unauthorized");
+        const report = await prisma.shiftReport.create({
+            data: {
+                userId: session.user.id,
+                storeId: session.user.storeId,
+                shiftType: attendance.shiftType,
+                date: reportDate,
+                status: "Draft",
+                startingCash: 500000,
+            },
+            include: {
+                user: true,
+                digitalTransactions: { include: { creator: true, updater: true } },
+                expenditures: { include: { creator: true, updater: true } },
+            },
+        });
 
-    const existing = await prisma.expenditure.findUnique({
-        where: { id }
-    });
-
-    if (!existing) throw new Error("Data tidak ditemukan");
-    
-    const isCreator = existing.createdBy === session.user.id;
-    const isManager = session.user.role === "cashier" || session.user.role === "admin" || session.user.role === "super_admin";
-    
-    if (!isCreator && !isManager) throw new Error("Tidak memiliki izin untuk mengubah data ini");
-
-    await prisma.expenditure.update({
-        where: { id },
-        data: {
-            supplierName: data.supplierName,
-            amountFromBill: data.amountFromBill,
-            amountFromCashier: data.amountFromCashier,
-            amountFromTransfer: data.amountFromTransfer,
-            lastUpdatedBy: !isCreator ? session.user.id : existing.lastUpdatedBy
-        }
-    });
-
-    revalidatePath("/cashier/report");
-    revalidatePath("/pramuniaga/entries");
-    return { success: true };
-}
-
-export async function deleteShiftEntry(type: "digital" | "expenditure", id: string) {
-    const session = await auth();
-    if (!session?.user) throw new Error("Unauthorized");
-
-    let existing;
-    if (type === "digital") {
-        existing = await prisma.digitalTransaction.findUnique({ where: { id } });
-    } else {
-        existing = await prisma.expenditure.findUnique({ where: { id } });
+        revalidatePath("/cashier/report");
+        return { success: true, data: { report: serialize(report) } };
+    } catch (error: any) {
+        console.error("createShiftReport error:", error);
+        return { success: false, error: "Gagal membuat laporan baru" };
     }
-
-    if (!existing) throw new Error("Data tidak ditemukan");
-    
-    // Deletion is stricter: only creator or admin
-    const isCreator = existing.createdBy === session.user.id;
-    const isAdmin = session.user.role === "admin" || session.user.role === "super_admin";
-    
-    if (!isCreator && !isAdmin) throw new Error("Hanya pembuat atau Admin yang dapat menghapus data permanen");
-
-    if (type === "digital") {
-        await prisma.digitalTransaction.delete({ where: { id } });
-    } else {
-        await prisma.expenditure.delete({ where: { id } });
-    }
-
-    revalidatePath("/cashier/report");
-    revalidatePath("/pramuniaga/entries");
-    return { success: true };
 }
 
-export async function saveCashierReport(data: any) {
+export async function saveCashierReport(data: any): Promise<ActionResponse> {
     const session = await auth();
-    if (!session?.user) throw new Error("Unauthorized");
+    if (!session?.user) return { success: false, error: "Unauthorized" };
 
     try {
         await prisma.$transaction(async (tx) => {
+            const existing = await tx.shiftReport.findUnique({
+                where: { id: data.id }
+            });
+
+            if (!existing) throw new Error("Laporan tidak ditemukan");
+            if (existing.status === "Verified") throw new Error("Laporan sudah diverifikasi admin dan tidak bisa diubah");
+
+            // Handle revision note
+            let newCashierNote = existing.cashierNote || "";
+            if (data.editReason) {
+                const nowStr = new Date().toLocaleString("id-ID");
+                newCashierNote += `\n[${nowStr}] ${session.user.name}: ${data.editReason}`;
+            }
+
             // 1. Update ShiftReport Header
+            // Apply Math.round to all financial inputs to prevent decimal bugs
             await tx.shiftReport.update({
                 where: { id: data.id },
                 data: {
-                    startingCash: data.startingCash,
-                    posCash: data.posCash,
-                    posDebit: data.posDebit,
-                    billMoneyReceived: data.billMoneyReceived,
-                    manualCashCount: data.manualCashCount,
-                    status: data.isSubmit ? "Submitted" : "Draft",
-                    submittedAt: data.isSubmit ? new Date() : null,
+                    startingCash: Math.round(data.startingCash),
+                    posCash: Math.round(data.posCash),
+                    posDebit: Math.round(data.posDebit),
+                    billMoneyReceived: Math.round(data.billMoneyReceived),
+                    manualCashCount: Math.round(data.manualCashCount),
+                    status: data.isSubmit ? "Submitted" : data.isReadOnly ? existing.status : "Draft",
+                    submittedAt: (data.isSubmit && !existing.submittedAt) ? new Date() : existing.submittedAt,
+                    cashierNote: newCashierNote.trim(),
                 }
             });
 
             // 2. Update Digital Transactions
             if (data.digitalTransactions) {
                 for (const d of data.digitalTransactions) {
-                    // Check if anything changed and who is editing
-                    const existing = await tx.digitalTransaction.findUnique({
+                    const existingTx = await tx.digitalTransaction.findUnique({
                         where: { id: d.id }
                     });
 
-                    if (existing) {
-                        const isChanged = 
-                            existing.serviceType !== d.serviceType ||
-                            existing.grossAmount !== d.grossAmount ||
-                            existing.profitAmount !== d.profitAmount ||
-                            existing.detailContact !== d.detailContact ||
-                            existing.flipId !== d.flipId ||
-                            existing.isNonCash !== d.isNonCash ||
-                            existing.paymentMethod !== d.paymentMethod;
-
-                        if (isChanged) {
-                            await tx.digitalTransaction.update({
-                                where: { id: d.id },
-                                data: {
-                                    serviceType: d.serviceType,
-                                    grossAmount: d.grossAmount,
-                                    profitAmount: d.profitAmount,
-                                    detailContact: d.detailContact,
-                                    flipId: d.flipId,
-                                    isNonCash: d.isNonCash,
-                                    paymentMethod: d.paymentMethod,
-                                    lastUpdatedBy: existing.createdBy !== session.user.id ? session.user.id : existing.lastUpdatedBy
-                                }
-                            });
-                        }
-                    } else if (!data.isSubmit) {
-                        // Handle adding new rows from Cashier UI (if any)
+                    if (existingTx) {
+                        await tx.digitalTransaction.update({
+                            where: { id: d.id },
+                            data: {
+                                serviceType: d.serviceType,
+                                grossAmount: Math.round(d.grossAmount),
+                                profitAmount: Math.round(d.profitAmount),
+                                detailContact: d.detailContact,
+                                flipId: d.flipId,
+                                isNonCash: d.isNonCash,
+                                paymentMethod: d.paymentMethod,
+                                lastUpdatedBy: existingTx.createdBy !== session.user.id ? session.user.id : existingTx.lastUpdatedBy
+                            }
+                        });
+                    } else {
                         await tx.digitalTransaction.create({
                             data: {
-                                id: d.id, // Use the client-generated ID
+                                id: d.id,
                                 reportId: data.id,
                                 createdBy: session.user.id,
                                 serviceType: d.serviceType,
-                                grossAmount: d.grossAmount,
-                                profitAmount: d.profitAmount,
+                                grossAmount: Math.round(d.grossAmount),
+                                profitAmount: Math.round(d.profitAmount),
                                 detailContact: d.detailContact,
                                 flipId: d.flipId,
                                 isNonCash: d.isNonCash,
@@ -326,53 +232,227 @@ export async function saveCashierReport(data: any) {
             // 3. Update Expenditures
             if (data.expenditures) {
                 for (const e of data.expenditures) {
-                    const existing = await tx.expenditure.findUnique({
+                    const existingExp = await tx.expenditure.findUnique({
                         where: { id: e.id }
                     });
 
-                    if (existing) {
-                        const isChanged = 
-                            existing.supplierName !== e.supplierName ||
-                            existing.amountFromBill !== e.amountFromBill ||
-                            existing.amountFromCashier !== e.amountFromCashier ||
-                            existing.amountFromTransfer !== e.amountFromTransfer;
-
-                        if (isChanged) {
-                            await tx.expenditure.update({
-                                where: { id: e.id },
-                                data: {
-                                    supplierName: e.supplierName,
-                                    amountFromBill: e.amountFromBill,
-                                    amountFromCashier: e.amountFromCashier,
-                                    amountFromTransfer: e.amountFromTransfer,
-                                    lastUpdatedBy: existing.createdBy !== session.user.id ? session.user.id : existing.lastUpdatedBy
-                                }
-                            });
-                        }
-                    } else if (!data.isSubmit) {
+                    if (existingExp) {
+                        await tx.expenditure.update({
+                            where: { id: e.id },
+                            data: {
+                                supplierName: e.supplierName,
+                                amountFromBill: Math.round(e.amountFromBill),
+                                amountFromCashier: Math.round(e.amountFromCashier),
+                                amountFromTransfer: Math.round(e.amountFromTransfer),
+                                lastUpdatedBy: existingExp.createdBy !== session.user.id ? session.user.id : existingExp.lastUpdatedBy
+                            }
+                        });
+                    } else {
                         await tx.expenditure.create({
                             data: {
                                 id: e.id,
                                 reportId: data.id,
                                 createdBy: session.user.id,
                                 supplierName: e.supplierName,
-                                amountFromBill: e.amountFromBill,
-                                amountFromCashier: e.amountFromCashier,
-                                amountFromTransfer: e.amountFromTransfer,
+                                amountFromBill: Math.round(e.amountFromBill),
+                                amountFromCashier: Math.round(e.amountFromCashier),
+                                amountFromTransfer: Math.round(e.amountFromTransfer),
                             }
                         });
                     }
                 }
             }
-
-            // Note: We might want to handle deletion of rows that are removed in UI
-            // But let's keep it simple as requested for now.
         });
 
         revalidatePath("/cashier/report");
         revalidatePath("/admin/verifications");
+        revalidatePath("/cashier/history");
         return { success: true };
-    } catch (error) {
-        return { error: "Gagal menyimpan laporan." };
+    } catch (error: any) {
+        console.error("saveCashierReport error:", error);
+        return { success: false, error: error.message || "Gagal menyimpan laporan" };
     }
+}
+
+// These are still used by Pramuniaga Entries, let's standardize them too
+export async function addShiftEntries(data: {
+  digitalTx: any[];
+  expenditures: any[];
+}): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  try {
+    const res = await getActiveReport();
+    if (!res.success || !res.data) throw new Error(res.error);
+    
+    const { report } = res.data;
+
+    await prisma.$transaction(async (tx) => {
+      if (data.digitalTx.length > 0) {
+        await tx.digitalTransaction.createMany({
+          data: data.digitalTx.map((t) => ({
+            reportId: report.id,
+            createdBy: session.user.id,
+            serviceType: t.serviceType,
+            grossAmount: Math.round(t.grossAmount),
+            profitAmount: Math.round(t.profitAmount),
+            detailContact: t.detailContact,
+            flipId: t.flipId,
+            isNonCash: t.isNonCash,
+            paymentMethod: t.paymentMethod,
+          })),
+        });
+      }
+
+      if (data.expenditures.length > 0) {
+        await tx.expenditure.createMany({
+          data: data.expenditures.map((e) => ({
+            reportId: report.id,
+            createdBy: session.user.id,
+            supplierName: e.supplierName,
+            amountFromBill: Math.round(e.amountFromBill),
+            amountFromCashier: Math.round(e.amountFromCashier),
+            amountFromTransfer: Math.round(e.amountFromTransfer),
+            receiptUrl: e.receiptUrl,
+          })),
+        });
+      }
+    });
+
+    revalidatePath("/cashier/report");
+    revalidatePath("/pramuniaga/entries");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Gagal menyinkronkan data" };
+  }
+}
+
+export async function updateDigitalEntry(id: string, data: any): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.digitalTransaction.update({
+      where: { id },
+      data: {
+        serviceType: data.serviceType,
+        grossAmount: Math.round(data.grossAmount),
+        profitAmount: Math.round(data.profitAmount),
+        detailContact: data.detailContact,
+        flipId: data.flipId,
+        isNonCash: data.isNonCash,
+        paymentMethod: data.paymentMethod,
+        lastUpdatedBy: session.user.id
+      }
+    });
+    revalidatePath("/cashier/report");
+    revalidatePath("/pramuniaga/entries");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Gagal memperbarui data" };
+  }
+}
+
+export async function updateExpenditureEntry(id: string, data: any): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.expenditure.update({
+      where: { id },
+      data: {
+        supplierName: data.supplierName,
+        amountFromBill: Math.round(data.amountFromBill),
+        amountFromCashier: Math.round(data.amountFromCashier),
+        amountFromTransfer: Math.round(data.amountFromTransfer),
+        lastUpdatedBy: session.user.id
+      }
+    });
+    revalidatePath("/cashier/report");
+    revalidatePath("/pramuniaga/entries");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Gagal memperbarui data" };
+  }
+}
+
+export async function deleteShiftEntry(type: "digital" | "expenditure", id: string): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  try {
+    if (type === "digital") {
+      await prisma.digitalTransaction.delete({ where: { id } });
+    } else {
+      await prisma.expenditure.delete({ where: { id } });
+    }
+    revalidatePath("/cashier/report");
+    revalidatePath("/pramuniaga/entries");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Gagal menghapus data" };
+  }
+}
+
+export async function deleteShiftReport(reportId: string): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+  
+  // Only Admin or Super Admin can delete reports
+  if (session.user.role !== "admin" && session.user.role !== "super_admin") {
+    return { success: false, error: "Hanya Admin yang dapat menghapus laporan" };
+  }
+
+  try {
+    await prisma.shiftReport.delete({
+      where: { id: reportId }
+    });
+    
+    revalidatePath("/cashier/history");
+    revalidatePath("/admin/verifications");
+    return { success: true };
+  } catch (error: any) {
+    console.error("deleteShiftReport error:", error);
+    return { success: false, error: "Gagal menghapus laporan" };
+  }
+}
+export async function getShiftTeamEntries(): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+
+  try {
+    const storeId = session.user.storeId;
+    const shiftType = await getCurrentShift(storeId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find all reports for this shift today in this store
+    const reports = await prisma.shiftReport.findMany({
+      where: {
+        storeId: storeId,
+        shiftType: shiftType,
+        date: {
+          gte: today,
+          lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+        },
+      },
+      include: {
+        digitalTransactions: { include: { creator: true, updater: true } },
+        expenditures: { include: { creator: true, updater: true } },
+      },
+    });
+
+    // Merge transactions and expenditures from all reports
+    const digitalTransactions = reports.flatMap(r => r.digitalTransactions);
+    const expenditures = reports.flatMap(r => r.expenditures);
+
+    return { 
+      success: true, 
+      data: serialize({ digitalTransactions, expenditures }) 
+    };
+  } catch (error: any) {
+    console.error("getShiftTeamEntries error:", error);
+    return { success: false, error: "Gagal mengambil data riwayat tim" };
+  }
 }

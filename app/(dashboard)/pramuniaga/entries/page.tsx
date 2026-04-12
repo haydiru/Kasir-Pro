@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { type DigitalTransaction, type Expenditure, formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { addShiftEntries, getOrCreateActiveReport, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry } from "@/app/actions/report";
+import { addShiftEntries, getOrCreateActiveReport, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries } from "@/app/actions/report";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -68,10 +68,10 @@ export default function PramuniagaEntriesPage() {
 
   const loadActiveShiftData = async () => {
     try {
-      const { report } = await getOrCreateActiveReport();
-      if (report) {
-        setSyncedDigitalTx(report.digitalTransactions || []);
-        setSyncedExpenditures(report.expenditures || []);
+      const res = await getShiftTeamEntries();
+      if (res.success && res.data) {
+        setSyncedDigitalTx(res.data.digitalTransactions || []);
+        setSyncedExpenditures(res.data.expenditures || []);
       }
     } catch (err) {
       toast.error("Gagal memuat riwayat shift.");
@@ -495,11 +495,15 @@ export default function PramuniagaEntriesPage() {
                                     <Button size="sm" className="h-7 text-xs" onClick={async () => {
                                         setIsUpdating(true);
                                         try {
-                                            await updateDigitalEntry(tx.id, editForm);
-                                            toast.success("Data diperbarui");
-                                            setEditingId(null);
-                                            loadActiveShiftData();
-                                        } catch (err) { toast.error("Gagal update"); }
+                                            const res = await updateDigitalEntry(tx.id, editForm);
+                                            if (res.success) {
+                                              toast.success("Data diperbarui");
+                                              setEditingId(null);
+                                              loadActiveShiftData();
+                                            } else {
+                                              toast.error(res.error || "Gagal update");
+                                            }
+                                        } catch (err) { toast.error("Terjadi kesalahan teknis"); }
                                         finally { setIsUpdating(false); }
                                     }} disabled={isUpdating}>
                                         {isUpdating ? "..." : "Simpan"}
@@ -546,9 +550,13 @@ export default function PramuniagaEntriesPage() {
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={async () => {
                                       if (confirm("Hapus data ini permanen?")) {
-                                          await deleteShiftEntry("digital", tx.id);
-                                          toast.success("Data dihapus");
-                                          loadActiveShiftData();
+                                          const res = await deleteShiftEntry("digital", tx.id);
+                                          if (res.success) {
+                                            toast.success("Data dihapus");
+                                            loadActiveShiftData();
+                                          } else {
+                                            toast.error(res.error || "Gagal menghapus");
+                                          }
                                       }
                                   }}>
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -615,11 +623,15 @@ export default function PramuniagaEntriesPage() {
                                     <Button size="sm" className="h-7 text-xs bg-rose-600 hover:bg-rose-700 text-white" onClick={async () => {
                                         setIsUpdating(true);
                                         try {
-                                            await updateExpenditureEntry(ex.id, editForm);
-                                            toast.success("Pengeluaran diperbarui");
-                                            setEditingId(null);
-                                            loadActiveShiftData();
-                                        } catch (err) { toast.error("Gagal update"); }
+                                            const res = await updateExpenditureEntry(ex.id, editForm);
+                                            if (res.success) {
+                                              toast.success("Pengeluaran diperbarui");
+                                              setEditingId(null);
+                                              loadActiveShiftData();
+                                            } else {
+                                              toast.error(res.error || "Gagal update");
+                                            }
+                                        } catch (err) { toast.error("Terjadi kesalahan teknis"); }
                                         finally { setIsUpdating(false); }
                                     }} disabled={isUpdating}>
                                         {isUpdating ? "..." : "Simpan"}
@@ -669,9 +681,13 @@ export default function PramuniagaEntriesPage() {
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={async () => {
                                       if (confirm("Hapus data ini permanen?")) {
-                                          await deleteShiftEntry("expenditure", ex.id);
-                                          toast.success("Data dihapus");
-                                          loadActiveShiftData();
+                                          const res = await deleteShiftEntry("expenditure", ex.id);
+                                          if (res.success) {
+                                            toast.success("Data dihapus");
+                                            loadActiveShiftData();
+                                          } else {
+                                            toast.error(res.error || "Gagal menghapus");
+                                          }
                                       }
                                   }}>
                                     <Trash2 className="h-3.5 w-3.5" />

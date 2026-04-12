@@ -2,36 +2,51 @@
 
 import { signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export async function authenticate(
   prevState: string | undefined,
   formData: FormData,
 ) {
+  let isSuccess = false;
+  let errorMessage = "";
+
   try {
-    await signIn("credentials", formData);
+    const data = Object.fromEntries(formData);
+    // Use redirect: false to handle it manually and avoid NEXT_REDIRECT inside catch
+    const result = await signIn("credentials", { ...data, redirect: false });
+    
+    if (result?.error) {
+      errorMessage = "Login gagal. Email atau PIN salah.";
+    } else {
+      isSuccess = true;
+    }
   } catch (error: any) {
     if (error instanceof AuthError) {
-      console.error("Auth Error Type:", error.type, "Message:", error.message);
       switch (error.type) {
         case "CredentialsSignin":
-          return "Login gagal. Email atau PIN salah.";
+          errorMessage = "Login gagal. Email atau PIN salah.";
+          break;
         case "CallbackRouteError":
-          return "Terjadi kesalahan sistem pada rute autentikasi. Periksa koneksi database.";
+          errorMessage = "Terjadi kesalahan sistem pada rute autentikasi.";
+          break;
         default:
-          return `Terjadi kesalahan sistem: ${error.type}`;
+          errorMessage = `Terjadi kesalahan sistem: ${error.type}`;
       }
+    } else {
+      console.error("Unexpected Auth Error:", error);
+      errorMessage = "Terjadi kesalahan koneksi sistem.";
     }
-    
-    // Catch-all for database connection errors or other crashes
-    // This prevents the "Unexpected response" error on the client
-    const errorMessage = error.message || String(error);
-    if (errorMessage.includes("NEXT_REDIRECT")) {
-      throw error; // Let Next.js handle redirects
-    }
-    
-    console.error("Unexpected Auth Error:", error);
-    return `Gagal masuk: ${errorMessage.split('\n')[0]}`; // Return only the first line of error to UI
   }
+
+  if (isSuccess) {
+    // Clear router cache to ensure session is recognized everywhere
+    revalidatePath("/", "layout");
+    redirect("/dashboard");
+  }
+
+  return errorMessage;
 }
 
 export async function logOut() {

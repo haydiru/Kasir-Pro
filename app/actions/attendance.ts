@@ -3,77 +3,173 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { serialize, ActionResponse } from "@/lib/serialize";
 
-export async function getActiveAttendance() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
+export async function getActiveAttendance(): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
 
-  const attendance = await prisma.attendance.findFirst({
-    where: {
-      userId: session.user.id,
-      clockOut: null,
-    },
-    orderBy: { clockIn: "desc" },
-  });
-
-  return attendance;
-}
-
-export async function checkIn(data: { shiftType: string; actingAsCashier: boolean }) {
-  const session = await auth();
-  if (!session?.user?.id || !session?.user?.storeId) throw new Error("Unauthorized");
-
-  const existing = await getActiveAttendance();
-  if (existing) throw new Error("Sudah ada presensi aktif");
-
-  const attendance = await prisma.attendance.create({
-    data: {
-      userId: session.user.id,
-      storeId: session.user.storeId,
-      shiftType: data.shiftType,
-      actingAsCashier: data.actingAsCashier,
-      clockIn: new Date(),
-    },
-  });
-
-  revalidatePath("/attendance");
-  return attendance;
-}
-
-export async function clockOut(id: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
-  await prisma.attendance.update({
-    where: { id },
-    data: {
-      clockOut: new Date(),
-    },
-  });
-
-  revalidatePath("/attendance");
-  return { success: true };
-}
-
-export async function getTodayAttendanceLog() {
-  const session = await auth();
-  if (!session?.user?.storeId) return [];
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const logs = await prisma.attendance.findMany({
-    where: {
-      storeId: session.user.storeId,
-      clockIn: {
-        gte: today,
+    const attendance = await prisma.attendance.findFirst({
+      where: {
+        userId: session.user.id,
+        clockOut: null,
       },
-    },
-    include: {
-      user: true,
-    },
-    orderBy: { clockIn: "desc" },
-  });
+      orderBy: { clockIn: "desc" },
+    });
 
-  return logs;
+    return { 
+      success: true, 
+      data: serialize(attendance) 
+    };
+  } catch (error: any) {
+    console.error("getActiveAttendance error:", error);
+    return { success: false, error: error.message || "Gagal mengambil data presensi aktif" };
+  }
+}
+
+export async function checkIn(data: { shiftType: string; actingAsCashier: boolean }): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || !session?.user?.storeId) return { success: false, error: "Unauthorized" };
+
+    const existingRes = await getActiveAttendance();
+    if (existingRes.success && existingRes.data) {
+      return { success: false, error: "Sudah ada presensi aktif" };
+    }
+
+    const attendance = await prisma.attendance.create({
+      data: {
+        userId: session.user.id,
+        storeId: session.user.storeId,
+        shiftType: data.shiftType,
+        actingAsCashier: data.actingAsCashier,
+        clockIn: new Date(),
+      },
+    });
+
+    revalidatePath("/attendance");
+    return { 
+      success: true, 
+      data: serialize(attendance) 
+    };
+  } catch (error: any) {
+    console.error("checkIn error:", error);
+    return { success: false, error: error.message || "Gagal melakukan clock-in" };
+  }
+}
+
+export async function clockOut(id: string): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+    const updated = await prisma.attendance.update({
+      where: { id },
+      data: {
+        clockOut: new Date(),
+      },
+    });
+
+    revalidatePath("/attendance");
+    return { success: true, data: serialize(updated) };
+  } catch (error: any) {
+    console.error("clockOut error:", error);
+    return { success: false, error: "Gagal melakukan clock-out" };
+  }
+}
+
+export async function getTodayAttendanceLog(): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) return { success: true, data: [] };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const logs = await prisma.attendance.findMany({
+      where: {
+        storeId: session.user.storeId,
+        clockIn: {
+          gte: today,
+        },
+      },
+      include: {
+        user: true,
+      },
+      orderBy: { clockIn: "asc" }, // Ascending so we process chronologically
+    });
+
+    // Aggregate by user + shift
+    const grouped = new Map<string, any>();
+
+    for (const log of logs) {
+      const key = log.userId;
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+            ...log,
+            shiftList: [log.shiftType]
+        });
+      } else {
+        // Concatenate unique shift names
+        if (!existing.shiftList.includes(log.shiftType)) {
+            existing.shiftList.push(log.shiftType);
+            existing.shiftType = existing.shiftList.join(", ");
+        }
+
+        // Update first clock-in
+        if (log.clockIn < existing.clockIn) {
+            existing.clockIn = log.clockIn;
+        }
+        
+        // Update last clock-out
+        if (existing.clockOut === null || log.clockOut === null) {
+            existing.clockOut = null;
+        } else if (log.clockOut > existing.clockOut) {
+            existing.clockOut = log.clockOut;
+        }
+      }
+    }
+
+    // Convert back to array and sort descending by clockIn for UI
+    const result = Array.from(grouped.values()).sort((a, b) => b.clockIn.getTime() - a.clockIn.getTime());
+
+    return { 
+      success: true, 
+      data: serialize(result) 
+    };
+  } catch (error: any) {
+    console.error("getTodayAttendanceLog error:", error);
+    return { success: false, error: "Gagal mengambil log presensi hari ini" };
+  }
+}
+export async function deleteAttendanceLogs(userId: string, dateStr: string): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "admin" && session.user.role !== "super_admin")) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const date = new Date(dateStr);
+    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+
+    await prisma.attendance.deleteMany({
+      where: {
+        userId,
+        clockIn: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    revalidatePath("/attendance");
+    return { success: true };
+  } catch (error: any) {
+    console.error("deleteAttendanceLogs error:", error);
+    return { success: false, error: "Gagal menghapus log presensi" };
+  }
 }

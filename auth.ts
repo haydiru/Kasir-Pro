@@ -8,12 +8,14 @@ declare module "next-auth" {
   interface User {
     role?: string;
     storeId?: string;
+    storeName?: string;
   }
   interface Session {
     user: {
       id: string;
       role: string;
       storeId: string;
+      storeName: string;
     } & DefaultSession["user"];
   }
 }
@@ -36,6 +38,7 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
 
             const user = await prisma.user.findUnique({
               where: { email },
+              include: { store: true }
             });
 
             if (!user) {
@@ -52,6 +55,7 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
                 email: user.email,
                 role: user.role,
                 storeId: user.storeId,
+                storeName: user.store?.name || "KasirPro Store",
               };
             }
           } catch (error) {

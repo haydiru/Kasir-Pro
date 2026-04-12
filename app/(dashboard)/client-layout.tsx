@@ -7,22 +7,28 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export function DashboardClientLayout({
   children,
-  user
+  user,
+  actingAsCashier
 }: {
   children: React.ReactNode;
   user: any;
+  actingAsCashier?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
-      <Sidebar className="hidden md:flex" user={user} />
+      <Sidebar className="hidden md:flex" user={user} actingAsCashier={actingAsCashier} />
 
       {/* Mobile sidebar */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-64 p-0">
-          <Sidebar onNavigate={() => setMobileOpen(false)} user={user} />
+          <Sidebar 
+            onNavigate={() => setMobileOpen(false)} 
+            user={user} 
+            actingAsCashier={actingAsCashier} 
+          />
         </SheetContent>
       </Sheet>
 

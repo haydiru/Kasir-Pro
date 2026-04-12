@@ -46,7 +46,7 @@ export default function LoginPage() {
       <Card className="border-0 shadow-xl shadow-black/5 dark:shadow-black/30 backdrop-blur-sm bg-card/80">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Masuk ke Akun</CardTitle>
-          <CardDescription>Pilih akun demo untuk melanjutkan</CardDescription>
+          <CardDescription>Masukkan kredensial Anda untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-5">

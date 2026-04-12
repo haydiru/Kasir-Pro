@@ -46,12 +46,13 @@ interface SidebarProps {
   className?: string;
   onNavigate?: () => void;
   user?: any;
+  actingAsCashier?: boolean;
 }
 
-export function Sidebar({ className, onNavigate, user }: SidebarProps) {
+export function Sidebar({ className, onNavigate, user, actingAsCashier }: SidebarProps) {
   const pathname = usePathname();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-  const isCashier = user?.role === "cashier";
+  const isCashier = user?.role === "cashier" || !!actingAsCashier;
 
   const NavItem = ({
     item,
@@ -118,7 +119,7 @@ export function Sidebar({ className, onNavigate, user }: SidebarProps) {
         </div>
         <div className="flex flex-col">
           <span className="text-sm font-bold tracking-tight">KasirPro</span>
-          <span className="text-[11px] text-muted-foreground leading-none">Minimart Sejahtera</span>
+          <span className="text-[11px] text-muted-foreground leading-none">{user?.storeName || "KasirPro Store"}</span>
         </div>
       </div>
 
@@ -138,7 +139,7 @@ export function Sidebar({ className, onNavigate, user }: SidebarProps) {
         )}
 
         {/* Kasir section */}
-        {(user?.role === "admin" || user?.role === "super_admin" || user?.role === "cashier") && (
+        {(user?.role === "admin" || user?.role === "super_admin" || user?.role === "cashier" || !!actingAsCashier) && (
           <>
             <p className="px-3 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Kasir

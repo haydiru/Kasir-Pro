@@ -15,6 +15,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,17 +47,20 @@ import {
   UploadCloud,
   UserSquare2,
   FileEdit,
+  ClipboardList,
 } from "lucide-react";
 import {
-  flipWebhooks,
   formatCurrency,
   type DigitalTransaction,
   type Expenditure,
 } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { getOrCreateActiveReport, saveCashierReport } from "@/app/actions/report";
+import { getActiveReport, createShiftReport, saveCashierReport } from "@/app/actions/report";
+import { getAvailableShifts } from "@/app/actions/attendance-shifts";
+import { getActiveAttendance } from "@/app/actions/attendance";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 // Generate unique ID
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -75,8 +87,9 @@ const emptyExpenditure = (): Expenditure => ({
 
 export default function CashierReportPage() {
   // Section 1: Shift Info
-  const today = new Date().toISOString().split("T")[0];
-  const [shiftType, setShiftType] = useState<"Pagi" | "Malam">("Pagi");
+  const todayDateStr = new Date().toISOString().split("T")[0];
+  const [shiftType, setShiftType] = useState<string>("");
+  const [availableShifts, setAvailableShifts] = useState<any[]>([]);
   const [startingCash, setStartingCash] = useState(500000);
   const [billMoneyReceived, setBillMoneyReceived] = useState(0);
 
@@ -95,9 +108,18 @@ export default function CashierReportPage() {
 
   // Status
   const [reportId, setReportId] = useState<string | null>(null);
-  const [status, setStatus] = useState<"Draft" | "Submitted">("Draft");
+  const [status, setStatus] = useState<"Draft" | "Submitted" | "Verified">("Draft");
   const [autoSaving, setAutoSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRevising, setIsRevising] = useState(false);
+  const [editReason, setEditReason] = useState("");
+  const [showRevisionDialog, setShowRevisionDialog] = useState(false);
+  const [reportOwnerName, setReportOwnerName] = useState<string>("");
+  const [actingAsCashier, setActingAsCashier] = useState(false);
+  const [noAttendance, setNoAttendance] = useState(false);
+  const [noActiveReport, setNoActiveReport] = useState(false);
+  const [activeShiftInfo, setActiveShiftInfo] = useState<{name: string, date: string} | null>(null);
+  const [isCreatingReport, setIsCreatingReport] = useState(false);
 
   const { data: session } = useSession();
   const router = useRouter();
@@ -106,7 +128,36 @@ export default function CashierReportPage() {
   useEffect(() => {
     async function init() {
       try {
-        const { report, isReadOnly } = await getOrCreateActiveReport();
+        const [reportRes, attendanceRes] = await Promise.all([
+            getActiveReport(),
+            getActiveAttendance()
+        ]);
+
+        if (attendanceRes.success && attendanceRes.data) {
+            setActingAsCashier(!!attendanceRes.data.actingAsCashier);
+        }
+
+        if (!reportRes.success) {
+          if (reportRes.error === "AttendanceRequired") {
+            setNoAttendance(true);
+          } else if (reportRes.error === "NoActiveReport") {
+            setNoActiveReport(true);
+            setActiveShiftInfo({
+              name: reportRes.data?.shiftType,
+              date: reportRes.data?.date ? new Date(reportRes.data.date).toLocaleDateString('id-ID', { 
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric' 
+              }) : ""
+            });
+          } else {
+            toast.error(reportRes.error || "Gagal memuat laporan.");
+          }
+          return;
+        }
+
+        const { report } = reportRes.data;
         if (report) {
           setReportId(report.id);
           setShiftType(report.shiftType as any);
@@ -116,6 +167,7 @@ export default function CashierReportPage() {
           setBillMoneyReceived(report.billMoneyReceived);
           setManualCashCount(report.manualCashCount);
           setStatus(report.status as any);
+          setReportOwnerName(report.user?.name || "");
           
           if (report.digitalTransactions) {
             setDigitalTx(report.digitalTransactions.map((t: any) => ({
@@ -138,13 +190,20 @@ export default function CashierReportPage() {
         setIsLoading(false);
       }
     }
-    init();
-  }, []);
+    
+    async function loadShifts() {
+        const res = await getAvailableShifts();
+        if (res.success && res.data) {
+            setAvailableShifts(res.data);
+        }
+    }
 
-  // Flip warning check
-  const unmatchedFlips = flipWebhooks.filter(
-    (fw) => !fw.matched && !digitalTx.some((dt) => dt.flipId === fw.flipId)
-  );
+    init();
+    loadShifts();
+  }, [router]);
+
+  // Flip warning check (isolated mock data)
+  const unmatchedFlips: any[] = [];
 
   // Calculate expected cash
   const digitalCashIn = digitalTx
@@ -162,8 +221,8 @@ export default function CashierReportPage() {
 
   // Only Uang Kasir affects the cash drawer. Digital grossAmount (tunai) masuk ke rekap cash.
   // Laba Digital TIDAK masuk ke kalkulasi cash (hanya untuk statistik DB).
-  const expectedCash = startingCash + posCash + digitalCashIn - expFromCashier;
-  const variance = manualCashCount - expectedCash;
+  const expectedCash = Math.round(startingCash + posCash + digitalCashIn - expFromCashier);
+  const variance = Math.round(manualCashCount - expectedCash);
 
   // Auto-save simulation (debounce)
   useEffect(() => {
@@ -231,7 +290,8 @@ export default function CashierReportPage() {
 
   // Manual save
   const handleSave = async (isAuto = false) => {
-    if (!reportId || status === "Submitted") return;
+    // Prevent auto-save if already submitted and not in revision mode
+    if (!reportId || (status === "Submitted" && !isRevising)) return;
     
     if (!isAuto) setAutoSaving(true);
     
@@ -244,7 +304,8 @@ export default function CashierReportPage() {
         manualCashCount,
         digitalTransactions: digitalTx,
         expenditures: expenditures,
-        isSubmit: false
+        isSubmit: false,
+        editReason: isRevising ? editReason : undefined
     });
 
     if (!isAuto) setAutoSaving(false);
@@ -254,17 +315,112 @@ export default function CashierReportPage() {
         icon: <Save className="h-4 w-4" />,
         description: "Perubahan terakhir berhasil disimpan secara manual.",
       });
+      if (isRevising) {
+          setIsRevising(false);
+          setEditReason("");
+      }
+    } else if (!isAuto && !res.success) {
+      toast.error(res.error);
     }
   };
 
-  const inputDisabled = status === "Submitted";
+  const handleCreateReport = async () => {
+    setIsCreatingReport(true);
+    try {
+      const res = await createShiftReport();
+      if (res.success && res.data?.report) {
+        const { report } = res.data;
+        setReportId(report.id);
+        setShiftType(report.shiftType);
+        setStartingCash(report.startingCash);
+        setStatus(report.status);
+        setReportOwnerName(report.user?.name || "");
+        setNoActiveReport(false);
+        toast.success("Laporan shift dimulai!");
+      } else {
+        toast.error(res.error || "Gagal membuat laporan");
+      }
+    } catch (err) {
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setIsCreatingReport(false);
+    }
+  };
+
+  const inputDisabled = status === "Submitted" && !isRevising;
 
   if (isLoading) {
     return (
         <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-muted-foreground">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="animate-pulse">Menghubungkan ke Laporan Shift Aktif...</p>
+            <p className="animate-pulse font-medium">Menghubungkan ke Laporan Shift Aktif...</p>
         </div>
+    );
+  }
+
+  if (noAttendance) {
+    return (
+      <div className="max-w-md mx-auto py-12 text-center space-y-6">
+        <div className="mx-auto w-20 h-20 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+          <Clock className="h-10 w-10 text-amber-500" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">Harap Absensi Dulu</h2>
+          <p className="text-muted-foreground">
+            Anda harus melakukan Clock-In (Mulai Kerja) di menu Presensi agar sistem dapat merekap laporan shift Anda dengan benar.
+          </p>
+        </div>
+        <Button asChild size="lg" className="w-full">
+          <Link href="/attendance">
+            Ke Menu Presensi
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (noActiveReport) {
+    return (
+      <div className="max-w-md mx-auto py-12 text-center space-y-8">
+        <div className="mx-auto w-24 h-24 rounded-full bg-primary/5 flex items-center justify-center border-4 border-white shadow-xl">
+           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+            <ClipboardList className="h-8 w-8 text-primary" />
+           </div>
+        </div>
+        
+        <div className="space-y-3">
+          <h2 className="text-2xl font-black tracking-tight text-foreground">Siap Memulai Shift?</h2>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-bold uppercase tracking-wider">
+            {activeShiftInfo?.name} • {activeShiftInfo?.date}
+          </div>
+          <p className="text-muted-foreground text-sm max-w-[280px] mx-auto">
+            Sistem akan mencatat laporan digital, pengeluaran, dan rekap selisih untuk shift ini.
+          </p>
+        </div>
+
+        <div className="space-y-4 pt-4">
+          <Button 
+            size="lg" 
+            className="w-full h-14 text-base font-bold rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            onClick={handleCreateReport}
+            disabled={isCreatingReport}
+          >
+            {isCreatingReport ? (
+              <span className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Menyiapkan Laporan...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Plus className="h-5 w-5" /> Buat Laporan {activeShiftInfo?.name}
+              </span>
+            )}
+          </Button>
+          <p className="text-[10px] text-muted-foreground">
+            Laporan dibuat berdasarkan jam absensi kerja Anda.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -283,7 +439,7 @@ export default function CashierReportPage() {
           )}
         </div>
         <span className="text-xs text-muted-foreground">
-          {today} • Shift {shiftType}
+          {todayDateStr} • {shiftType}
         </span>
       </div>
 
@@ -318,21 +474,28 @@ export default function CashierReportPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Kasir</Label>
-              <Input value="Andi Wijaya" disabled className="bg-muted/50" />
+              <Input value={reportOwnerName || session?.user?.name || "Kasir"} disabled className="bg-muted/50" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Shift</Label>
               <Select
                 value={shiftType}
-                onValueChange={(v) => setShiftType(v as "Pagi" | "Malam")}
+                onValueChange={(v) => setShiftType(v)}
                 disabled={inputDisabled}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Pilih Shift" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Pagi">☀️ Pagi</SelectItem>
-                  <SelectItem value="Malam">🌙 Malam</SelectItem>
+                  {availableShifts.map((s) => (
+                      <SelectItem key={s.id} value={s.name}>
+                        {s.name} ({s.startTime}-{s.endTime})
+                      </SelectItem>
+                  ))}
+                  {/* Fallback if current shift is not in available (e.g. settings changed) */}
+                  {shiftType && !availableShifts.find(s => s.name === shiftType) && (
+                      <SelectItem value={shiftType}>{shiftType}</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -436,9 +599,9 @@ export default function CashierReportPage() {
             <div className="space-y-3">
               {digitalTx.map((tx, idx) => {
                 const isCreator = tx.createdBy === session?.user?.id;
-                const isCashierRole = session?.user?.role === "cashier";
+                const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
                 const canEdit = !inputDisabled && (isCreator || isCashierRole);
-                const canDelete = !inputDisabled && isCreator;
+                const canDelete = !inputDisabled && (isCreator || actingAsCashier);
 
                 return (
                   <div key={tx.id} className="rounded-lg border p-4 space-y-3">
@@ -598,9 +761,9 @@ export default function CashierReportPage() {
               {expenditures.map((ex, idx) => {
                 const exTotal = ex.amountFromBill + ex.amountFromCashier + ex.amountFromTransfer;
                 const isCreator = ex.createdBy === session?.user?.id;
-                const isCashierRole = session?.user?.role === "cashier";
+                const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
                 const canEdit = !inputDisabled && (isCreator || isCashierRole);
-                const canDelete = !inputDisabled && isCreator;
+                const canDelete = !inputDisabled && (isCreator || actingAsCashier);
 
                 return (
                   <div key={ex.id} className="rounded-lg border p-4 space-y-3">
@@ -899,14 +1062,58 @@ export default function CashierReportPage() {
         </div>
       )}
 
-      {status === "Submitted" && (
-        <div className="flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-4">
-          <CheckCircle2 className="h-5 w-5 text-amber-500" />
-          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-            Laporan telah di-submit. Menunggu verifikasi Admin.
-          </p>
+      {status === "Submitted" && !isRevising && (
+        <div className="flex flex-col items-center gap-4 mt-8">
+            <div className="flex items-center justify-center gap-2 w-full rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-4">
+                <CheckCircle2 className="h-5 w-5 text-amber-500" />
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Laporan telah di-submit. Menunggu verifikasi Admin.
+                </p>
+            </div>
+            <Button 
+                variant="outline" 
+                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                onClick={() => setIsRevising(true)}
+            >
+                <FileEdit className="mr-2 h-4 w-4" />
+                Revisi Laporan
+            </Button>
         </div>
       )}
+
+      {isRevising && (
+          <Card className="border-amber-200 bg-amber-50/30 mt-8">
+              <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                      <Label htmlFor="revision-reason" className="text-amber-800 font-medium">Alasan Revisi (Wajib)</Label>
+                      <Textarea 
+                          id="revision-reason"
+                          placeholder="Jelaskan bagian mana yang diubah dan alasannya..."
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          className="bg-white"
+                      />
+                  </div>
+                  <div className="flex justify-end gap-3">
+                      <Button variant="ghost" onClick={() => {
+                          setIsRevising(false);
+                          setEditReason("");
+                      }}>
+                          Batal
+                      </Button>
+                      <Button 
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                        disabled={!editReason.trim()}
+                        onClick={() => handleSave()}
+                      >
+                          Simpan Revisi
+                      </Button>
+                  </div>
+              </CardContent>
+          </Card>
+      )}
+
+      <div className="h-20" /> {/* Spacer */}
     </div>
   );
 }

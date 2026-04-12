@@ -56,6 +56,10 @@ model Attendance {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([storeId])
+  @@index([clockIn])
 }
 
 model ShiftReport {
@@ -70,6 +74,7 @@ model ShiftReport {
   manualCashCount    Float    @default(0)
   finalAdminVariance Float?
   adminNotes         String?
+  cashierNote        String?
   
   submittedAt        DateTime?
   verifiedAt         DateTime?
@@ -84,6 +89,11 @@ model ShiftReport {
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@index([userId])
+  @@index([storeId])
+  @@index([date])
+  @@index([shiftType])
 }
 
 model DigitalTransaction {

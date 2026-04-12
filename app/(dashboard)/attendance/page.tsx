@@ -26,9 +26,9 @@ import {
   LogOut,
   Timer,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 import {
-  attendances as mockAttendances,
   formatTime,
   getRoleLabel,
   type ShiftType,
@@ -39,7 +39,8 @@ import {
   getActiveAttendance, 
   checkIn, 
   clockOut, 
-  getTodayAttendanceLog 
+  getTodayAttendanceLog,
+  deleteAttendanceLogs
 } from "@/app/actions/attendance";
 import { getAvailableShifts } from "@/app/actions/attendance-shifts";
 
@@ -67,8 +68,8 @@ export default function AttendancePage() {
     if (status !== "authenticated") return;
 
     let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = 2000; // 2 seconds
+    const maxRetries = 2;
+    const retryDelay = 2000;
 
     async function sync(isRetry = false) {
       if (isRetry) {
@@ -76,13 +77,14 @@ export default function AttendancePage() {
       }
 
       try {
-        const [active, logs, shifts] = await Promise.all([
+        const [activeRes, logsRes, shiftsRes] = await Promise.all([
           getActiveAttendance(),
           getTodayAttendanceLog(),
           getAvailableShifts()
         ]);
 
-        if (active) {
+        if (activeRes.success && activeRes.data) {
+          const active = activeRes.data;
           setIsClockedIn(true);
           setClockInTime(new Date(active.clockIn));
           setShiftType(active.shiftType);
@@ -90,15 +92,37 @@ export default function AttendancePage() {
           setActiveId(active.id);
         }
 
-        setTodayLogs(logs);
-        setAvailableShifts(shifts);
-        
-        // Default to first available shift if not clocked in
-        if (!active && shifts.length > 0) {
-          setShiftType(shifts[0].name);
-        } else if (!active && shifts.length === 0) {
-           // Fallback if DB empty (should not happen after admin setup)
-           setShiftType("Pagi");
+        if (logsRes.success) setTodayLogs(logsRes.data || []);
+        if (shiftsRes.success) {
+          const shifts = shiftsRes.data || [];
+          setAvailableShifts(shifts);
+          
+          // Default to current shift if not clocked in
+          if (!activeRes.data && shifts.length > 0) {
+            const now = new Date();
+            const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+            
+            let detectedShift = shifts[0].name;
+            for (const shift of shifts) {
+                const [startH, startM] = shift.startTime.split(":").map(Number);
+                const [endH, endM] = shift.endTime.split(":").map(Number);
+                const startMin = startH * 60 + startM;
+                const endMin = endH * 60 + endM;
+
+                if (startMin < endMin) {
+                    if (currentTotalMinutes >= startMin && currentTotalMinutes < endMin) {
+                        detectedShift = shift.name;
+                        break;
+                    }
+                } else {
+                    if (currentTotalMinutes >= startMin || currentTotalMinutes < endMin) {
+                        detectedShift = shift.name;
+                        break;
+                    }
+                }
+            }
+            setShiftType(detectedShift);
+          }
         }
 
         setIsLoading(false);
@@ -136,7 +160,10 @@ export default function AttendancePage() {
 
   const handleClockIn = async () => {
     try {
-      const att = await checkIn({ shiftType, actingAsCashier });
+      const res = await checkIn({ shiftType, actingAsCashier });
+      if (!res.success) throw new Error(res.error);
+
+      const att = res.data;
       setIsClockedIn(true);
       setClockInTime(new Date(att.clockIn));
       setActiveId(att.id);
@@ -145,8 +172,8 @@ export default function AttendancePage() {
         description: `Shift ${shiftType} dimulai.${actingAsCashier ? " (Login sebagai Kasir)" : ""}`,
       });
       // Refresh logs
-      const logs = await getTodayAttendanceLog();
-      setTodayLogs(logs);
+      const logsRes = await getTodayAttendanceLog();
+      if (logsRes.success) setTodayLogs(logsRes.data);
     } catch (err: any) {
       toast.error(err.message || "Gagal Clock-In");
     }
@@ -155,19 +182,49 @@ export default function AttendancePage() {
   const handleClockOut = async () => {
     if (!activeId) return;
     try {
-      await clockOut(activeId);
+      const res = await clockOut(activeId);
+      if (!res.success) throw new Error(res.error);
+
       setIsClockedIn(false);
       setActiveId(null);
       toast.success("Clock-Out berhasil!", {
         description: `Durasi kerja: ${formatElapsed(elapsedSeconds)}`,
       });
       // Refresh logs
-      const logs = await getTodayAttendanceLog();
-      setTodayLogs(logs);
-    } catch (err) {
-      toast.error("Gagal Clock-Out");
+      const logsRes = await getTodayAttendanceLog();
+      if (logsRes.success) setTodayLogs(logsRes.data);
+    } catch (err: any) {
+      toast.error(err.message || "Gagal Clock-Out");
     }
   };
+
+  const handleDeleteLog = async (userId: string, date: string) => {
+    if (!confirm("Hapus semua log presensi user ini untuk hari ini?")) return;
+    
+    try {
+      const res = await deleteAttendanceLogs(userId, date);
+      if (res.success) {
+        toast.success("Log berhasil dihapus");
+        // Refresh logs
+        const logsRes = await getTodayAttendanceLog();
+        if (logsRes.success) setTodayLogs(logsRes.data);
+        
+        // If the deleted user was the current logged in user and they were clocked in,
+        // we should probably sync their local state too.
+        if (session?.user?.id === userId) {
+          setIsClockedIn(false);
+          setActiveId(null);
+          setClockInTime(null);
+        }
+      } else {
+        toast.error(res.error || "Gagal menghapus log");
+      }
+    } catch (err) {
+      toast.error("Terjadi kesalahan");
+    }
+  };
+
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
 
   if (isLoading) {
       return (
@@ -180,7 +237,6 @@ export default function AttendancePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Clock Display */}
       <Card className="border-0 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 p-8 text-center">
           <p className="text-sm text-muted-foreground mb-1">Waktu Sekarang</p>
@@ -204,7 +260,6 @@ export default function AttendancePage() {
         <CardContent className="p-6">
           {!isClockedIn ? (
             <div className="space-y-5">
-              {/* Shift selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Pilih Shift</label>
                 <Select value={shiftType} onValueChange={(v) => setShiftType(v)}>
@@ -230,7 +285,6 @@ export default function AttendancePage() {
                 </Select>
               </div>
 
-              {/* Override role */}
               <div className="flex items-center gap-3 rounded-lg border border-dashed p-4">
                 <input
                   type="checkbox"
@@ -247,7 +301,6 @@ export default function AttendancePage() {
                 </label>
               </div>
 
-              {/* Clock In button */}
               <Button
                 size="lg"
                 className="w-full h-14 text-lg font-semibold"
@@ -259,7 +312,6 @@ export default function AttendancePage() {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Status */}
               <div className="flex items-center justify-center gap-3">
                 <span className="relative flex h-3 w-3">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -276,7 +328,6 @@ export default function AttendancePage() {
                 )}
               </div>
 
-              {/* Timer */}
               <div className="text-center">
                 <p className="text-xs text-muted-foreground mb-1">Durasi Kerja</p>
                 <div className="flex items-center justify-center gap-2">
@@ -290,7 +341,6 @@ export default function AttendancePage() {
                 </p>
               </div>
 
-              {/* Clock Out button */}
               <Button
                 size="lg"
                 variant="destructive"
@@ -305,7 +355,6 @@ export default function AttendancePage() {
         </CardContent>
       </Card>
 
-      {/* Today's Attendance Log */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -323,6 +372,7 @@ export default function AttendancePage() {
                 <TableHead>Clock-In</TableHead>
                 <TableHead>Clock-Out</TableHead>
                 <TableHead>Status</TableHead>
+                {isAdmin && <TableHead className="w-10">Aksi</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -356,6 +406,19 @@ export default function AttendancePage() {
                       </Badge>
                     )}
                   </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteLog(att.userId, att.clockIn)}
+                        title="Hapus Log"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {todayLogs.length === 0 && !isLoading && (
