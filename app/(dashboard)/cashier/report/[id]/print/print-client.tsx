@@ -8,7 +8,7 @@ import {
   calcExpectedCash,
   calcExpenditureSummary,
   getExpenditureTotal,
-} from "@/lib/mock-data";
+} from "@/lib/utils";
 
 export function PrintClient({ report }: { report: any }) {
   const expectedCash = calcExpectedCash(report);

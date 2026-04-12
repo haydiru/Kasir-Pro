@@ -31,8 +31,8 @@ import {
 import {
   formatTime,
   getRoleLabel,
-  type ShiftType,
-} from "@/lib/mock-data";
+} from "@/lib/utils";
+import { type ShiftType } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { 

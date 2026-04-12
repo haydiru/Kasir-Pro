@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { formatCurrency, formatTime, calcExpectedCash, getRoleLabel } from "@/lib/mock-data";
+import { formatCurrency, formatTime, calcExpectedCash, getRoleLabel } from "@/lib/utils";
 
 export default async function AdminDashboardPage() {
   const session = await auth();

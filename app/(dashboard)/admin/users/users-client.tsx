@@ -43,7 +43,8 @@ import {
   Search,
   CalendarRange,
 } from "lucide-react";
-import { getRoleBadgeVariant, getRoleLabel, type Role } from "@/lib/mock-data";
+import { getRoleBadgeVariant, getRoleLabel } from "@/lib/utils";
+import { type Role } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { createStoreUser, updateStoreUser, resetUserPin } from "@/app/actions/admin";
 

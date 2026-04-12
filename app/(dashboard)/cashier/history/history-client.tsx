@@ -35,13 +35,14 @@ import {
   FileEdit,
   Trash2,
 } from "lucide-react";
-import {
-  formatCurrency,
-  formatDateTime,
-  calcExpectedCash,
+import { 
+  formatCurrency, 
+  formatDateTime, 
+  getRoleLabel, 
   getStatusColor,
-  getExpenditureTotal,
-} from "@/lib/mock-data";
+  calcExpectedCash,
+  getExpenditureTotal
+} from "@/lib/utils";
 import Link from "next/link";
 import { deleteShiftReport } from "@/app/actions/report";
 import { useSession } from "next-auth/react";

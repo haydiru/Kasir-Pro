@@ -31,7 +31,15 @@ import {
   AlertTriangle,
   Trash2,
 } from "lucide-react";
-import { formatCurrency, formatDateTime, calcExpectedCash, getStatusColor, getExpenditureTotal } from "@/lib/mock-data";
+import { 
+  formatCurrency, 
+  formatDateTime, 
+  getRoleLabel, 
+  getStatusColor, 
+  getRoleBadgeVariant,
+  calcExpectedCash,
+  getExpenditureTotal
+} from "@/lib/utils";
 import { toast } from "sonner";
 import { verifyShiftReport } from "@/app/actions/admin";
 import { deleteShiftReport } from "@/app/actions/report";

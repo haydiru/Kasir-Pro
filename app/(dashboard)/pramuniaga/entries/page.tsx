@@ -25,7 +25,8 @@ import {
   FileEdit,
   Save
 } from "lucide-react";
-import { type DigitalTransaction, type Expenditure, formatCurrency } from "@/lib/mock-data";
+import { type DigitalTransaction, type Expenditure } from "@/lib/mock-data";
+import { formatCurrency, formatDateTime, getRoleLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { addShiftEntries, getOrCreateActiveReport, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries } from "@/app/actions/report";
 import { useEffect } from "react";
