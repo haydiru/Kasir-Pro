@@ -11,13 +11,15 @@ export async function authenticate(
     await signIn("credentials", formData);
   } catch (error) {
     if (error instanceof AuthError) {
+      console.error("AuthError Details:", error.type, error.message);
       switch (error.type) {
         case "CredentialsSignin":
           return "Login gagal. Email atau PIN salah.";
         default:
-          return "Terjadi kesalahan sistem.";
+          return "Terjadi kesalahan sistem: " + error.type;
       }
     }
+    console.error("Unexpected Error during Auth:", error);
     throw error;
   }
 }
