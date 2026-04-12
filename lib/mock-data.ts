@@ -3,7 +3,7 @@
 // ============================================================
 
 export type Role = "super_admin" | "admin" | "cashier" | "pramuniaga";
-export type ShiftType = "Pagi" | "Malam";
+export type ShiftType = string;
 export type ReportStatus = "Draft" | "Submitted" | "Verified";
 
 export interface Store {

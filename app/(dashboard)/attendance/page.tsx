@@ -334,7 +334,9 @@ export default function AttendancePage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {att.shiftType === "Pagi" ? "☀️" : "🌙"} {att.shiftType}
+                      {att.shiftType?.toLowerCase().includes("pagi") ? "☀️" : 
+                       att.shiftType?.toLowerCase().includes("malam") ? "🌙" : "⏰"} 
+                      {" "}{att.shiftType}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm">
