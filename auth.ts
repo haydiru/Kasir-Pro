@@ -32,26 +32,39 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
         if (parsedCredentials.success) {
           const { email, pin } = parsedCredentials.data;
           
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
+          console.log("Attempting to find user with email:", email);
+          try {
+            const user = await prisma.user.findUnique({
+              where: { email },
+            });
 
-          if (!user) return null;
+            if (!user) {
+              console.log("Auth: User not found in database.");
+              return null;
+            }
 
-          const passwordsMatch = await bcrypt.compare(pin, user.pin);
+            console.log("Auth: User found, comparing PIN...");
+            const passwordsMatch = await bcrypt.compare(pin, user.pin);
 
-          if (passwordsMatch) {
-            return {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              storeId: user.storeId,
-            };
+            if (passwordsMatch) {
+              console.log("Auth: PIN matches, logging in...");
+              return {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                storeId: user.storeId,
+              };
+            } else {
+              console.log("Auth: PIN does not match.");
+            }
+          } catch (dbError) {
+            console.error("Auth Database Error:", dbError);
+            throw dbError;
           }
         }
 
-        console.log("Invalid credentials");
+        console.log("Invalid credentials or parsing failed");
         return null;
       },
     }),
