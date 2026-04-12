@@ -2,8 +2,6 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./auth.config";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 
 // Extend the built-in session types
 declare module "next-auth" {
@@ -32,26 +30,37 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
         if (parsedCredentials.success) {
           const { email, pin } = parsedCredentials.data;
           
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
+          try {
+            const { prisma } = await import("@/lib/prisma");
+            const bcrypt = await import("bcryptjs");
 
-          if (!user) return null;
+            const user = await prisma.user.findUnique({
+              where: { email },
+            });
 
-          const passwordsMatch = await bcrypt.compare(pin, user.pin);
+            if (!user) {
+              console.log("Authorize: User not found", email);
+              return null;
+            }
 
-          if (passwordsMatch) {
-            return {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              storeId: user.storeId,
-            };
+            const passwordsMatch = await bcrypt.compare(pin, user.pin);
+
+            if (passwordsMatch) {
+              return {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                storeId: user.storeId,
+              };
+            }
+          } catch (error) {
+            console.error("Authorize error:", error);
+            return null;
           }
         }
 
-        console.log("Invalid credentials");
+        console.log("Invalid credentials or parsing failed");
         return null;
       },
     }),
