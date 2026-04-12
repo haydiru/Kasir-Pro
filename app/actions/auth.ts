@@ -9,17 +9,28 @@ export async function authenticate(
 ) {
   try {
     await signIn("credentials", formData);
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof AuthError) {
       console.error("Auth Error Type:", error.type, "Message:", error.message);
       switch (error.type) {
         case "CredentialsSignin":
           return "Login gagal. Email atau PIN salah.";
+        case "CallbackRouteError":
+          return "Terjadi kesalahan sistem pada rute autentikasi. Periksa koneksi database.";
         default:
           return `Terjadi kesalahan sistem: ${error.type}`;
       }
     }
-    throw error;
+    
+    // Catch-all for database connection errors or other crashes
+    // This prevents the "Unexpected response" error on the client
+    const errorMessage = error.message || String(error);
+    if (errorMessage.includes("NEXT_REDIRECT")) {
+      throw error; // Let Next.js handle redirects
+    }
+    
+    console.error("Unexpected Auth Error:", error);
+    return `Gagal masuk: ${errorMessage.split('\n')[0]}`; // Return only the first line of error to UI
   }
 }
 
