@@ -11,15 +11,14 @@ export async function authenticate(
     await signIn("credentials", formData);
   } catch (error) {
     if (error instanceof AuthError) {
-      console.error("AuthError Details:", error.type, error.message);
+      console.error("Auth Error Type:", error.type, "Message:", error.message);
       switch (error.type) {
         case "CredentialsSignin":
           return "Login gagal. Email atau PIN salah.";
         default:
-          return "Terjadi kesalahan sistem: " + error.type;
+          return `Terjadi kesalahan sistem: ${error.type}`;
       }
     }
-    console.error("Unexpected Error during Auth:", error);
     throw error;
   }
 }
@@ -68,16 +67,16 @@ export async function registerStore(prevState: string | undefined, formData: For
   if (!storeName || !adminName || !email || !pin) return "Mohon isi semua data yang diwajibkan.";
   if (pin.length < 4) return "PIN minimal 4 angka.";
 
-  const { prisma } = await import("@/lib/prisma");
-
-  // Check if email already exists
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) return "Email sudah terdaftar di sistem.";
-
-  const bcrypt = await import("bcryptjs");
-  const hashedPin = await bcrypt.hash(pin, 10);
-
   try {
+    const { prisma } = await import("@/lib/prisma");
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) return "Email sudah terdaftar di sistem.";
+
+    const bcrypt = await import("bcryptjs");
+    const hashedPin = await bcrypt.hash(pin, 10);
+
     // Transaction to ensure atomicity
     await prisma.$transaction(async (tx) => {
       // Create Store
@@ -112,7 +111,7 @@ export async function registerStore(prevState: string | undefined, formData: For
 
     return "SUCCESS";
   } catch (error: any) {
-    console.error("Registration Error:", error);
-    return "Gagal daftar: " + (error.message || "Kesalahan sistem");
+    console.error("Register Error:", error);
+    return `Gagal mendaftar: ${error.message || "Kesalahan koneksi database."}`;
   }
 }
