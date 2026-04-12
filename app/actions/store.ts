@@ -107,7 +107,7 @@ export async function deleteShiftSetting(shiftId: string) {
   }
 }
 
-export async function updateStoreDetails(formData: FormData) {
+export async function updateStoreDetails(prevState: any, formData: FormData) {
   const session = await auth();
   if (!session?.user || (session.user.role !== "admin" && session.user.role !== "super_admin")) {
     return { error: "Akses ditolak" };
