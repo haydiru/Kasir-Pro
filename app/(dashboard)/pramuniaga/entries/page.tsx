@@ -28,7 +28,7 @@ import {
 import { type DigitalTransaction, type Expenditure } from "@/lib/mock-data";
 import { formatCurrency, formatDateTime, getRoleLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { addShiftEntries, getOrCreateActiveReport, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries } from "@/app/actions/report";
+import { addShiftEntries, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries } from "@/app/actions/report";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
