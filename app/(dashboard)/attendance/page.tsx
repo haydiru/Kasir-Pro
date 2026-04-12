@@ -77,11 +77,15 @@ export default function AttendancePage() {
       }
 
       try {
-        const [activeRes, logsRes, shiftsRes] = await Promise.all([
-          getActiveAttendance(),
-          getTodayAttendanceLog(),
-          getAvailableShifts()
-        ]);
+        console.log("Memulai sinkronisasi presensi...");
+        const activeRes = await getActiveAttendance();
+        console.log("Active Attendance:", activeRes.success);
+        
+        const logsRes = await getTodayAttendanceLog();
+        console.log("Attendance Logs:", logsRes.success);
+        
+        const shiftsRes = await getAvailableShifts();
+        console.log("Available Shifts:", shiftsRes.success);
 
         if (activeRes.success && activeRes.data) {
           const active = activeRes.data;
