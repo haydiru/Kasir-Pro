@@ -201,6 +201,18 @@ export function HistoryClient({ initialReports, userRole }: HistoryClientProps) 
                             size="icon"
                             className="h-8 w-8"
                             asChild
+                            title="Edit Laporan"
+                            disabled={report.status === "Verified"}
+                          >
+                            <Link href={`/cashier/report?id=${report.id}`}>
+                              <FileEdit className={cn("h-4 w-4 text-muted-foreground", report.status === "Verified" && "opacity-20")} />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            asChild
                             title="Print Bukti"
                           >
                             <Link href={`/cashier/report/${report.id}/print`}>

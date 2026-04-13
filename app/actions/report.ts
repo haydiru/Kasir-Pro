@@ -98,6 +98,39 @@ export async function getActiveReport(): Promise<ActionResponse> {
   }
 }
 
+export async function getReportById(id: string): Promise<ActionResponse> {
+  if (!id) return { success: false, error: "ID Laporan diperlukan" };
+  
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+
+    const report = await prisma.shiftReport.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        digitalTransactions: { include: { creator: true, updater: true } },
+        expenditures: { include: { creator: true, updater: true } },
+      },
+    });
+
+    if (!report) return { success: false, error: "Laporan tidak ditemukan" };
+    
+    // Security check: must be the same store
+    if (report.storeId !== session.user.storeId) {
+      return { success: false, error: "Anda tidak memiliki akses ke laporan ini" };
+    }
+
+    return { 
+      success: true, 
+      data: { report: serialize(report), isReadOnly: report.status === "Verified" } 
+    };
+  } catch (error: any) {
+    console.error("getReportById error:", error);
+    return { success: false, error: "Gagal memuat laporan" };
+  }
+}
+
 export async function createShiftReport(): Promise<ActionResponse> {
     try {
         const session = await auth();

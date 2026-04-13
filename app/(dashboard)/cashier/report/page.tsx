@@ -60,11 +60,11 @@ import {
   type Expenditure,
 } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { getActiveReport, createShiftReport, saveCashierReport } from "@/app/actions/report";
+import { getActiveReport, createShiftReport, saveCashierReport, getReportById } from "@/app/actions/report";
 import { getAvailableShifts } from "@/app/actions/attendance-shifts";
 import { getActiveAttendance } from "@/app/actions/attendance";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 // Generate unique ID
@@ -128,13 +128,15 @@ export default function CashierReportPage() {
 
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get("id");
 
   // Load report on mount
   useEffect(() => {
     async function init() {
       try {
         const [reportRes, attendanceRes] = await Promise.all([
-            getActiveReport(),
+            targetId ? getReportById(targetId) : getActiveReport(),
             getActiveAttendance()
         ]);
 
@@ -143,9 +145,9 @@ export default function CashierReportPage() {
         }
 
         if (!reportRes.success) {
-          if (reportRes.error === "AttendanceRequired") {
+          if (reportRes.error === "AttendanceRequired" && !targetId) {
             setNoAttendance(true);
-          } else if (reportRes.error === "NoActiveReport") {
+          } else if (reportRes.error === "NoActiveReport" && !targetId) {
             setNoActiveReport(true);
             setActiveShiftInfo({
               name: reportRes.data?.shiftType,
@@ -294,12 +296,16 @@ export default function CashierReportPage() {
   };
 
   // Manual save
-  const handleSave = async (isAuto = false) => {
+  const handleSave = async (isAuto = false, isRevisionSubmit = false) => {
     // Prevent auto-save if already submitted and not in revision mode
     if (!reportId || (status === "Submitted" && !isRevising)) return;
     
     if (!isAuto) setAutoSaving(true);
     
+    // If it's a manual save (not auto), and we are in revision mode, 
+    // we want to maintain the Submitted status if it was already submitted.
+    // However, the action will set it to Draft if isSubmit is false.
+    // So if isRevisionSubmit is true, we pass isSubmit: true.
     const res = await saveCashierReport({
         id: reportId,
         startingCash,
@@ -309,16 +315,16 @@ export default function CashierReportPage() {
         manualCashCount,
         digitalTransactions: digitalTx,
         expenditures: expenditures,
-        isSubmit: false,
+        isSubmit: isRevisionSubmit || (status === "Submitted" && isRevising),
         editReason: isRevising ? editReason : undefined
     });
 
     if (!isAuto) setAutoSaving(false);
     
     if (!isAuto && res.success) {
-      toast("Draft disimpan", {
-        icon: <Save className="h-4 w-4" />,
-        description: "Perubahan terakhir berhasil disimpan secara manual.",
+      toast(isRevisionSubmit || isRevising ? "Revisi disimpan" : "Draft disimpan", {
+        icon: isRevising ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Save className="h-4 w-4" />,
+        description: isRevising ? "Laporan berhasil diperbarui dengan catatan revisi." : "Perubahan terakhir berhasil disimpan secara manual.",
       });
       if (isRevising) {
           setIsRevising(false);
