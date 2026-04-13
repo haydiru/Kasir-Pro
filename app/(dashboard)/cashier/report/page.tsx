@@ -103,7 +103,7 @@ export default function CashierReportPage() {
   const [posDebit, setPosDebit] = useState(0);
 
   // Section 3: Digital Transactions
-  const [digitalTx, setDigitalTx] = useState<DigitalTransaction[]>([emptyDigitalTx()]);
+  const [digitalTx, setDigitalTx] = useState<DigitalTransaction[]>([]);
 
   // Section 4: Expenditures
   const [expenditures, setExpenditures] = useState<Expenditure[]>([]);
