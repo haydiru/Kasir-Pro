@@ -17,13 +17,18 @@ export default async function AdminAttendancePage() {
   });
   const timezone = store?.timezone || "Asia/Jakarta";
 
-  // Initial fetch for today
-  const todayStr = new Date().toISOString().split('T')[0];
-  const historyRes = await getAdminAttendanceHistory({ date: todayStr });
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1; // 1-indexed
+  const currentYear = now.getFullYear();
+
+  const historyRes = await getAdminAttendanceHistory({ 
+    month: currentMonth, 
+    year: currentYear 
+  });
   const employeesRes = await getStoreEmployeesShort();
 
   const initialData = (historyRes.success && historyRes.data) ? (historyRes.data as { logs: any[], shiftSettings: any[] }) : { logs: [], shiftSettings: [] };
-  const employees = (employeesRes.success && employeesRes.data) ? employeesRes.data : [];
+  const employees = (employeesRes.success && employeesRes.data) ? (employeesRes.data as any[]) : [];
 
   return (
     <AttendanceHistoryClient 
@@ -31,7 +36,8 @@ export default async function AdminAttendancePage() {
       initialShiftSettings={initialData.shiftSettings}
       employees={employees}
       timezone={timezone}
-      initialDate={todayStr}
+      initialMonth={currentMonth}
+      initialYear={currentYear}
     />
   );
 }

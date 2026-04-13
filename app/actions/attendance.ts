@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
-import { getTZDateRange } from "@/lib/utils";
+import { getTZDateRange, getTZMonthRange } from "@/lib/utils";
 
 export async function getActiveAttendance(): Promise<ActionResponse> {
   try {
@@ -200,7 +200,7 @@ export async function getMyAttendanceHistory() {
   }
 }
 
-export async function getAdminAttendanceHistory(filters: { userId?: string, date?: string }) {
+export async function getAdminAttendanceHistory(filters: { userId?: string, date?: string, month?: number, year?: number }) {
   try {
     const session = await auth();
     if (!session?.user || (session.user.role !== "admin" && session.user.role !== "super_admin")) {
@@ -219,7 +219,13 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
       whereClause.userId = filters.userId;
     }
 
-    if (filters.date) {
+    if (filters.month && filters.year) {
+      const { start, end } = getTZMonthRange(filters.year, filters.month, timezone);
+      whereClause.clockIn = {
+        gte: start,
+        lte: end,
+      };
+    } else if (filters.date) {
       const { start, end } = getTZDateRange(new Date(filters.date), timezone);
       whereClause.clockIn = {
         gte: start,

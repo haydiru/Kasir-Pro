@@ -77,6 +77,31 @@ export function getTZDateRange(date: Date, timeZone: string) {
   };
 }
 
+/**
+ * Returns the start and end of a given month in a specific timezone,
+ * as UTC Date objects.
+ */
+export function getTZMonthRange(year: number, month: number, timeZone: string) {
+  const getUTC = (s: string) => {
+    const d = new Date(s);
+    const inv = new Date(d.toLocaleString("en-US", { timeZone }));
+    const diff = d.getTime() - inv.getTime();
+    return new Date(d.getTime() + diff);
+  };
+
+  // Month is 1-indexed (1-12)
+  const firstDay = `${year}-${String(month).padStart(2, '0')}-01T00:00:00`;
+  
+  // Get last day by going to the next month and subtracting 1 day
+  const dateObj = new Date(year, month, 0); // month is already 1-indexed here, so this gives last day of 'month'
+  const lastDay = `${year}-${String(month).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}T23:59:59.999`;
+
+  return {
+    start: getUTC(firstDay),
+    end: getUTC(lastDay)
+  };
+}
+
 // ---------- UI & Role Helpers ----------
 
 export function getRoleBadgeVariant(role: string) {
