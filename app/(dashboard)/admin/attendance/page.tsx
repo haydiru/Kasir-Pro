@@ -22,7 +22,7 @@ export default async function AdminAttendancePage() {
   const historyRes = await getAdminAttendanceHistory({ date: todayStr });
   const employeesRes = await getStoreEmployeesShort();
 
-  const initialData = historyRes.success ? historyRes.data : { logs: [], shiftSettings: [] };
+  const initialData = (historyRes.success && historyRes.data) ? (historyRes.data as { logs: any[], shiftSettings: any[] }) : { logs: [], shiftSettings: [] };
   const employees = employeesRes.success ? employeesRes.data : [];
 
   return (
