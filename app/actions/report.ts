@@ -156,11 +156,17 @@ export async function createShiftReport(): Promise<ActionResponse> {
 export async function saveCashierReport(data: any): Promise<ActionResponse> {
     const session = await auth();
     if (!session?.user) return { success: false, error: "Unauthorized" };
+    if (!data?.id) return { success: false, error: "ID Laporan tidak valid" };
 
     try {
+        // Optimized Transaction with higher timeout to handle pooler issues
         await prisma.$transaction(async (tx) => {
             const existing = await tx.shiftReport.findUnique({
-                where: { id: data.id }
+                where: { id: data.id },
+                include: {
+                    digitalTransactions: { select: { id: true, createdBy: true, lastUpdatedBy: true } },
+                    expenditures: { select: { id: true, createdBy: true, lastUpdatedBy: true } }
+                }
             });
 
             if (!existing) throw new Error("Laporan tidak ditemukan");
@@ -174,15 +180,14 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             }
 
             // 1. Update ShiftReport Header
-            // Apply Math.round to all financial inputs to prevent decimal bugs
             await tx.shiftReport.update({
                 where: { id: data.id },
                 data: {
-                    startingCash: Math.round(data.startingCash),
-                    posCash: Math.round(data.posCash),
-                    posDebit: Math.round(data.posDebit),
-                    billMoneyReceived: Math.round(data.billMoneyReceived),
-                    manualCashCount: Math.round(data.manualCashCount),
+                    startingCash: Math.round(data.startingCash || 0),
+                    posCash: Math.round(data.posCash || 0),
+                    posDebit: Math.round(data.posDebit || 0),
+                    billMoneyReceived: Math.round(data.billMoneyReceived || 0),
+                    manualCashCount: Math.round(data.manualCashCount || 0),
                     status: data.isSubmit ? "Submitted" : data.isReadOnly ? existing.status : "Draft",
                     submittedAt: (data.isSubmit && !existing.submittedAt) ? new Date() : existing.submittedAt,
                     cashierNote: newCashierNote.trim(),
@@ -190,23 +195,24 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             });
 
             // 2. Update Digital Transactions
-            if (data.digitalTransactions) {
+            if (data.digitalTransactions && Array.isArray(data.digitalTransactions)) {
+                const existingTxMap = new Map(existing.digitalTransactions.map(t => [t.id, t]));
+                
                 for (const d of data.digitalTransactions) {
-                    const existingTx = await tx.digitalTransaction.findUnique({
-                        where: { id: d.id }
-                    });
+                    if (!d?.id) continue;
+                    const existingTx = existingTxMap.get(d.id);
 
                     if (existingTx) {
                         await tx.digitalTransaction.update({
                             where: { id: d.id },
                             data: {
-                                serviceType: d.serviceType,
-                                grossAmount: Math.round(d.grossAmount),
-                                profitAmount: Math.round(d.profitAmount),
-                                detailContact: d.detailContact,
-                                flipId: d.flipId,
-                                isNonCash: d.isNonCash,
-                                paymentMethod: d.paymentMethod,
+                                serviceType: d.serviceType || "",
+                                grossAmount: Math.round(d.grossAmount || 0),
+                                profitAmount: Math.round(d.profitAmount || 0),
+                                detailContact: d.detailContact || "",
+                                flipId: d.flipId || null,
+                                isNonCash: !!d.isNonCash,
+                                paymentMethod: d.paymentMethod || null,
                                 lastUpdatedBy: existingTx.createdBy !== session.user.id ? session.user.id : existingTx.lastUpdatedBy
                             }
                         });
@@ -216,13 +222,13 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                                 id: d.id,
                                 reportId: data.id,
                                 createdBy: session.user.id,
-                                serviceType: d.serviceType,
-                                grossAmount: Math.round(d.grossAmount),
-                                profitAmount: Math.round(d.profitAmount),
-                                detailContact: d.detailContact,
-                                flipId: d.flipId,
-                                isNonCash: d.isNonCash,
-                                paymentMethod: d.paymentMethod,
+                                serviceType: d.serviceType || "",
+                                grossAmount: Math.round(d.grossAmount || 0),
+                                profitAmount: Math.round(d.profitAmount || 0),
+                                detailContact: d.detailContact || "",
+                                flipId: d.flipId || null,
+                                isNonCash: !!d.isNonCash,
+                                paymentMethod: d.paymentMethod || null,
                             }
                         });
                     }
@@ -230,20 +236,21 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             }
 
             // 3. Update Expenditures
-            if (data.expenditures) {
+            if (data.expenditures && Array.isArray(data.expenditures)) {
+                const existingExpMap = new Map(existing.expenditures.map(e => [e.id, e]));
+
                 for (const e of data.expenditures) {
-                    const existingExp = await tx.expenditure.findUnique({
-                        where: { id: e.id }
-                    });
+                    if (!e?.id) continue;
+                    const existingExp = existingExpMap.get(e.id);
 
                     if (existingExp) {
                         await tx.expenditure.update({
                             where: { id: e.id },
                             data: {
-                                supplierName: e.supplierName,
-                                amountFromBill: Math.round(e.amountFromBill),
-                                amountFromCashier: Math.round(e.amountFromCashier),
-                                amountFromTransfer: Math.round(e.amountFromTransfer),
+                                supplierName: e.supplierName || "",
+                                amountFromBill: Math.round(e.amountFromBill || 0),
+                                amountFromCashier: Math.round(e.amountFromCashier || 0),
+                                amountFromTransfer: Math.round(e.amountFromTransfer || 0),
                                 lastUpdatedBy: existingExp.createdBy !== session.user.id ? session.user.id : existingExp.lastUpdatedBy
                             }
                         });
@@ -253,15 +260,18 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                                 id: e.id,
                                 reportId: data.id,
                                 createdBy: session.user.id,
-                                supplierName: e.supplierName,
-                                amountFromBill: Math.round(e.amountFromBill),
-                                amountFromCashier: Math.round(e.amountFromCashier),
-                                amountFromTransfer: Math.round(e.amountFromTransfer),
+                                supplierName: e.supplierName || "",
+                                amountFromBill: Math.round(e.amountFromBill || 0),
+                                amountFromCashier: Math.round(e.amountFromCashier || 0),
+                                amountFromTransfer: Math.round(e.amountFromTransfer || 0),
                             }
                         });
                     }
                 }
             }
+        }, {
+            maxWait: 5000,
+            timeout: 10000
         });
 
         revalidatePath("/cashier/report");
