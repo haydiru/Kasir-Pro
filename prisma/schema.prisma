@@ -16,6 +16,7 @@ model Store {
   reports   ShiftReport[]
   shiftSettings ShiftSetting[]
   attendances Attendance[]
+  timezone  String   @default("Asia/Jakarta")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

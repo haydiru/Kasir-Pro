@@ -18,25 +18,50 @@ export interface PayrollRecapItem {
 /**
  * Calculates the start and end dates for the current payroll cycle.
  */
-function getActivePayrollRange(cycleStart: number, cycleEnd: number) {
+/**
+ * Calculates the start and end dates for the current payroll cycle.
+ */
+function getActivePayrollRange(cycleStart: number, cycleEnd: number, timeZone: string) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
+  
+  // Get components in target TZ
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = formatter.formatToParts(now);
+  const partMap: Record<string, string> = {};
+  parts.forEach(p => partMap[p.type] = p.value);
+  
+  const year = parseInt(partMap.year);
+  const month = parseInt(partMap.month) - 1; // 0-indexed
+  const day = parseInt(partMap.day);
 
   let start: Date;
   let end: Date;
 
+  const getUTC = (s: string) => {
+    const d = new Date(s);
+    const inv = new Date(d.toLocaleString("en-US", { timeZone }));
+    const diff = d.getTime() - inv.getTime();
+    return new Date(d.getTime() + diff);
+  };
+
   if (day >= cycleStart) {
     // Current cycle started this month
-    start = new Date(year, month, cycleStart);
+    const startStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(cycleStart).padStart(2, '0')}T00:00:00`;
     // End is next month's cycleEnd
-    end = new Date(year, month + 1, cycleEnd, 23, 59, 59, 999);
+    const endStr = `${month === 11 ? year + 1 : year}-${String((month + 1) % 12 + 1).padStart(2, '0')}-${String(cycleEnd).padStart(2, '0')}T23:59:59.999`;
+    start = getUTC(startStr);
+    end = getUTC(endStr);
   } else {
     // Current cycle started last month
-    start = new Date(year, month - 1, cycleStart);
-    // End is this month's cycleEnd
-    end = new Date(year, month, cycleEnd, 23, 59, 59, 999);
+    const startStr = `${month === 0 ? year - 1 : year}-${String(month === 0 ? 12 : month).padStart(2, '0')}-${String(cycleStart).padStart(2, '0')}T00:00:00`;
+    const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(cycleEnd).padStart(2, '0')}T23:59:59.999`;
+    start = getUTC(startStr);
+    end = getUTC(endStr);
   }
 
   return { start, end };
@@ -47,6 +72,11 @@ export async function getPayrollRecap() {
   if (!session?.user?.storeId) throw new Error("Unauthorized");
   const storeId = session.user.storeId;
 
+  const store = await prisma.store.findUnique({
+    where: { id: storeId }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
+
   // 1. Get all employees in the store
   const employees = await prisma.user.findMany({
     where: { storeId },
@@ -56,7 +86,7 @@ export async function getPayrollRecap() {
   const recap: PayrollRecapItem[] = [];
 
   for (const user of employees) {
-    const { start, end } = getActivePayrollRange(user.payrollCycleStart, user.payrollCycleEnd);
+    const { start, end } = getActivePayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone);
     
     // 2. Fetch all attendance logs in this range
     const logs = await prisma.attendance.findMany({
@@ -70,7 +100,6 @@ export async function getPayrollRecap() {
     });
 
     // 3. Aggregate stats
-    // Count days based on unique date (YYYY-MM-DD)
     const uniqueDays = new Set(logs.map(log => log.clockIn.toISOString().split("T")[0]));
     
     let totalMs = 0;
@@ -81,14 +110,13 @@ export async function getPayrollRecap() {
         totalMs += log.clockOut.getTime() - log.clockIn.getTime();
       } else {
         isCurrentlyActive = true;
-        // Still counting the current session up to "now" for estimate
         totalMs += Date.now() - log.clockIn.getTime();
       }
     });
 
     const totalHours = totalMs / (1000 * 60 * 60);
 
-    const periodLabel = `${start.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' })}`;
+    const periodLabel = `${start.toLocaleDateString("id-ID", { day: 'numeric', month: 'short', timeZone: timezone })} - ${end.toLocaleDateString("id-ID", { day: 'numeric', month: 'short', timeZone: timezone })}`;
 
     recap.push({
       userId: user.id,

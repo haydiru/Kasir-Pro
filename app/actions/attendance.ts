@@ -84,14 +84,18 @@ export async function getTodayAttendanceLog(): Promise<ActionResponse> {
     const session = await auth();
     if (!session?.user?.storeId) return { success: true, data: [] };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const store = await prisma.store.findUnique({
+      where: { id: session.user.storeId }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
+    const { start: todayStart } = getTZDateRange(new Date(), timezone);
 
     const logs = await prisma.attendance.findMany({
       where: {
         storeId: session.user.storeId,
         clockIn: {
-          gte: today,
+          gte: todayStart,
         },
       },
       include: {
@@ -152,16 +156,20 @@ export async function deleteAttendanceLogs(userId: string, dateStr: string): Pro
       return { success: false, error: "Unauthorized" };
     }
 
+    const store = await prisma.store.findUnique({
+      where: { id: session.user.storeId }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
     const date = new Date(dateStr);
-    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+    const { start, end } = getTZDateRange(date, timezone);
 
     await prisma.attendance.deleteMany({
       where: {
         userId,
         clockIn: {
-          gte: startOfDay,
-          lte: endOfDay,
+          gte: start,
+          lte: end,
         },
       },
     });

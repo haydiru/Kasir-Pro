@@ -115,11 +115,12 @@ export async function updateStoreDetails(prevState: any, formData: FormData) {
 
   const name = formData.get("name") as string;
   const address = formData.get("address") as string;
+  const timezone = formData.get("timezone") as string;
 
   try {
     await prisma.store.update({
       where: { id: session.user.storeId },
-      data: { name, address }
+      data: { name, address, timezone }
     });
     revalidatePath("/admin/store-settings");
     return { success: "Detail toko berhasil diperbarui" };

@@ -16,17 +16,65 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDateTime(iso: string | Date): string {
+export function formatDateTime(iso: string | Date, timeZone?: string): string {
   return new Date(iso).toLocaleString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
+    timeZone: timeZone || "Asia/Jakarta"
   });
 }
 
-export function formatTime(iso: string | Date): string {
+export function formatTime(iso: string | Date, timeZone?: string): string {
   return new Date(iso).toLocaleTimeString("id-ID", {
     hour: "2-digit", minute: "2-digit",
+    timeZone: timeZone || "Asia/Jakarta"
   });
+}
+
+/**
+ * Returns the start and end of a given date in a specific timezone, 
+ * but as UTC Date objects for database querying.
+ */
+export function getTZDateRange(date: Date, timeZone: string) {
+  // 1. Get the 00:00:00 of the date in the specific TZ
+  // We use formatToParts to get the local YYYY-MM-DD
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  
+  const parts = formatter.formatToParts(date);
+  const partMap: Record<string, string> = {};
+  parts.forEach(p => partMap[p.type] = p.value);
+  
+  const year = parseInt(partMap.year);
+  const month = parseInt(partMap.month) - 1; // 0-indexed
+  const day = parseInt(partMap.day);
+  
+  // 2. Construct the start and end in the local TZ, then convert to UTC
+  // Constructing a date string like "2024-04-13T00:00:00" in the target TZ
+  const startLocal = `${partMap.year}-${partMap.month.padStart(2, '0')}-${partMap.day.padStart(2, '0')}T00:00:00`;
+  const endLocal = `${partMap.year}-${partMap.month.padStart(2, '0')}-${partMap.day.padStart(2, '0')}T23:59:59.999`;
+  
+  // We need to know the offset to get the exact UTC
+  // A simple way is to use new Date().toLocaleString with timeZone to get a proxy, 
+  // but for precision we use the Z suffix calculation.
+  
+  const start = new Date(new Date(startLocal).toLocaleString("en-US", { timeZone }));
+  // Wait, there's a better way without external libs:
+  const getUTC = (s: string) => {
+    const d = new Date(s);
+    const inv = new Date(d.toLocaleString("en-US", { timeZone }));
+    const diff = d.getTime() - inv.getTime();
+    return new Date(d.getTime() + diff);
+  };
+
+  return { 
+    start: getUTC(startLocal), 
+    end: getUTC(endLocal) 
+  };
 }
 
 // ---------- UI & Role Helpers ----------

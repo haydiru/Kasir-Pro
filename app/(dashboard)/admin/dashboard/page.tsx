@@ -6,13 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { getRoleLabel, formatCurrency, formatTime, calcExpectedCash } from "@/lib/utils";
+import { getRoleLabel, formatCurrency, formatTime, calcExpectedCash, getTZDateRange } from "@/lib/utils";
 import { getPayrollRecap } from "@/app/actions/payroll";
 
 export default async function AdminDashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const storeId = session.user.storeId;
+
+  const store = await prisma.store.findUnique({
+    where: { id: storeId }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
 
   // Fetch real data
   const activeAttendances = await prisma.attendance.findMany({
@@ -39,13 +44,12 @@ export default async function AdminDashboardPage() {
   const payrollRecap = await getPayrollRecap();
 
   // Calculate today's basic stats correctly based on real reports from today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
+  const { start: todayStart } = getTZDateRange(new Date(), timezone);
+  
   const todaysReports = await prisma.shiftReport.findMany({
     where: {
       storeId,
-      date: { gte: today }
+      date: { gte: todayStart }
     }
   });
 
@@ -161,7 +165,7 @@ export default async function AdminDashboardPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{att.user.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {getRoleLabel(att.user.role as any)} • Clock-in {formatTime(att.clockIn.toISOString())}
+                        {getRoleLabel(att.user.role as any)} • Clock-in {formatTime(att.clockIn, timezone)}
                       </p>
                     </div>
                     <Badge variant="outline" className="text-xs shrink-0">
