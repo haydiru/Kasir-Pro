@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getDashboardData } from "@/app/actions/dashboard";
+import { getMyPayrollStats } from "@/app/actions/payroll";
+import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,9 @@ import {
   ArrowRight, 
   ClipboardList, 
   UserCheck, 
-  ShoppingBag 
+  ShoppingBag,
+  CalendarCheck,
+  Timer
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, formatDateTime, formatTime, getRoleLabel, getStatusColor } from "@/lib/utils";
@@ -29,12 +33,19 @@ export default async function DashboardPage() {
         redirect("/admin/dashboard");
     }
 
+    const store = await prisma.store.findUnique({
+        where: { id: session.user.storeId }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
     const statsRes = await getDashboardData();
     const stats = statsRes.success ? statsRes.data : {
         attendance: null,
         digital: { count: 0, total: 0 },
         expenditure: { count: 0, total: 0 }
     };
+
+    const payrollStats = await getMyPayrollStats();
 
     const isClockedIn = !!stats.attendance;
 
@@ -93,7 +104,7 @@ export default async function DashboardPage() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 font-medium">
                             {isClockedIn 
-                                ? `${stats.attendance.shiftType} — Masuk: ${new Date(stats.attendance.clockIn).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}` 
+                                ? `${stats.attendance.shiftType} — Masuk: ${formatTime(stats.attendance.clockIn, timezone)}` 
                                 : "Segera lakukan clock-in"}
                         </p>
                     </CardContent>
@@ -134,6 +145,42 @@ export default async function DashboardPage() {
                 </Card>
             </div>
 
+            {/* Payroll Progress Stats */}
+            <div className="space-y-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                    <CalendarCheck className="h-5 w-5 text-primary" /> Statistik Periode ({payrollStats.periodLabel})
+                </h2>
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm border border-primary/10">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Hari Kerja</p>
+                                    <div className="text-3xl font-black">{payrollStats.totalDays} Hari</div>
+                                </div>
+                                <div className="p-3 bg-primary/20 rounded-2xl">
+                                    <CalendarCheck className="h-8 w-8 text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 backdrop-blur-sm border border-emerald-500/10">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimasi Jam Kerja</p>
+                                    <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{payrollStats.totalHours} Jam</div>
+                                </div>
+                                <div className="p-3 bg-emerald-500/20 rounded-2xl">
+                                    <Timer className="h-8 w-8 text-emerald-600" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
             {/* Menu Shortcuts */}
             <div className="space-y-4">
                 <h2 className="text-lg font-bold flex items-center gap-2">
@@ -158,22 +205,14 @@ export default async function DashboardPage() {
                         </div>
                     </Link>
 
-                    <Link href="/cashier/history" className="group">
+                    <Link href="/attendance/history" className="group">
                         <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-card border border-border/50 shadow-sm transition-all hover:border-primary/50 hover:shadow-md hover:-translate-y-1">
-                            <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-white transition-colors text-amber-600">
-                                <Clock className="h-6 w-6" />
+                            <div className="h-12 w-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-white transition-colors text-indigo-600">
+                                <History className="h-6 w-6" />
                             </div>
-                            <span className="text-sm font-bold">Riwayat Shift</span>
+                            <span className="text-sm font-bold">Riwayat Presensi</span>
                         </div>
                     </Link>
-
-                    {/* Placeholder for future menu or entries */}
-                    <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-card border border-border/50 border-dashed opacity-50 cursor-not-allowed">
-                        <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center mb-3">
-                            <ArrowRight className="h-6 w-6" />
-                        </div>
-                        <span className="text-sm font-medium">Segera Hadir</span>
-                    </div>
                 </div>
             </div>
         </div>

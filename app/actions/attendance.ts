@@ -182,3 +182,20 @@ export async function deleteAttendanceLogs(userId: string, dateStr: string): Pro
     return { success: false, error: "Gagal menghapus log presensi" };
   }
 }
+
+export async function getMyAttendanceHistory() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const logs = await prisma.attendance.findMany({
+      where: { userId: session.user.id },
+      orderBy: { clockIn: "desc" },
+      take: 50, // Last 50 entries
+    });
+
+    return { success: true, data: serialize(logs) };
+  } catch (error) {
+    return { success: false, error: "Gagal memuat riwayat" };
+  }
+}

@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { serialize, ActionResponse } from "@/lib/serialize";
+import { getTZDateRange } from "@/lib/utils";
 
 export async function getDashboardData(): Promise<ActionResponse> {
     try {
@@ -11,9 +12,12 @@ export async function getDashboardData(): Promise<ActionResponse> {
             return { success: false, error: "Unauthorized" };
         }
 
-        const today = new Date();
-        const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-        const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+        const store = await prisma.store.findUnique({
+            where: { id: session.user.storeId }
+        });
+        const timezone = store?.timezone || "Asia/Jakarta";
+
+        const { start: startOfDay, end: endOfDay } = getTZDateRange(new Date(), timezone);
 
         // 1. Get Active Attendance
         const attendance = await prisma.attendance.findFirst({

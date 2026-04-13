@@ -133,3 +133,50 @@ export async function getPayrollRecap() {
 
   return recap;
 }
+
+export async function getMyPayrollStats() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: { store: true }
+  });
+
+  if (!user) throw new Error("User not found");
+
+  const timezone = user.store?.timezone || "Asia/Jakarta";
+  const { start, end } = getActivePayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone);
+  
+  const logs = await prisma.attendance.findMany({
+    where: {
+      userId: user.id,
+      clockIn: {
+        gte: start,
+        lte: end
+      }
+    }
+  });
+
+  const uniqueDays = new Set(logs.map(log => log.clockIn.toISOString().split("T")[0]));
+    
+  let totalMs = 0;
+  logs.forEach(log => {
+    if (log.clockOut) {
+      totalMs += log.clockOut.getTime() - log.clockIn.getTime();
+    } else {
+      totalMs += Date.now() - log.clockIn.getTime();
+    }
+  });
+
+  const totalHours = totalMs / (1000 * 60 * 60);
+  const periodLabel = `${start.toLocaleDateString("id-ID", { day: 'numeric', month: 'short', timeZone: timezone })} - ${end.toLocaleDateString("id-ID", { day: 'numeric', month: 'short', timeZone: timezone })}`;
+
+  return {
+    totalDays: uniqueDays.size,
+    totalHours: parseFloat(totalHours.toFixed(1)),
+    periodLabel,
+    cycleStart: user.payrollCycleStart,
+    cycleEnd: user.payrollCycleEnd
+  };
+}
