@@ -16,7 +16,8 @@ import {
   UserCheck, 
   ShoppingBag,
   CalendarCheck,
-  Timer
+  Timer,
+  History
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, formatDateTime, formatTime, getRoleLabel, getStatusColor } from "@/lib/utils";
