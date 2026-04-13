@@ -242,8 +242,11 @@ export default function CashierReportPage() {
 
   // Digital transaction handlers
   const addDigitalRow = () => setDigitalTx((prev) => [...prev, emptyDigitalTx()]);
-  const removeDigitalRow = (id: string) =>
-    setDigitalTx((prev) => prev.filter((d) => d.id !== id));
+  const removeDigitalRow = (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus baris transaksi ini?")) {
+      setDigitalTx((prev) => prev.filter((d) => d.id !== id));
+    }
+  };
   const updateDigitalTx = (id: string, field: keyof DigitalTransaction, value: unknown) => {
     setDigitalTx((prev) =>
       prev.map((d) => {
@@ -260,8 +263,11 @@ export default function CashierReportPage() {
 
   // Expenditure handlers
   const addExpenditure = () => setExpenditures((prev) => [...prev, emptyExpenditure()]);
-  const removeExpenditure = (id: string) =>
-    setExpenditures((prev) => prev.filter((e) => e.id !== id));
+  const removeExpenditure = (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus baris pengeluaran ini?")) {
+      setExpenditures((prev) => prev.filter((e) => e.id !== id));
+    }
+  };
   const updateExpenditure = (id: string, field: keyof Expenditure, value: unknown) => {
     setExpenditures((prev) =>
       prev.map((e) => (e.id === id ? { ...e, [field]: value } : e))

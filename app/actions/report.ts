@@ -227,10 +227,19 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                 }
             });
 
-            // 2. Update Digital Transactions
-            if (data.digitalTransactions && Array.isArray(data.digitalTransactions)) {
-                const existingTxMap = new Map(existing.digitalTransactions.map(t => [t.id, t]));
+            // 2. Sync Digital Transactions (Manage Deletions first)
+            if (Array.isArray(data.digitalTransactions)) {
+                const incomingIds = data.digitalTransactions.map(d => d.id).filter(id => !!id && typeof id === 'string');
                 
+                // Delete entries in DB for this report that are NOT in the incoming payload
+                await tx.digitalTransaction.deleteMany({
+                    where: {
+                        reportId: data.id,
+                        id: { notIn: incomingIds }
+                    }
+                });
+
+                const existingTxMap = new Map(existing.digitalTransactions.map(t => [t.id, t]));
                 for (const d of data.digitalTransactions) {
                     if (!d?.id) continue;
                     const existingTx = existingTxMap.get(d.id);
@@ -268,10 +277,19 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                 }
             }
 
-            // 3. Update Expenditures
-            if (data.expenditures && Array.isArray(data.expenditures)) {
-                const existingExpMap = new Map(existing.expenditures.map(e => [e.id, e]));
+            // 3. Sync Expenditures (Manage Deletions first)
+            if (Array.isArray(data.expenditures)) {
+                const incomingIds = data.expenditures.map(e => e.id).filter(id => !!id && typeof id === 'string');
+                
+                // Delete entries in DB for this report that are NOT in the incoming payload
+                await tx.expenditure.deleteMany({
+                    where: {
+                        reportId: data.id,
+                        id: { notIn: incomingIds }
+                    }
+                });
 
+                const existingExpMap = new Map(existing.expenditures.map(e => [e.id, e]));
                 for (const e of data.expenditures) {
                     if (!e?.id) continue;
                     const existingExp = existingExpMap.get(e.id);
