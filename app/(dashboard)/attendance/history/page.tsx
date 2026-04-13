@@ -19,7 +19,7 @@ export default async function AttendanceHistoryPage() {
   const timezone = store?.timezone || "Asia/Jakarta";
 
   const res = await getMyAttendanceHistory();
-  const logs = res.success ? res.data : [];
+  const logs = (res.success && res.data) ? (res.data as any[]) : [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
