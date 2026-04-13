@@ -41,7 +41,8 @@ import {
   getRoleLabel, 
   getStatusColor,
   calcExpectedCash,
-  getExpenditureTotal
+  getExpenditureTotal,
+  cn
 } from "@/lib/utils";
 import Link from "next/link";
 import { deleteShiftReport } from "@/app/actions/report";
