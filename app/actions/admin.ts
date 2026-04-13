@@ -167,3 +167,21 @@ export async function resetUserPin(userId: string) {
     return { success: false, message: error.message };
   }
 }
+
+export async function getStoreEmployeesShort() {
+  try {
+    const admin = await checkAdminAccess();
+    const users = await prisma.user.findMany({
+      where: { storeId: admin.storeId },
+      select: {
+        id: true,
+        name: true,
+        role: true
+      },
+      orderBy: { name: "asc" }
+    });
+    return { success: true, data: users };
+  } catch (error) {
+    return { success: false, error: "Gagal memuat daftar pegawai" };
+  }
+}

@@ -199,3 +199,61 @@ export async function getMyAttendanceHistory() {
     return { success: false, error: "Gagal memuat riwayat" };
   }
 }
+
+export async function getAdminAttendanceHistory(filters: { userId?: string, date?: string }) {
+  try {
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "admin" && session.user.role !== "super_admin")) {
+      throw new Error("Unauthorized");
+    }
+
+    const storeId = session.user.storeId;
+    const store = await prisma.store.findUnique({
+      where: { id: storeId }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
+    let whereClause: any = { storeId };
+
+    if (filters.userId && filters.userId !== "all") {
+      whereClause.userId = filters.userId;
+    }
+
+    if (filters.date) {
+      const { start, end } = getTZDateRange(new Date(filters.date), timezone);
+      whereClause.clockIn = {
+        gte: start,
+        lte: end,
+      };
+    }
+
+    const logs = await prisma.attendance.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            name: true,
+            role: true
+          }
+        }
+      },
+      orderBy: { clockIn: "desc" }
+    });
+
+    const shiftSettings = await prisma.shiftSetting.findMany({
+      where: { storeId },
+      orderBy: { startTime: "asc" }
+    });
+
+    return { 
+      success: true, 
+      data: {
+        logs: serialize(logs),
+        shiftSettings: serialize(shiftSettings)
+      } 
+    };
+  } catch (error) {
+    console.error("getAdminAttendanceHistory error:", error);
+    return { success: false, error: "Gagal mengambil riwayat absensi admin" };
+  }
+}
