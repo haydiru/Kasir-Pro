@@ -229,7 +229,7 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
 
             // 2. Sync Digital Transactions (Manage Deletions first)
             if (Array.isArray(data.digitalTransactions)) {
-                const incomingIds = data.digitalTransactions.map((d: any) => d.id).filter(id => !!id && typeof id === 'string');
+                const incomingIds = data.digitalTransactions.map((d: any) => d.id).filter((id: any) => !!id && typeof id === 'string');
                 
                 // Delete entries in DB for this report that are NOT in the incoming payload
                 await tx.digitalTransaction.deleteMany({
@@ -279,7 +279,7 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
 
             // 3. Sync Expenditures (Manage Deletions first)
             if (Array.isArray(data.expenditures)) {
-                const incomingIds = data.expenditures.map((e: any) => e.id).filter(id => !!id && typeof id === 'string');
+                const incomingIds = data.expenditures.map((e: any) => e.id).filter((id: any) => !!id && typeof id === 'string');
                 
                 // Delete entries in DB for this report that are NOT in the incoming payload
                 await tx.expenditure.deleteMany({
