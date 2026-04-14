@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { getRoleLabel, formatCurrency, formatTime, calcExpectedCash, getTZDateRange } from "@/lib/utils";
+import { getRoleLabel, formatCurrency, formatTime, calcExpectedCash, getTZDateRange, formatLocalDate } from "@/lib/utils";
 import { getPayrollRecap } from "@/app/actions/payroll";
 
 export default async function AdminDashboardPage() {
@@ -273,7 +273,7 @@ export default async function AdminDashboardPage() {
                   return (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.user.name}</TableCell>
-                      <TableCell>{report.date.toISOString().split("T")[0]}</TableCell>
+                      <TableCell>{formatLocalDate(report.date, timezone)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">{report.shiftType}</Badge>
                       </TableCell>

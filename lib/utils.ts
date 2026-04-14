@@ -32,38 +32,45 @@ export function formatTime(iso: string | Date, timeZone?: string): string {
 }
 
 /**
+ * Returns a date string (YYYY-MM-DD) in a specific timezone.
+ */
+export function formatLocalDate(date: Date | string, timeZone: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-CA", { // en-CA gives YYYY-MM-DD
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
+ * Returns a full Indonesian date string (e.g. Selasa, 14 April 2026) in a specific timezone.
+ */
+export function formatFullLocalDate(date: Date | string, timeZone: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString("id-ID", {
+    weekday: 'long', 
+    day: 'numeric', 
+    month: 'long', 
+    year: 'numeric',
+    timeZone
+  });
+}
+
+/**
  * Returns the start and end of a given date in a specific timezone, 
  * but as UTC Date objects for database querying.
  */
 export function getTZDateRange(date: Date, timeZone: string) {
-  // 1. Get the 00:00:00 of the date in the specific TZ
-  // We use formatToParts to get the local YYYY-MM-DD
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
+  // 1. Get the local YYYY-MM-DD in the target TZ
+  const isoDate = formatLocalDate(date, timeZone); // "YYYY-MM-DD"
   
-  const parts = formatter.formatToParts(date);
-  const partMap: Record<string, string> = {};
-  parts.forEach(p => partMap[p.type] = p.value);
+  // 2. Construct the start and end in the local TZ
+  const startLocal = `${isoDate}T00:00:00`;
+  const endLocal = `${isoDate}T23:59:59.999`;
   
-  const year = parseInt(partMap.year);
-  const month = parseInt(partMap.month) - 1; // 0-indexed
-  const day = parseInt(partMap.day);
-  
-  // 2. Construct the start and end in the local TZ, then convert to UTC
-  // Constructing a date string like "2024-04-13T00:00:00" in the target TZ
-  const startLocal = `${partMap.year}-${partMap.month.padStart(2, '0')}-${partMap.day.padStart(2, '0')}T00:00:00`;
-  const endLocal = `${partMap.year}-${partMap.month.padStart(2, '0')}-${partMap.day.padStart(2, '0')}T23:59:59.999`;
-  
-  // We need to know the offset to get the exact UTC
-  // A simple way is to use new Date().toLocaleString with timeZone to get a proxy, 
-  // but for precision we use the Z suffix calculation.
-  
-  const start = new Date(new Date(startLocal).toLocaleString("en-US", { timeZone }));
-  // Wait, there's a better way without external libs:
+  // 3. Convert these to exact UTC moments
   const getUTC = (s: string) => {
     const d = new Date(s);
     const inv = new Date(d.toLocaleString("en-US", { timeZone }));

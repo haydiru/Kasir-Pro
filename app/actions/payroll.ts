@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { formatLocalDate } from "@/lib/utils";
 
 export interface PayrollRecapItem {
   userId: string;
@@ -100,7 +101,7 @@ export async function getPayrollRecap() {
     });
 
     // 3. Aggregate stats
-    const uniqueDays = new Set(logs.map(log => log.clockIn.toISOString().split("T")[0]));
+    const uniqueDays = new Set(logs.map(log => formatLocalDate(log.clockIn, timezone)));
     
     let totalMs = 0;
     let isCurrentlyActive = false;
@@ -158,7 +159,7 @@ export async function getMyPayrollStats() {
     }
   });
 
-  const uniqueDays = new Set(logs.map(log => log.clockIn.toISOString().split("T")[0]));
+  const uniqueDays = new Set(logs.map(log => formatLocalDate(log.clockIn, timezone)));
     
   let totalMs = 0;
   logs.forEach(log => {

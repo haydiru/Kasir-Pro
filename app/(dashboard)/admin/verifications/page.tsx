@@ -11,6 +11,11 @@ export default async function AdminVerificationsPage() {
   }
 
   const storeId = session.user.storeId;
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { timezone: true }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
 
   // Retrieve reports matching specific statuses
   const reports = await prisma.shiftReport.findMany({
@@ -39,6 +44,7 @@ export default async function AdminVerificationsPage() {
       submittedReports={submittedReports}
       verifiedReports={verifiedReports}
       unmatchedFlips={unmatchedFlips}
+      timezone={timezone}
     />
   );
 }

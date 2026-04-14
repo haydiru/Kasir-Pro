@@ -38,7 +38,8 @@ import {
   getStatusColor, 
   getRoleBadgeVariant,
   calcExpectedCash,
-  getExpenditureTotal
+  getExpenditureTotal,
+  formatLocalDate
 } from "@/lib/utils";
 import { toast } from "sonner";
 import { verifyShiftReport } from "@/app/actions/admin";
@@ -49,9 +50,10 @@ interface VerificationsClientProps {
   submittedReports: any[];
   verifiedReports: any[];
   unmatchedFlips: any[];
+  timezone: string;
 }
 
-export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips }: VerificationsClientProps) {
+export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, timezone }: VerificationsClientProps) {
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -137,7 +139,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                           <div>
                             <h3 className="font-semibold">{report.user.name}</h3>
                             <p className="text-sm text-muted-foreground">
-                              {report.store.name} • {report.date.toISOString().split("T")[0]} • Shift {report.shiftType}
+                              {report.store.name} • {formatLocalDate(report.date, timezone)} • Shift {report.shiftType}
                             </p>
                           </div>
                           <Badge className={getStatusColor(report.status)}>
@@ -313,7 +315,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                   {verifiedReports.map((report) => (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.user.name}</TableCell>
-                      <TableCell>{report.date.toISOString().split("T")[0]}</TableCell>
+                      <TableCell>{formatLocalDate(report.date, timezone)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">{report.shiftType}</Badge>
                       </TableCell>
@@ -327,7 +329,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                         {report.adminNotes || "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {report.verifiedAt ? formatDateTime(report.verifiedAt.toISOString()) : "—"}
+                        {report.verifiedAt ? formatDateTime(report.verifiedAt.toISOString(), timezone) : "—"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -347,7 +349,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               Verifikasi Laporan
             </DialogTitle>
             <DialogDescription>
-              {selectedReport?.user.name} — {selectedReport?.date?.toISOString().split("T")[0]} Shift {selectedReport?.shiftType}
+              {selectedReport?.user.name} — {selectedReport ? formatLocalDate(selectedReport.date, timezone) : ""} Shift {selectedReport?.shiftType}
             </DialogDescription>
           </DialogHeader>
           <form action={verifyAction} className="space-y-4 pt-2">

@@ -9,6 +9,11 @@ export default async function PrintReportPage({ params }: { params: Promise<{ id
 
   const { id: reportId } = await params;
   const storeId = session.user.storeId;
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { timezone: true }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
 
   // Retrieve the report (only allowing access if it matches the user's store)
   const report = await prisma.shiftReport.findUnique({
@@ -29,5 +34,5 @@ export default async function PrintReportPage({ params }: { params: Promise<{ id
     );
   }
 
-  return <PrintClient report={report} />;
+  return <PrintClient report={report} timezone={timezone} />;
 }

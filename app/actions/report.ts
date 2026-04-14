@@ -4,13 +4,27 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
+import { getTZDateRange, formatTime } from "@/lib/utils";
 
 /**
  * Determines current shift based on store settings and server time.
  */
 async function getCurrentShift(storeId: string) {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { timezone: true }
+  });
+  const timeZone = store?.timezone || "Asia/Jakarta";
+
   const now = new Date();
-  const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+  // Get local hours and minutes
+  const localStr = now.toLocaleString("en-US", { timeZone, hour12: false });
+  const timeMatch = localStr.match(/(\d+):(\d+):(\d+)/);
+  if (!timeMatch) return "Pagi";
+
+  const localH = parseInt(timeMatch[1]);
+  const localM = parseInt(timeMatch[2]);
+  const currentTotalMinutes = localH * 60 + localM;
 
   const settings = await prisma.shiftSetting.findMany({
     where: { storeId },
@@ -43,6 +57,12 @@ export async function getActiveReport(): Promise<ActionResponse> {
     const session = await auth();
     if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
+    const store = await prisma.store.findUnique({
+      where: { id: session.user.storeId },
+      select: { timezone: true }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
     // 1. Get current active attendance
     const attendance = await prisma.attendance.findFirst({
         where: {
@@ -57,19 +77,19 @@ export async function getActiveReport(): Promise<ActionResponse> {
 
     const shiftType = attendance.shiftType;
     const reportDate = attendance.clockIn;
-    const todayStart = new Date(reportDate);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    
+    // Correct way: use TZ Date Range based on clockIn time
+    const { start, end } = getTZDateRange(reportDate, timezone);
 
-    // 2. Find existing report for this USER + STORE + SHIFT + ATTENDANCE DATE
+    // 2. Find existing report for this USER + STORE + SHIFT + ATTENDANCE DATE RANGE
     const report = await prisma.shiftReport.findFirst({
       where: {
         userId: session.user.id,
         storeId: session.user.storeId,
         shiftType: shiftType,
         date: {
-          gte: todayStart,
-          lt: todayEnd,
+          gte: start,
+          lt: end,
         },
       },
       include: {
@@ -90,7 +110,7 @@ export async function getActiveReport(): Promise<ActionResponse> {
 
     return { 
       success: true, 
-      data: { report: serialize(report), isReadOnly: false } 
+      data: { report: serialize(report), isReadOnly: false, timezone } 
     };
   } catch (error: any) {
     console.error("getActiveReport error:", error);
@@ -104,6 +124,12 @@ export async function getReportById(id: string): Promise<ActionResponse> {
   try {
     const session = await auth();
     if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+
+    const store = await prisma.store.findUnique({
+      where: { id: session.user.storeId },
+      select: { timezone: true }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
 
     const report = await prisma.shiftReport.findUnique({
       where: { id },
@@ -123,7 +149,7 @@ export async function getReportById(id: string): Promise<ActionResponse> {
 
     return { 
       success: true, 
-      data: { report: serialize(report), isReadOnly: report.status === "Verified" } 
+      data: { report: serialize(report), isReadOnly: report.status === "Verified", timezone } 
     };
   } catch (error: any) {
     console.error("getReportById error:", error);
@@ -136,6 +162,12 @@ export async function createShiftReport(): Promise<ActionResponse> {
         const session = await auth();
         if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
+        const store = await prisma.store.findUnique({
+          where: { id: session.user.storeId },
+          select: { timezone: true }
+        });
+        const timezone = store?.timezone || "Asia/Jakarta";
+
         const attendance = await prisma.attendance.findFirst({
             where: {
                 userId: session.user.id,
@@ -146,6 +178,7 @@ export async function createShiftReport(): Promise<ActionResponse> {
         if (!attendance) return { success: false, error: "Harap lakukan absensi terlebih dahulu." };
 
         const reportDate = attendance.clockIn;
+        const { start, end } = getTZDateRange(reportDate, timezone);
         
         // Double check if report already exists to avoid duplicates
         const existing = await prisma.shiftReport.findFirst({
@@ -154,8 +187,8 @@ export async function createShiftReport(): Promise<ActionResponse> {
                 storeId: session.user.storeId,
                 shiftType: attendance.shiftType,
                 date: {
-                    gte: new Date(new Date(reportDate).setHours(0,0,0,0)),
-                    lt: new Date(new Date(reportDate).setHours(23,59,59,999))
+                    gte: start,
+                    lt: end
                 }
             }
         });
@@ -192,6 +225,12 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
     if (!data?.id) return { success: false, error: "ID Laporan tidak valid" };
 
     try {
+        const store = await prisma.store.findUnique({
+          where: { id: session.user.storeId },
+          select: { timezone: true }
+        });
+        const timezone = store?.timezone || "Asia/Jakarta";
+
         // Optimized Transaction with higher timeout to handle pooler issues
         await prisma.$transaction(async (tx) => {
             const existing = await tx.shiftReport.findUnique({
@@ -208,7 +247,7 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             // Handle revision note
             let newCashierNote = existing.cashierNote || "";
             if (data.editReason) {
-                const nowStr = new Date().toLocaleString("id-ID");
+                const nowStr = new Date().toLocaleString("id-ID", { timeZone: timezone });
                 newCashierNote += `\n[${nowStr}] ${session.user.name}: ${data.editReason}`;
             }
 
@@ -483,10 +522,14 @@ export async function getShiftTeamEntries(): Promise<ActionResponse> {
   if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
   try {
-    const storeId = session.user.storeId;
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { timezone: true }
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
     const shiftType = await getCurrentShift(storeId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { start, end } = getTZDateRange(new Date(), timezone);
 
     // Find all reports for this shift today in this store
     const reports = await prisma.shiftReport.findMany({
@@ -494,8 +537,8 @@ export async function getShiftTeamEntries(): Promise<ActionResponse> {
         storeId: storeId,
         shiftType: shiftType,
         date: {
-          gte: today,
-          lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+          gte: start,
+          lt: end,
         },
       },
       include: {

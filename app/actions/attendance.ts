@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
-import { getTZDateRange, getTZMonthRange } from "@/lib/utils";
+import { getTZDateRange, getTZMonthRange, formatLocalDate } from "@/lib/utils";
 
 export async function getActiveAttendance(): Promise<ActionResponse> {
   try {
@@ -243,8 +243,50 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
           }
         }
       },
-      orderBy: { clockIn: "desc" }
+      orderBy: { clockIn: "asc" } // Sort asc to process earliest entries first
     });
+
+    // Aggregate by user + day
+    const grouped = new Map<string, any>();
+
+    for (const log of logs) {
+      const localDay = formatLocalDate(log.clockIn, timezone);
+      const key = `${log.userId}_${localDay}`;
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+            ...log,
+            shiftList: [log.shiftType]
+        });
+      } else {
+        // Concatenate unique shift names
+        if (!existing.shiftList.includes(log.shiftType)) {
+            existing.shiftList.push(log.shiftType);
+            existing.shiftType = existing.shiftList.join(", ");
+        }
+
+        // Update first clock-in (earliest)
+        if (log.clockIn < existing.clockIn) {
+            existing.clockIn = log.clockIn;
+        }
+        
+        // Update last clock-out (latest)
+        if (existing.clockOut === null || log.clockOut === null) {
+            existing.clockOut = null;
+        } else if (log.clockOut > existing.clockOut) {
+            existing.clockOut = log.clockOut;
+        }
+
+        // Update actingAsCashier (true if any)
+        if (log.actingAsCashier) {
+            existing.actingAsCashier = true;
+        }
+      }
+    }
+
+    // Convert back to array and sort descending by clockIn for UI
+    const aggregatedLogs = Array.from(grouped.values()).sort((a, b) => b.clockIn.getTime() - a.clockIn.getTime());
 
     const shiftSettings = await prisma.shiftSetting.findMany({
       where: { storeId },
@@ -254,7 +296,7 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
     return { 
       success: true, 
       data: {
-        logs: serialize(logs),
+        logs: serialize(aggregatedLogs),
         shiftSettings: serialize(shiftSettings)
       } 
     };

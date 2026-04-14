@@ -42,7 +42,8 @@ import {
   getStatusColor,
   calcExpectedCash,
   getExpenditureTotal,
-  cn
+  cn,
+  formatLocalDate
 } from "@/lib/utils";
 import Link from "next/link";
 import { deleteShiftReport } from "@/app/actions/report";
@@ -53,9 +54,10 @@ import { useRouter } from "next/navigation";
 interface HistoryClientProps {
   initialReports: any[];
   userRole?: string;
+  timezone: string;
 }
 
-export function HistoryClient({ initialReports, userRole }: HistoryClientProps) {
+export function HistoryClient({ initialReports, userRole, timezone }: HistoryClientProps) {
   const [searchDate, setSearchDate] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
@@ -86,7 +88,7 @@ export function HistoryClient({ initialReports, userRole }: HistoryClientProps) 
   };
 
   const filteredReports = initialReports.filter((r) => {
-    const reportDateStr = r.date.toISOString().split("T")[0];
+    const reportDateStr = formatLocalDate(r.date, timezone);
     const matchesDate = !searchDate || reportDateStr === searchDate;
     const matchesStatus = filterStatus === "all" || r.status === filterStatus;
     return matchesDate && matchesStatus;
@@ -149,7 +151,7 @@ export function HistoryClient({ initialReports, userRole }: HistoryClientProps) 
                   return (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">
-                        {report.date.toISOString().split("T")[0]}
+                        {formatLocalDate(report.date, timezone)}
                       </TableCell>
                       <TableCell>{report.user.name}</TableCell>
                       <TableCell>
@@ -265,7 +267,7 @@ export function HistoryClient({ initialReports, userRole }: HistoryClientProps) 
                  <div>
                    <p className="text-muted-foreground">Tanggal & Waktu</p>
                    <p className="font-medium">
-                      {selectedReport.date.toISOString().split("T")[0]}
+                      {formatLocalDate(selectedReport.date, timezone)}
                    </p>
                  </div>
                  <div className="text-right">

@@ -10,6 +10,12 @@ export default async function CashierHistoryPage() {
   const storeId = session.user.storeId;
   const role = session.user.role;
 
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { timezone: true }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
+
   // Set the filter condition based on role
   // Admins see all for their store, cashier/pramuniaga see only their own
   const whereCondition = (role === "admin" || role === "super_admin") 
@@ -27,5 +33,5 @@ export default async function CashierHistoryPage() {
     orderBy: { date: 'desc' }
   });
 
-  return <HistoryClient initialReports={reports} userRole={role} />;
+  return <HistoryClient initialReports={reports} userRole={role} timezone={timezone} />;
 }

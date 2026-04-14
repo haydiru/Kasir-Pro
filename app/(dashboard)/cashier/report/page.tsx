@@ -54,6 +54,8 @@ import {
   formatDateTime,
   getRoleLabel,
   getStatusColor,
+  formatFullLocalDate,
+  formatLocalDate
 } from "@/lib/utils";
 import {
   type DigitalTransaction,
@@ -124,6 +126,7 @@ export default function CashierReportPage() {
   const [noAttendance, setNoAttendance] = useState(false);
   const [noActiveReport, setNoActiveReport] = useState(false);
   const [activeShiftInfo, setActiveShiftInfo] = useState<{name: string, date: string} | null>(null);
+  const [storeTimezone, setStoreTimezone] = useState("Asia/Jakarta");
   const [isCreatingReport, setIsCreatingReport] = useState(false);
 
   const { data: session } = useSession();
@@ -144,6 +147,10 @@ export default function CashierReportPage() {
             setActingAsCashier(!!attendanceRes.data.actingAsCashier);
         }
 
+        if (reportRes.success && reportRes.data) {
+          setStoreTimezone(reportRes.data.timezone || "Asia/Jakarta");
+        }
+
         if (!reportRes.success) {
           if (reportRes.error === "AttendanceRequired" && !targetId) {
             setNoAttendance(true);
@@ -151,12 +158,7 @@ export default function CashierReportPage() {
             setNoActiveReport(true);
             setActiveShiftInfo({
               name: reportRes.data?.shiftType,
-              date: reportRes.data?.date ? new Date(reportRes.data.date).toLocaleDateString('id-ID', { 
-                weekday: 'long', 
-                day: 'numeric', 
-                month: 'long', 
-                year: 'numeric' 
-              }) : ""
+              date: reportRes.data?.date ? formatFullLocalDate(reportRes.data.date, reportRes.data.timezone || "Asia/Jakarta") : ""
             });
           } else {
             toast.error(reportRes.error || "Gagal memuat laporan.");

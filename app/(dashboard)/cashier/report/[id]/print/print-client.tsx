@@ -8,9 +8,10 @@ import {
   calcExpectedCash,
   calcExpenditureSummary,
   getExpenditureTotal,
+  formatLocalDate
 } from "@/lib/utils";
 
-export function PrintClient({ report }: { report: any }) {
+export function PrintClient({ report, timezone }: { report: any, timezone: string }) {
   const expectedCash = calcExpectedCash(report);
   const variance = report.manualCashCount - expectedCash;
   const digitalCashIn = report.digitalTransactions
@@ -51,7 +52,7 @@ export function PrintClient({ report }: { report: any }) {
             </div>
             <div className="flex gap-2">
               <span className="text-gray-500 w-20">Tanggal</span>
-              <span className="font-medium">: {report.date.toISOString().split("T")[0]}</span>
+              <span className="font-medium">: {formatLocalDate(report.date, timezone)}</span>
             </div>
             <div className="flex gap-2">
               <span className="text-gray-500 w-20">Shift</span>
@@ -66,13 +67,13 @@ export function PrintClient({ report }: { report: any }) {
             {report.submittedAt && (
               <div className="flex gap-2 justify-end">
                 <span className="text-gray-500">Submitted</span>
-                <span className="font-medium">: {formatDateTime(report.submittedAt.toISOString())}</span>
+                <span className="font-medium">: {formatDateTime(report.submittedAt.toISOString(), timezone)}</span>
               </div>
             )}
             {report.verifiedAt && (
               <div className="flex gap-2 justify-end">
                 <span className="text-gray-500">Verified</span>
-                <span className="font-medium">: {formatDateTime(report.verifiedAt.toISOString())}</span>
+                <span className="font-medium">: {formatDateTime(report.verifiedAt.toISOString(), timezone)}</span>
               </div>
             )}
           </div>
