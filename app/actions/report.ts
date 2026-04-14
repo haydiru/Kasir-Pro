@@ -520,6 +520,7 @@ export async function deleteShiftReport(reportId: string): Promise<ActionRespons
 export async function getShiftTeamEntries(): Promise<ActionResponse> {
   const session = await auth();
   if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+  const storeId = session.user.storeId;
 
   try {
     const store = await prisma.store.findUnique({
