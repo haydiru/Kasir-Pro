@@ -79,61 +79,62 @@ export function PrintClient({ report, timezone }: { report: any, timezone: strin
           </div>
         </div>
 
-        {/* SECTION 1: Rekap Utama & Selisih */}
-        <div className="mb-4 bg-gray-50 border border-gray-300 rounded overflow-hidden">
-          <div className="bg-gray-100 px-3 py-1.5 border-b border-gray-300 flex items-center justify-between">
-            <h2 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-               Rekap & Selisih Cash
-            </h2>
+        {/* SECTION 1 & 2: Rekap Kas & Tagihan (Side-by-side for paper efficiency) */}
+        <div className="flex gap-3 mb-4 items-stretch print:gap-2">
+          <div className="flex-1 bg-gray-50 border border-gray-300 rounded overflow-hidden flex flex-col">
+            <div className="bg-gray-100 px-3 py-1.5 border-b border-gray-300 flex items-center justify-between">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                Rekap & Selisih Cash
+              </h2>
+            </div>
+            <div className="p-3 space-y-1.5 flex-1">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-600">Modal Awal Laci</span>
+                <span className="font-mono">{formatCurrency(report.startingCash)}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-600">+ POS Tunai</span>
+                <span className="font-mono">{formatCurrency(report.posCash)}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-600">+ Layanan Digital (Tunai)</span>
+                <span className="font-mono">{formatCurrency(digitalCashIn)}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-600">− Pengeluaran (Uang Kasir)</span>
+                <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromCashier)}</span>
+              </div>
+              <div className="h-px bg-gray-300 my-1" />
+              <div className="flex justify-between items-center font-bold text-[11px]">
+                <span>TOTAL CASH SEHARUSNYA</span>
+                <span className="font-mono">{formatCurrency(expectedCash)}</span>
+              </div>
+            </div>
           </div>
-          <div className="p-3 space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Modal Awal Laci</span>
-              <span className="font-mono">{formatCurrency(report.startingCash)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">+ POS Tunai</span>
-              <span className="font-mono">{formatCurrency(report.posCash)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">+ Layanan Digital (Tunai)</span>
-              <span className="font-mono">{formatCurrency(digitalCashIn)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">− Pengeluaran (Uang Kasir)</span>
-              <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromCashier)}</span>
-            </div>
-            <div className="h-px bg-gray-300 my-1" />
-            <div className="flex justify-between items-center font-bold text-[12px]">
-              <span>TOTAL CASH SEHARUSNYA</span>
-              <span className="font-mono">{formatCurrency(expectedCash)}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* SECTION 2: Rekap Uang Tagihan */}
-        {(report.billMoneyReceived > 0 || expSummary.fromBill > 0) && (
-          <div className="mb-4 border border-amber-200 bg-amber-50/30 rounded overflow-hidden">
-            <div className="px-3 py-1 border-b border-amber-200 text-amber-800 text-[9px] font-bold uppercase tracking-wider">
-              Rekap Uang Tagihan
+          {(report.billMoneyReceived > 0 || expSummary.fromBill > 0) && (
+            <div className="flex-1 border border-amber-200 bg-amber-50/30 rounded overflow-hidden flex flex-col">
+              <div className="px-3 py-1.5 border-b border-amber-200 text-amber-800 text-[10px] font-bold uppercase tracking-widest">
+                Rekap Uang Tagihan
+              </div>
+              <div className="p-3 space-y-1.5 flex-1">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-amber-900/70">Uang Tagihan Masuk</span>
+                  <span className="font-mono">{formatCurrency(report.billMoneyReceived)}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-amber-900/70">− Pengeluaran (Tagihan)</span>
+                  <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromBill)}</span>
+                </div>
+                <div className="h-px bg-amber-200/50 my-1" />
+                <div className="flex justify-between items-center font-bold text-amber-900 text-[11px]">
+                  <span>Sisa Uang Tagihan</span>
+                  <span className="font-mono">{formatCurrency(sisaUangTagihan)}</span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="text-amber-900/70">Uang Tagihan Masuk</span>
-                <span className="font-mono">{formatCurrency(report.billMoneyReceived)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-amber-900/70">− Dipakai untuk Pengeluaran</span>
-                <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromBill)}</span>
-              </div>
-              <div className="h-px bg-amber-200/50 my-1" />
-              <div className="flex justify-between items-center font-bold text-amber-900">
-                <span>Sisa Uang Tagihan</span>
-                <span className="font-mono">{formatCurrency(sisaUangTagihan)}</span>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* SECTION 3: Hitungan Manual & Variance */}
         <div className="mb-6 space-y-3">
@@ -159,53 +160,56 @@ export function PrintClient({ report, timezone }: { report: any, timezone: strin
           )}
         </div>
 
-        {/* SECTION 4: Detail Transaksi Digital (List) */}
-        {report.digitalTransactions.length > 0 && (
-          <div className="mb-3">
-            <h3 className="text-[9px] font-bold uppercase border-b border-gray-200 pb-0.5 mb-1">Detail Transaksi Digital</h3>
-            <div className="space-y-0.5">
-              {report.digitalTransactions.map((tx: any) => (
-                <div key={tx.id} className="flex justify-between text-[8px] text-gray-600">
-                  <span className="truncate pr-2">
-                    {tx.serviceType} {tx.detailContact ? `(${tx.detailContact})` : ""} {tx.isNonCash ? `[${tx.paymentMethod}]` : ""}
-                  </span>
-                  <span className="font-mono">{formatCurrency(tx.grossAmount)}</span>
+        {/* SECTION 4 & 5: Detail Transaksi & Pengeluaran (Side-by-side for efficiency) */}
+        {(report.digitalTransactions.length > 0 || report.expenditures.length > 0) && (
+          <div className="flex gap-6 mb-4 items-start print:gap-4">
+            {/* Detail Transaksi Digital */}
+            {report.digitalTransactions.length > 0 && (
+              <div className="flex-1">
+                <h3 className="text-[9px] font-bold uppercase border-b border-gray-200 pb-0.5 mb-1">Detail Transaksi Digital</h3>
+                <div className="space-y-0.5">
+                  {report.digitalTransactions.map((tx: any) => (
+                    <div key={tx.id} className="flex justify-between text-[8px] text-gray-600">
+                      <span className="truncate pr-2 max-w-[120px]">
+                        {tx.serviceType} {tx.detailContact ? `(${tx.detailContact})` : ""}
+                      </span>
+                      <span className="font-mono">{formatCurrency(tx.grossAmount)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* SECTION 5: Detail Pengeluaran (List) */}
-        {report.expenditures.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[9px] font-bold uppercase border-b border-gray-200 pb-0.5 mb-1">Detail Pengeluaran</h3>
-            
-            {/* Source Breakdown Summary */}
-            <div className="flex gap-4 mb-2 text-[8px] text-gray-500 font-medium bg-gray-50 p-1.5 rounded border border-gray-100 italic">
-               <span>Total Kasir: {formatCurrency(expSummary.fromCashier)}</span>
-               <span>Total Tagihan: {formatCurrency(expSummary.fromBill)}</span>
-               <span>Total Transfer: {formatCurrency(expSummary.fromTransfer)}</span>
-            </div>
+            {/* Detail Pengeluaran */}
+            {report.expenditures.length > 0 && (
+              <div className="flex-1">
+                <h3 className="text-[9px] font-bold uppercase border-b border-gray-200 pb-0.5 mb-1">Detail Pengeluaran</h3>
+                
+                {/* Source Breakdown Condensed */}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1.5 text-[7px] text-gray-500 italic bg-gray-50 p-1 rounded border border-gray-100">
+                   <span>Kasir: {formatCurrency(expSummary.fromCashier)}</span>
+                   <span>Tagihan: {formatCurrency(expSummary.fromBill)}</span>
+                </div>
 
-            <div className="space-y-1.5">
-              {report.expenditures.map((ex: any) => {
-                const total = (ex.amountFromBill || 0) + (ex.amountFromCashier || 0) + (ex.amountFromTransfer || 0);
-                return (
-                  <div key={ex.id} className="text-[8px] border-b border-gray-100 pb-1 last:border-0 text-gray-700">
-                    <div className="flex justify-between font-medium">
-                       <span>- {ex.supplierName}</span>
-                       <span className="font-mono">{formatCurrency(total)}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 text-[7px] text-gray-500 pl-3">
-                       {ex.amountFromCashier > 0 && <span>Kasir: {formatCurrency(ex.amountFromCashier)}</span>}
-                       {ex.amountFromBill > 0 && <span>Tagihan: {formatCurrency(ex.amountFromBill)}</span>}
-                       {ex.amountFromTransfer > 0 && <span>Transfer: {formatCurrency(ex.amountFromTransfer)}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                <div className="space-y-1.5">
+                  {report.expenditures.map((ex: any) => {
+                    const total = (ex.amountFromBill || 0) + (ex.amountFromCashier || 0) + (ex.amountFromTransfer || 0);
+                    return (
+                      <div key={ex.id} className="text-[8px] border-b border-gray-100 pb-1 last:border-0 text-gray-700">
+                        <div className="flex justify-between font-medium">
+                           <span className="truncate pr-1">- {ex.supplierName}</span>
+                           <span className="font-mono">{formatCurrency(total)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-2 text-[7px] text-gray-500 pl-2">
+                           {ex.amountFromCashier > 0 && <span>K:{formatCurrency(ex.amountFromCashier)}</span>}
+                           {ex.amountFromBill > 0 && <span>T:{formatCurrency(ex.amountFromBill)}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
