@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { getAdminAttendanceHistory } from "@/app/actions/attendance";
+import { getAdminAttendanceHistory, deleteAttendanceByUserDay } from "@/app/actions/attendance";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   History, 
   Users, 
@@ -19,9 +20,10 @@ import {
   LayoutGrid, 
   List,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Trash2
 } from "lucide-react";
-import { formatTime, cn } from "@/lib/utils";
+import { formatTime, formatLocalDate, cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface Props {
@@ -48,6 +50,8 @@ export function AttendanceHistoryClient({
     year: initialYear
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; localDay: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const months = [
     { value: 1, label: "Januari" },
@@ -85,6 +89,29 @@ export function AttendanceHistoryClient({
 
   function resetFilters() {
     setFilters({ userId: "all", month: initialMonth, year: initialYear });
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteAttendanceByUserDay(deleteTarget.userId, deleteTarget.localDay);
+      if (res.success) {
+        toast.success(`Data absensi ${deleteTarget.name} pada ${deleteTarget.localDay} berhasil dihapus`);
+        // Remove deleted log from local state
+        setLogs((prev) => prev.filter((l) => {
+          const day = formatLocalDate(l.clockIn, timezone);
+          return !(l.userId === deleteTarget.userId && day === deleteTarget.localDay);
+        }));
+      } else {
+        toast.error(res.error || "Gagal menghapus data");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan sistem");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
   }
 
   // Grouping logic for Formation View: Date -> Shift
@@ -358,25 +385,28 @@ export function AttendanceHistoryClient({
                         <TableHead className="font-black text-xs uppercase tracking-widest text-emerald-600">Jam Masuk</TableHead>
                         <TableHead className="font-black text-xs uppercase tracking-widest text-rose-500">Jam Pulang</TableHead>
                         <TableHead className="font-black text-xs uppercase tracking-widest text-center">Status</TableHead>
+                        <TableHead className="font-black text-xs uppercase tracking-widest text-center">Aksi</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                     {logs.length === 0 ? (
                         <TableRow>
-                        <TableCell colSpan={6} className="text-center py-32 text-muted-foreground italic font-medium">
+                        <TableCell colSpan={7} className="text-center py-32 text-muted-foreground italic font-medium">
                             Tidak ada riwayat untuk periode ini.
                         </TableCell>
                         </TableRow>
                     ) : (
-                        logs.map(log => (
+                        logs.map(log => {
+                          const localDay = formatLocalDate(log.clockIn, timezone);
+                          return (
                             <TableRow key={log.id} className="border-border/20 hover:bg-primary/5 transition-all group h-16">
                             <TableCell className="pl-8">
                                 <div className="flex flex-col">
                                     <span className="text-sm font-bold">
-                                         {new Date(log.clockIn).toLocaleDateString("id-ID", { day: 'numeric', month: 'short' })}
+                                         {new Date(log.clockIn).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', timeZone: timezone })}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground font-black uppercase">
-                                         {new Date(log.clockIn).toLocaleDateString("id-ID", { weekday: 'short' })}
+                                         {new Date(log.clockIn).toLocaleDateString("id-ID", { weekday: 'short', timeZone: timezone })}
                                     </span>
                                 </div>
                             </TableCell>
@@ -409,8 +439,20 @@ export function AttendanceHistoryClient({
                                     <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 shadow-none text-[10px] font-black uppercase animate-pulse">Bertugas</Badge>
                                 )}
                             </TableCell>
+                            <TableCell className="text-center">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+                                    title="Hapus log absensi hari ini"
+                                    onClick={() => setDeleteTarget({ userId: log.userId, localDay, name: log.user.name })}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </TableCell>
                             </TableRow>
-                        ))
+                          );
+                        })
                     )}
                     </TableBody>
                 </Table>
@@ -419,6 +461,43 @@ export function AttendanceHistoryClient({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Confirm Delete Dialog ── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null); }}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Hapus Log Absensi
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              Anda akan menghapus <span className="font-bold text-foreground">semua catatan absensi</span> milik{" "}
+              <span className="font-bold text-foreground">{deleteTarget?.name}</span> pada tanggal{" "}
+              <span className="font-bold text-foreground">{deleteTarget?.localDay}</span>.
+              <br /><br />
+              Data yang dihapus <span className="text-destructive font-bold">tidak dapat dikembalikan</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+              className="rounded-xl"
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="rounded-xl gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? "Menghapus..." : "Ya, Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

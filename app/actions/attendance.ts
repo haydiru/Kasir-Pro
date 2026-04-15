@@ -305,3 +305,47 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
     return { success: false, error: "Gagal mengambil riwayat absensi admin" };
   }
 }
+
+/**
+ * Deletes ALL raw attendance records for a specific user on a specific local date.
+ * Only accessible by admin / super_admin of the same store.
+ */
+export async function deleteAttendanceByUserDay(
+  userId: string,
+  localDay: string
+): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (
+      !session?.user?.storeId ||
+      (session.user.role !== "admin" && session.user.role !== "super_admin")
+    ) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const storeId = session.user.storeId;
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { timezone: true },
+    });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
+    // Compute UTC range for that local day
+    const { start, end } = getTZDateRange(new Date(localDay + "T12:00:00"), timezone);
+
+    const result = await prisma.attendance.deleteMany({
+      where: {
+        storeId,
+        userId,
+        clockIn: { gte: start, lte: end },
+      },
+    });
+
+    revalidatePath("/admin/attendance");
+    return { success: true, data: { deleted: result.count } };
+  } catch (error) {
+    console.error("deleteAttendanceByUserDay error:", error);
+    return { success: false, error: "Gagal menghapus data absensi" };
+  }
+}
