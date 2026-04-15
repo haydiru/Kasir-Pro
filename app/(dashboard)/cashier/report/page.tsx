@@ -233,14 +233,29 @@ export default function CashierReportPage() {
   const expectedCash = Math.round(startingCash + posCash + digitalCashIn - expFromCashier);
   const variance = Math.round(manualCashCount - expectedCash);
 
-  // Auto-save simulation (debounce)
+  // Auto-save: debounce 5s, tracks ALL form fields, skips if nothing changed
+  const lastSavedRef = useCallback(() => ({ current: "" }), [])();
+
   useEffect(() => {
     if (status === "Submitted" || !reportId) return;
+
+    // Build a lightweight snapshot of current form state
+    const snapshot = JSON.stringify({
+      startingCash, posCash, posDebit, billMoneyReceived, manualCashCount,
+      dt: digitalTx.map(d => ({ s: d.serviceType, g: d.grossAmount, p: d.profitAmount, c: d.detailContact, n: d.isNonCash, m: d.paymentMethod })),
+      ex: expenditures.map(e => ({ s: e.supplierName, b: e.amountFromBill, c: e.amountFromCashier, t: e.amountFromTransfer })),
+    });
+
+    // Skip if nothing changed since last save
+    if (snapshot === lastSavedRef.current) return;
+
     const timer = setTimeout(() => {
+      lastSavedRef.current = snapshot;
       handleSave(true);
     }, 5000);
     return () => clearTimeout(timer);
-  }, [posCash, posDebit, startingCash, manualCashCount, status, reportId]);
+  }, [posCash, posDebit, startingCash, billMoneyReceived, manualCashCount, digitalTx, expenditures, status, reportId]);
+
 
   // Digital transaction handlers
   const addDigitalRow = () => setDigitalTx((prev) => [...prev, emptyDigitalTx()]);
