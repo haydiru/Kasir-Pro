@@ -126,16 +126,14 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               const expected = calcExpectedCash(report);
               const diff = report.manualCashCount - expected;
               
-              const reportDateStr = report.date;
-              const { start: dayStart, end: dayEnd } = getTZDateRange(new Date(reportDateStr), timezone);
-              const dayStartMs = dayStart.getTime();
-              const dayEndMs = dayEnd.getTime();
+              const dayStartMs = new Date(report.date).getTime();
+              const dayEndMs = report.submittedAt ? new Date(report.submittedAt).getTime() : new Date().getTime();
 
               const reportUnmatchedFlips = unmatchedFlips.filter((fw) => {
                 const txTime = new Date(fw.transactionTime).getTime();
-                const isSameDay = txTime >= dayStartMs && txTime <= dayEndMs;
+                const isWithinShift = txTime >= dayStartMs && txTime <= dayEndMs;
                 const isNotInReport = !report.digitalTransactions.some((dt: any) => dt.flipId === fw.flipId);
-                return isSameDay && isNotInReport;
+                return isWithinShift && isNotInReport;
               });
 
               return (
@@ -189,7 +187,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                               <div className="flex flex-wrap gap-1.5 mt-2">
                                 {reportUnmatchedFlips.map((fw: any) => (
                                   <Badge key={fw.id} variant="outline" className="border-destructive/30 text-destructive text-[10px] font-mono gap-1 bg-white/50">
-                                    {fw.serviceType}: {formatCurrency(fw.nominal)}
+                                    {fw.flipId} • {fw.serviceType}: {formatCurrency(fw.nominal)}
                                   </Badge>
                                 ))}
                               </div>

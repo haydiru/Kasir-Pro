@@ -128,15 +128,15 @@ export async function getUnmatchedFlipForReport(
       return { success: false, error: "Report not found" };
     }
 
-    // Get all non-excluded flip transactions for that specific valid day in the store's timezone
-    const reportDate = report.date;
-    const { start: dayStart, end: dayEnd } = getTZDateRange(reportDate, report.store.timezone || "Asia/Jakarta");
+    // Get all non-excluded flip transactions strictly within the shift timeframe
+    const shiftStart = report.date;
+    const shiftEnd = report.submittedAt || new Date();
 
     const flipTxs = await prisma.flipWebhook.findMany({
       where: {
         storeId: report.storeId,
         excluded: false,
-        transactionTime: { gte: dayStart, lte: dayEnd },
+        transactionTime: { gte: shiftStart, lte: shiftEnd },
       },
     });
 
