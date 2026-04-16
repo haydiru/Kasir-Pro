@@ -15,7 +15,7 @@ interface Account {
   name: string;
   type: string;
   balance: number;
-  userId?: string;
+  userId?: string | null;
 }
 
 interface Transaction {
