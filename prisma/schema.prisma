@@ -16,7 +16,9 @@ model Store {
   reports   ShiftReport[]
   shiftSettings ShiftSetting[]
   attendances Attendance[]
+  flipWebhooks FlipWebhook[]
   timezone  String   @default("Asia/Jakarta")
+  flipApiKey String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -151,12 +153,25 @@ model AuditLog {
 }
 
 model FlipWebhook {
-  flipId          String   @id
+  id              String   @id @default(uuid())
+  storeId         String
+  flipId          String
+  serviceType     String
   nominal         Float
+  customerName    String?
+  customerNumber  String?
+  bankOrProvider  String?
   transactionTime DateTime
+  emailSubject    String
+  excluded        Boolean  @default(false)
   matched         Boolean  @default(false)
-  
+
+  store           Store    @relation(fields: [storeId], references: [id])
   createdAt       DateTime @default(now())
+
+  @@unique([flipId, storeId])
+  @@index([storeId])
+  @@index([transactionTime])
 }
 
 model ShiftSetting {

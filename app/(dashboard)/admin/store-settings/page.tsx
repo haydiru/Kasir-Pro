@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import ShiftClientActions from "./shift-client-actions";
 import StoreUpdateForm from "./store-update-form";
+import FlipApiKeySection from "./flip-api-key-section";
+import { headers } from "next/headers";
 
 export default async function StoreSettingsPage() {
   const session = await auth();
@@ -28,6 +30,12 @@ export default async function StoreSettingsPage() {
       }
     }
   });
+
+  // Get the app URL for Apps Script template
+  const headersList = await headers();
+  const host = headersList.get("host") || "localhost:3000";
+  const protocol = headersList.get("x-forwarded-proto") || "https";
+  const appUrl = `${protocol}://${host}`;
 
   if (!store) {
     return (
@@ -87,6 +95,12 @@ export default async function StoreSettingsPage() {
                Gunakan fitur <b>Jadwal Khusus</b> untuk mengatur jam operasional yang berbeda pada hari tertentu seperti libur akhir pekan.
              </p>
           </div>
+
+          <FlipApiKeySection
+            initialApiKey={store.flipApiKey || null}
+            storeId={store.id}
+            appUrl={appUrl}
+          />
         </div>
 
         {/* Master Shift Form Section */}

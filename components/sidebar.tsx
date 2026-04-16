@@ -19,6 +19,7 @@ import {
   KeyRound,
   Settings,
   FileEdit,
+  Smartphone,
 } from "lucide-react";
 import { logOut } from "@/app/actions/auth";
 
@@ -26,6 +27,7 @@ const adminNav = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Riwayat Absensi", href: "/admin/attendance", icon: History },
   { label: "Verifikasi", href: "/admin/verifications", icon: ShieldCheck },
+  { label: "Transaksi Flip", href: "/admin/flip-transactions", icon: Smartphone },
   { label: "Pengguna", href: "/admin/users", icon: Users },
   { label: "Pengaturan Toko", href: "/admin/store-settings", icon: Settings },
 ];
