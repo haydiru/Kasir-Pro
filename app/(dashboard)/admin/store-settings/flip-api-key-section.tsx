@@ -76,7 +76,8 @@ const CONFIG = {
 
 function forwardFlipEmails() {
   // Cari email dari Flip yang belum dilabeli dan setelah tanggal START_DATE
-  const query = \`from:no-reply@flip.id subject:"berhasil" after:\${CONFIG.START_DATE} -label:\${CONFIG.LABEL_DONE}\`;
+  // Mengabaikan email Top Up Saldo & tagihan Flip Freedom
+  const query = \`from:no-reply@flip.id subject:"berhasil" -subject:"Flip Freedom" -subject:"Top Up Saldo" after:\${CONFIG.START_DATE} -label:\${CONFIG.LABEL_DONE}\`;
   const threads = GmailApp.search(query, 0, 20);
 
   if (threads.length === 0) return;
