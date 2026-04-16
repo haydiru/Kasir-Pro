@@ -184,8 +184,15 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                             <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                             <div>
                               <p className="text-xs font-medium text-destructive">
-                                {reportUnmatchedFlips.length} transaksi Flip mungkin belum tercatat!
+                                {reportUnmatchedFlips.length} transaksi Flip belum tercatat di laporan ini:
                               </p>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {reportUnmatchedFlips.map((fw: any) => (
+                                  <Badge key={fw.id} variant="outline" className="border-destructive/30 text-destructive text-[10px] font-mono gap-1 bg-white/50">
+                                    {fw.serviceType}: {formatCurrency(fw.nominal)}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         )}

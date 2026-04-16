@@ -40,7 +40,28 @@ export async function getFlipTransactions(
       orderBy: { transactionTime: "desc" },
     });
 
-    return { success: true, data: serialize(transactions) };
+    // Dynamically compute matched status based on whether it exists in any report
+    const dbFlipIds = transactions.map(t => t.flipId).filter(Boolean);
+    const usedDigitalTxs = await prisma.digitalTransaction.findMany({
+      where: {
+        report: { storeId },
+      },
+      select: { flipId: true }
+    });
+    
+    // Normalize flipIds (remove leading #)
+    const usedSet = new Set(
+      usedDigitalTxs
+        .map(dt => dt.flipId?.replace(/^#/, "") || "")
+        .filter(Boolean)
+    );
+
+    const resolvedTransactions = transactions.map(t => ({
+      ...t,
+      matched: usedSet.has(t.flipId)
+    }));
+
+    return { success: true, data: serialize(resolvedTransactions) };
   } catch (error) {
     console.error("getFlipTransactions error:", error);
     return { success: false, error: "Gagal mengambil data transaksi Flip" };
