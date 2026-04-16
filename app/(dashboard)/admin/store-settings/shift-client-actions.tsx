@@ -17,7 +17,8 @@ import {
   Sparkles,
   ChevronRight,
   Loader2,
-  Info
+  Info,
+  Timer
 } from "lucide-react";
 import {
   Select,
