@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { ensureFinancialAccounts, getCashflowData } from "@/app/actions/cashflow";
 import { CashflowClient } from "./cashflow-client";
 
@@ -9,6 +10,12 @@ export default async function AdminCashflowPage() {
   if (session.user.role !== "admin" && session.user.role !== "super_admin") {
     redirect("/dashboard");
   }
+
+  const store = await prisma.store.findUnique({
+    where: { id: session.user.storeId },
+    select: { timezone: true }
+  });
+  const timezone = store?.timezone || "Asia/Jakarta";
 
   // Pastikan setidaknya dompet default (Bank) dan Kas Admin ini tersedia
   await ensureFinancialAccounts();
@@ -32,7 +39,7 @@ export default async function AdminCashflowPage() {
         initialTransactions={transactions}
         currentUserId={session.user.id}
         currentUserRole={session.user.role}
-        timezone={"Asia/Jakarta"}
+        timezone={timezone}
       />
     </div>
   );

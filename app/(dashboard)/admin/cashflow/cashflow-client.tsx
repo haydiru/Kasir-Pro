@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency, formatLocalDate } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -127,7 +127,7 @@ export function CashflowClient({ initialAccounts, initialTransactions, currentUs
                     return (
                       <TableRow key={tx.id}>
                         <TableCell>
-                          <div className="text-sm font-medium">{formatLocalDate(new Date(tx.date), timezone)}</div>
+                          <div className="text-sm font-medium">{formatDateTime(tx.date, timezone)}</div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">Oleh: {tx.user.name}</div>
                         </TableCell>
                         <TableCell>
