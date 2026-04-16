@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getAdminAttendanceHistory } from "@/app/actions/attendance";
+import { getAdminAttendanceHistory, autoFixMissedCheckouts } from "@/app/actions/attendance";
 import { getStoreEmployeesShort } from "@/app/actions/admin";
 import { AttendanceHistoryClient } from "./attendance-history-client";
 
@@ -20,6 +20,9 @@ export default async function AdminAttendancePage() {
   const now = new Date();
   const currentMonth = now.getMonth() + 1; // 1-indexed
   const currentYear = now.getFullYear();
+
+  // Auto-close attendances past their shift's autoCheckoutTime
+  await autoFixMissedCheckouts();
 
   const historyRes = await getAdminAttendanceHistory({ 
     month: currentMonth, 

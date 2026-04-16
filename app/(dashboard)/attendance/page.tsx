@@ -40,7 +40,8 @@ import {
   checkIn, 
   clockOut, 
   getTodayAttendanceLog,
-  deleteAttendanceLogs
+  deleteAttendanceLogs,
+  autoFixMissedCheckouts
 } from "@/app/actions/attendance";
 import { getAvailableShifts } from "@/app/actions/attendance-shifts";
 
@@ -78,6 +79,9 @@ export default function AttendancePage() {
 
       try {
         console.log("Memulai sinkronisasi presensi...");
+        // Auto-close forgotten checkouts if any
+        await autoFixMissedCheckouts();
+        
         const activeRes = await getActiveAttendance();
         console.log("Active Attendance:", activeRes.success);
         

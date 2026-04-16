@@ -21,7 +21,8 @@ import {
   List,
   ChevronRight,
   Sparkles,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { formatTime, formatLocalDate, cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -50,7 +51,7 @@ export function AttendanceHistoryClient({
     year: initialYear
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; localDay: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; localDay: string; name: string; shiftType: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const months = [
@@ -95,13 +96,13 @@ export function AttendanceHistoryClient({
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await deleteAttendanceByUserDay(deleteTarget.userId, deleteTarget.localDay);
+      const res = await deleteAttendanceByUserDay(deleteTarget.userId, deleteTarget.localDay, deleteTarget.shiftType);
       if (res.success) {
-        toast.success(`Data absensi ${deleteTarget.name} pada ${deleteTarget.localDay} berhasil dihapus`);
-        // Remove deleted log from local state
+        toast.success(`Absensi Shift ${deleteTarget.shiftType} milik ${deleteTarget.name} pada ${deleteTarget.localDay} berhasil dihapus`);
+        // Remove only that specific shift row from local state
         setLogs((prev) => prev.filter((l) => {
           const day = formatLocalDate(l.clockIn, timezone);
-          return !(l.userId === deleteTarget.userId && day === deleteTarget.localDay);
+          return !(l.userId === deleteTarget.userId && day === deleteTarget.localDay && l.shiftType === deleteTarget.shiftType);
         }));
       } else {
         toast.error(res.error || "Gagal menghapus data");
@@ -342,6 +343,11 @@ export function AttendanceHistoryClient({
                                                                     KASIR
                                                                 </span>
                                                             )}
+                                                            {log.clockOut && (new Date(log.clockOut).getTime() - new Date(log.clockIn).getTime()) < 5 * 60 * 1000 && (
+                                                              <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-600 border border-rose-500/20 flex items-center gap-1">
+                                                                <AlertTriangle className="h-2 w-2" /> Salah Klik?
+                                                              </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -417,7 +423,14 @@ export function AttendanceHistoryClient({
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="font-bold group-hover:text-primary transition-colors">{log.user.name}</span>
-                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{log.user.role}</span>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{log.user.role}</span>
+                                          {log.clockOut && (new Date(log.clockOut).getTime() - new Date(log.clockIn).getTime()) < 5 * 60 * 1000 && (
+                                            <span className="text-[8px] font-black uppercase bg-rose-500/10 text-rose-600 px-1 rounded flex items-center gap-0.5 border border-rose-500/20">
+                                              <AlertTriangle className="h-2 w-2" /> Singkat
+                                            </span>
+                                          )}
+                                        </div>
                                     </div>
                                 </div>
                             </TableCell>
@@ -445,7 +458,7 @@ export function AttendanceHistoryClient({
                                     size="icon"
                                     className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
                                     title="Hapus log absensi hari ini"
-                                    onClick={() => setDeleteTarget({ userId: log.userId, localDay, name: log.user.name })}
+                                    onClick={() => setDeleteTarget({ userId: log.userId, localDay, name: log.user.name, shiftType: log.shiftType })}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -470,10 +483,12 @@ export function AttendanceHistoryClient({
               <Trash2 className="h-5 w-5" /> Hapus Log Absensi
             </DialogTitle>
             <DialogDescription className="pt-1">
-              Anda akan menghapus <span className="font-bold text-foreground">semua catatan absensi</span> milik{" "}
+              Anda akan menghapus catatan absensi <span className="font-bold text-foreground">Shift {deleteTarget?.shiftType}</span> milik{" "}
               <span className="font-bold text-foreground">{deleteTarget?.name}</span> pada tanggal{" "}
               <span className="font-bold text-foreground">{deleteTarget?.localDay}</span>.
               <br /><br />
+              Hanya absensi shift ini yang akan dihapus. Absensi shift lain di hari yang sama <span className="text-emerald-600 font-bold">tetap aman</span>.
+              <br />
               Data yang dihapus <span className="text-destructive font-bold">tidak dapat dikembalikan</span>.
             </DialogDescription>
           </DialogHeader>

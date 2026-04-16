@@ -184,9 +184,10 @@ model ShiftSetting {
   id        String @id @default(uuid())
   storeId   String
   name      String // e.g., 'Shift Pagi', 'Shift Malam'
-  startTime String // e.g., '06:00'
-  endTime   String // e.g., '14:00'
-  dayOfWeek Int? // 0-6 (Sunday-Saturday), null = Every day
+  startTime        String // e.g., '06:00'
+  endTime          String // e.g., '14:00'
+  autoCheckoutTime String? // e.g., '18:00', batas auto-checkout jika kasir lupa
+  dayOfWeek        Int? // 0-6 (Sunday-Saturday), null = Every day
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

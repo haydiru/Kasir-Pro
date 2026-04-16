@@ -102,49 +102,34 @@ export async function getTodayAttendanceLog(): Promise<ActionResponse> {
       include: {
         user: true,
       },
-      orderBy: { clockIn: "asc" }, // Ascending so we process chronologically
+      orderBy: { clockIn: "asc" },
     });
 
-    // Aggregate by user + shift
+    // Group by User + ShiftType (to keep separate shifts visible, not all merged into one row)
     const grouped = new Map<string, any>();
 
     for (const log of logs) {
-      const key = log.userId;
+      const key = `${log.userId}_${log.shiftType}`;
       const existing = grouped.get(key);
 
       if (!existing) {
-        grouped.set(key, {
-            ...log,
-            shiftList: [log.shiftType]
-        });
+        grouped.set(key, { ...log, shiftList: [log.shiftType] });
       } else {
-        // Concatenate unique shift names
-        if (!existing.shiftList.includes(log.shiftType)) {
-            existing.shiftList.push(log.shiftType);
-            existing.shiftType = existing.shiftList.join(", ");
+        // Update earliest clock-in within same shift
+        if (log.clockIn < existing.clockIn) existing.clockIn = log.clockIn;
+        // Update latest clock-out within same shift
+        if (existing.clockOut !== null && log.clockOut !== null) {
+          if (log.clockOut > existing.clockOut) existing.clockOut = log.clockOut;
+        } else {
+          existing.clockOut = null; // Still active if any entry is open
         }
-
-        // Update first clock-in
-        if (log.clockIn < existing.clockIn) {
-            existing.clockIn = log.clockIn;
-        }
-        
-        // Update last clock-out
-        if (existing.clockOut === null || log.clockOut === null) {
-            existing.clockOut = null;
-        } else if (log.clockOut > existing.clockOut) {
-            existing.clockOut = log.clockOut;
-        }
+        if (log.actingAsCashier) existing.actingAsCashier = true;
       }
     }
 
-    // Convert back to array and sort descending by clockIn for UI
     const result = Array.from(grouped.values()).sort((a, b) => b.clockIn.getTime() - a.clockIn.getTime());
 
-    return { 
-      success: true, 
-      data: serialize(result) 
-    };
+    return { success: true, data: serialize(result) };
   } catch (error: any) {
     console.error("getTodayAttendanceLog error:", error);
     return { success: false, error: "Gagal mengambil log presensi hari ini" };
@@ -247,41 +232,29 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
     });
 
     // Aggregate by user + day
+    // Group by User + LocalDay + ShiftType (each shift is a separate row)
     const grouped = new Map<string, any>();
 
     for (const log of logs) {
       const localDay = formatLocalDate(log.clockIn, timezone);
-      const key = `${log.userId}_${localDay}`;
+      const key = `${log.userId}_${localDay}_${log.shiftType}`;
       const existing = grouped.get(key);
 
       if (!existing) {
         grouped.set(key, {
-            ...log,
-            shiftList: [log.shiftType]
+          ...log,
+          localDay, // attach local date for future delete reference
+          shiftList: [log.shiftType]
         });
       } else {
-        // Concatenate unique shift names
-        if (!existing.shiftList.includes(log.shiftType)) {
-            existing.shiftList.push(log.shiftType);
-            existing.shiftType = existing.shiftList.join(", ");
+        // Within the same shift on same day: merge earliest in / latest out
+        if (log.clockIn < existing.clockIn) existing.clockIn = log.clockIn;
+        if (existing.clockOut !== null && log.clockOut !== null) {
+          if (log.clockOut > existing.clockOut) existing.clockOut = log.clockOut;
+        } else {
+          existing.clockOut = null; // Still active if any is open
         }
-
-        // Update first clock-in (earliest)
-        if (log.clockIn < existing.clockIn) {
-            existing.clockIn = log.clockIn;
-        }
-        
-        // Update last clock-out (latest)
-        if (existing.clockOut === null || log.clockOut === null) {
-            existing.clockOut = null;
-        } else if (log.clockOut > existing.clockOut) {
-            existing.clockOut = log.clockOut;
-        }
-
-        // Update actingAsCashier (true if any)
-        if (log.actingAsCashier) {
-            existing.actingAsCashier = true;
-        }
+        if (log.actingAsCashier) existing.actingAsCashier = true;
       }
     }
 
@@ -307,12 +280,13 @@ export async function getAdminAttendanceHistory(filters: { userId?: string, date
 }
 
 /**
- * Deletes ALL raw attendance records for a specific user on a specific local date.
- * Only accessible by admin / super_admin of the same store.
+ * Deletes attendance records for a specific user, date AND shiftType.
+ * This way admin can remove a mis-clicked shift without touching correct ones.
  */
 export async function deleteAttendanceByUserDay(
   userId: string,
-  localDay: string
+  localDay: string,
+  shiftType?: string
 ): Promise<ActionResponse> {
   try {
     const session = await auth();
@@ -324,28 +298,98 @@ export async function deleteAttendanceByUserDay(
     }
 
     const storeId = session.user.storeId;
-
     const store = await prisma.store.findUnique({
       where: { id: storeId },
       select: { timezone: true },
     });
     const timezone = store?.timezone || "Asia/Jakarta";
-
-    // Compute UTC range for that local day
     const { start, end } = getTZDateRange(new Date(localDay + "T12:00:00"), timezone);
 
-    const result = await prisma.attendance.deleteMany({
-      where: {
-        storeId,
-        userId,
-        clockIn: { gte: start, lte: end },
-      },
-    });
+    const whereClause: any = {
+      storeId,
+      userId,
+      clockIn: { gte: start, lte: end },
+    };
+
+    // If a specific shiftType is provided, only delete that shift's records
+    if (shiftType) {
+      whereClause.shiftType = shiftType;
+    }
+
+    const result = await prisma.attendance.deleteMany({ where: whereClause });
 
     revalidatePath("/admin/attendance");
+    revalidatePath("/attendance");
     return { success: true, data: { deleted: result.count } };
   } catch (error) {
     console.error("deleteAttendanceByUserDay error:", error);
     return { success: false, error: "Gagal menghapus data absensi" };
+  }
+}
+
+/**
+ * Auto-closes forgotten checkouts based on each shift's autoCheckoutTime setting.
+ * Should be called when loading admin attendance page or daily cron.
+ */
+export async function autoFixMissedCheckouts(): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+    const storeId = session.user.storeId;
+
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { timezone: true } });
+    const timezone = store?.timezone || "Asia/Jakarta";
+
+    // Get all shift settings that have autoCheckoutTime configured
+    const shiftSettings = await prisma.shiftSetting.findMany({
+      where: { storeId, autoCheckoutTime: { not: null } }
+    });
+
+    if (shiftSettings.length === 0) return { success: true };
+
+    const nowUTC = new Date();
+    let fixedCount = 0;
+
+    for (const setting of shiftSettings) {
+      if (!setting.autoCheckoutTime) continue;
+
+      // Compute today's autoCheckoutTime in store timezone as UTC
+      const localDay = formatLocalDate(nowUTC, timezone);
+      const autoCheckoutLocal = `${localDay}T${setting.autoCheckoutTime}:00`;
+      const autoCheckoutDate = new Date(autoCheckoutLocal);
+      // Adjust for timezone offset
+      const tzDate = new Date(autoCheckoutDate.toLocaleString("en-US", { timeZone: timezone }));
+      const diff = autoCheckoutDate.getTime() - tzDate.getTime();
+      const autoCheckoutUTC = new Date(autoCheckoutDate.getTime() + diff);
+
+      // Only sweep if we've passed the autoCheckoutTime
+      if (nowUTC < autoCheckoutUTC) continue;
+
+      // Find open (forgotten) attendances for this shift
+      const { start: dayStart } = getTZDateRange(nowUTC, timezone);
+      const openLogs = await prisma.attendance.findMany({
+        where: {
+          storeId,
+          shiftType: setting.name,
+          clockOut: null,
+          clockIn: { gte: dayStart },
+        }
+      });
+
+      for (const log of openLogs) {
+        // Close the attendance at the autoCheckoutTime
+        await prisma.attendance.update({
+          where: { id: log.id },
+          data: { clockOut: autoCheckoutUTC }
+        });
+        fixedCount++;
+      }
+    }
+
+    if (fixedCount > 0) revalidatePath("/attendance");
+    return { success: true, data: { fixedCount } };
+  } catch (error) {
+    console.error("autoFixMissedCheckouts error:", error);
+    return { success: false, error: "Gagal memperbaiki checkout otomatis" };
   }
 }

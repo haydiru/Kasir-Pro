@@ -14,6 +14,7 @@ export async function updateShiftSettings(prevState: any, formData: FormData) {
   const shiftNames = formData.getAll("shiftName") as string[];
   const startTimes = formData.getAll("startTime") as string[];
   const endTimes = formData.getAll("endTime") as string[];
+  const autoCheckoutTimes = formData.getAll("autoCheckoutTime") as string[];
 
   try {
     // If no shifts are provided, we might be initializing or just deleting all.
@@ -32,6 +33,7 @@ export async function updateShiftSettings(prevState: any, formData: FormData) {
               name: "Pagi",
               startTime: "07:00",
               endTime: "14:30",
+              autoCheckoutTime: "18:00",
             }
           });
           
@@ -41,6 +43,7 @@ export async function updateShiftSettings(prevState: any, formData: FormData) {
               name: "Malam",
               startTime: "14:30",
               endTime: "22:00",
+              autoCheckoutTime: "23:30",
             }
           });
         }
@@ -57,6 +60,7 @@ export async function updateShiftSettings(prevState: any, formData: FormData) {
               name: shiftNames[i],
               startTime: startTimes[i],
               endTime: endTimes[i],
+              autoCheckoutTime: autoCheckoutTimes[i] || null,
               dayOfWeek: isDefault ? null : parseInt(dayOfWeekValue as string),
             }
           });

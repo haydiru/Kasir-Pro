@@ -195,7 +195,26 @@ export default function ShiftClientActions({ shifts, storeId }: { shifts: any[],
                             required 
                           />
                         </div>
+                        <div className="flex items-end pb-3 text-muted-foreground/30 hidden md:block">
+                           <ChevronRight className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 text-center md:text-left">
+                          <Label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 mb-1.5 block px-1 flex items-center gap-1">
+                            <Timer className="h-3 w-3 text-orange-500" />
+                            Auto-Checkout
+                          </Label>
+                          <Input 
+                            name="autoCheckoutTime" 
+                            type="time" 
+                            defaultValue={shift.autoCheckoutTime || ""} 
+                            className="h-11 bg-orange-500/5 border-orange-500/20 focus-visible:ring-orange-500 rounded-xl text-center md:text-left" 
+                          />
+                        </div>
                       </div>
+                      <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1 px-1">
+                        <Info className="h-3 w-3 inline shrink-0" />
+                        Auto-Checkout: jam di mana sistem otomatis menutup absensi Aktif jika pegawai lupa check-out.
+                      </p>
                     </div>
 
                     <div className="flex lg:flex-col justify-end gap-2 border-t lg:border-t-0 lg:border-l border-primary/5 pt-4 lg:pt-0 lg:pl-4">
