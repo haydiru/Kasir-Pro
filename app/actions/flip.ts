@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { serialize, ActionResponse } from "@/lib/serialize";
 import { revalidatePath } from "next/cache";
-import { getTZMonthRange } from "@/lib/utils";
+import { getTZMonthRange, getTZDateRange } from "@/lib/utils";
 import crypto from "crypto";
 
 /**
@@ -107,12 +107,9 @@ export async function getUnmatchedFlipForReport(
       return { success: false, error: "Report not found" };
     }
 
-    // Get all non-excluded flip transactions for that day
+    // Get all non-excluded flip transactions for that specific valid day in the store's timezone
     const reportDate = report.date;
-    const dayStart = new Date(reportDate);
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const dayEnd = new Date(reportDate);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    const { start: dayStart, end: dayEnd } = getTZDateRange(reportDate, report.store.timezone || "Asia/Jakarta");
 
     const flipTxs = await prisma.flipWebhook.findMany({
       where: {
