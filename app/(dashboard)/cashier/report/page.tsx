@@ -65,6 +65,7 @@ import { toast } from "sonner";
 import { getActiveReport, createShiftReport, saveCashierReport, getReportById } from "@/app/actions/report";
 import { getAvailableShifts } from "@/app/actions/attendance-shifts";
 import { getActiveAttendance } from "@/app/actions/attendance";
+import { getUnmatchedFlipForReport } from "@/app/actions/flip";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -123,6 +124,9 @@ export default function CashierReportPage() {
   const [showRevisionDialog, setShowRevisionDialog] = useState(false);
   const [reportOwnerName, setReportOwnerName] = useState<string>("");
   const [actingAsCashier, setActingAsCashier] = useState(false);
+  
+  // Flip integration state
+  const [unmatchedFlips, setUnmatchedFlips] = useState<any[]>([]);
   const [noAttendance, setNoAttendance] = useState(false);
   const [noActiveReport, setNoActiveReport] = useState(false);
   const [activeShiftInfo, setActiveShiftInfo] = useState<{name: string, date: string} | null>(null);
@@ -192,6 +196,12 @@ export default function CashierReportPage() {
                 updatedByName: e.updater?.name
             })));
           }
+
+          // Fetch Flip unmatched
+          const flipRes = await getUnmatchedFlipForReport(report.id);
+          if (flipRes.success && flipRes.data) {
+            setUnmatchedFlips(flipRes.data);
+          }
         }
       } catch (err) {
         toast.error("Gagal memuat laporan aktif.");
@@ -210,9 +220,6 @@ export default function CashierReportPage() {
     init();
     loadShifts();
   }, [router]);
-
-  // Flip warning check (isolated mock data)
-  const unmatchedFlips: any[] = [];
 
   // Calculate expected cash
   const digitalCashIn = digitalTx
@@ -625,6 +632,27 @@ export default function CashierReportPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Flip Warning Banner */}
+          {unmatchedFlips.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-500/10 border-l-2 border-amber-500 rounded-r-lg text-amber-600 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-semibold">Ada Transaksi Flip yang Belum Diinput</p>
+                <p className="text-xs">
+                  Ditemukan <b>{unmatchedFlips.length} transaksi</b> di hari ini dari layanan Flip yang belum Bapak/Ibu input ke dalam tebal di bawah. 
+                  Mohon periksa kotak masuk email atau dashboard Flip Bapak/Ibu.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {unmatchedFlips.map(f => (
+                    <Badge key={f.id} variant="outline" className="border-amber-500/30 text-amber-600 text-[10px] font-mono gap-1">
+                      {f.serviceType}: {formatCurrency(f.nominal)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {digitalTx.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               Belum ada transaksi digital

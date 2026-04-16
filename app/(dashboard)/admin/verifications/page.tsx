@@ -36,8 +36,20 @@ export default async function AdminVerificationsPage() {
   const submittedReports = reports.filter(r => r.status === "Submitted");
   const verifiedReports = reports.filter(r => r.status === "Verified").slice(0, 50); // limit
 
-  // Optional: Fetch actual unmatched Flip webhooks if implemented
-  const unmatchedFlips: any[] = [];
+  // Fetch actual unmatched Flip webhooks to show warnings on specific reports
+  const unmatched = await prisma.flipWebhook.findMany({
+    where: {
+      storeId,
+      excluded: false,
+      matched: false
+    }
+  });
+  
+  const unmatchedFlips = unmatched.map(fw => ({
+    ...fw,
+    transactionTime: fw.transactionTime.toISOString(),
+    createdAt: fw.createdAt.toISOString()
+  }));
 
   return (
     <VerificationsClient 

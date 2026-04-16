@@ -39,7 +39,8 @@ import {
   getRoleBadgeVariant,
   calcExpectedCash,
   getExpenditureTotal,
-  formatLocalDate
+  formatLocalDate,
+  getTZDateRange
 } from "@/lib/utils";
 import { toast } from "sonner";
 import { verifyShiftReport } from "@/app/actions/admin";
@@ -125,9 +126,17 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               const expected = calcExpectedCash(report);
               const diff = report.manualCashCount - expected;
               
-              const reportUnmatchedFlips = unmatchedFlips.filter(
-                (fw) => !report.digitalTransactions.some((dt: any) => dt.flipId === fw.flipId)
-              );
+              const reportDateStr = report.date;
+              const { start: dayStart, end: dayEnd } = getTZDateRange(new Date(reportDateStr), timezone);
+              const dayStartMs = dayStart.getTime();
+              const dayEndMs = dayEnd.getTime();
+
+              const reportUnmatchedFlips = unmatchedFlips.filter((fw) => {
+                const txTime = new Date(fw.transactionTime).getTime();
+                const isSameDay = txTime >= dayStartMs && txTime <= dayEndMs;
+                const isNotInReport = !report.digitalTransactions.some((dt: any) => dt.flipId === fw.flipId);
+                return isSameDay && isNotInReport;
+              });
 
               return (
                 <Card key={report.id} className="border-0 shadow-sm overflow-hidden">
