@@ -632,10 +632,11 @@ export default function CashierReportPage() {
           ) : (
             <div className="space-y-3">
               {digitalTx.map((tx, idx) => {
+                const isNewRow = !tx.createdBy; // Just created in this session, not yet saved
                 const isCreator = tx.createdBy === session?.user?.id;
                 const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const canEdit = !inputDisabled && (isCreator || isCashierRole);
-                const canDelete = !inputDisabled && (isCreator || actingAsCashier);
+                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole);
+                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier);
 
                 return (
                   <div key={tx.id} className="rounded-lg border p-4 space-y-3">
@@ -794,10 +795,11 @@ export default function CashierReportPage() {
             <div className="space-y-4">
               {expenditures.map((ex, idx) => {
                 const exTotal = ex.amountFromBill + ex.amountFromCashier + ex.amountFromTransfer;
+                const isNewRow = !ex.createdBy; // Just created in this session, not yet saved
                 const isCreator = ex.createdBy === session?.user?.id;
                 const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const canEdit = !inputDisabled && (isCreator || isCashierRole);
-                const canDelete = !inputDisabled && (isCreator || actingAsCashier);
+                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole);
+                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier);
 
                 return (
                   <div key={ex.id} className="rounded-lg border p-4 space-y-3">
