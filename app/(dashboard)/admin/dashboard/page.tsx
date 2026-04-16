@@ -62,6 +62,21 @@ export default async function AdminDashboardPage() {
     ? statsRes.data
     : { summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 }, daily: [] };
 
+  // Count unmatched flips
+  const flipWebhooks = await prisma.flipWebhook.findMany({
+    where: { storeId, excluded: false }
+  });
+  const usedDigitalTxs = await prisma.digitalTransaction.findMany({
+    where: { report: { storeId } },
+    select: { flipId: true }
+  });
+  const usedSet = new Set(
+    usedDigitalTxs
+      .map(dt => dt.flipId?.replace(/^#/, "") || "")
+      .filter(Boolean)
+  );
+  const unmatchedFlipCount = flipWebhooks.filter(fw => !usedSet.has(fw.flipId)).length;
+
   // Serialize verified reports (dates must be strings for client)
   const verifiedSerialized = verifiedReports.map((r) => ({
     ...r,
@@ -80,6 +95,7 @@ export default async function AdminDashboardPage() {
       }))}
       submittedCount={submittedCount}
       verifiedReports={verifiedSerialized as any}
+      unmatchedFlipCount={unmatchedFlipCount}
       payrollRecap={payrollRecap}
       initialStats={initialStats}
       initialStartDate={todayStr}

@@ -49,6 +49,7 @@ interface Props {
   activeAttendances: ActiveAttendance[];
   submittedCount: number;
   verifiedReports: VerifiedReport[];
+  unmatchedFlipCount: number;
   payrollRecap: PayrollRecapItem[];
   initialStats: DashboardStatsResult;
   initialStartDate: string;
@@ -111,6 +112,7 @@ export function DashboardClient({
   activeAttendances,
   submittedCount,
   verifiedReports,
+  unmatchedFlipCount,
   payrollRecap,
   initialStats,
   initialStartDate,
@@ -160,7 +162,7 @@ export function DashboardClient({
         <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.totalOmzet)} icon={DollarSign} colorClass="bg-chart-1/10 text-chart-1" />
         <SummaryCard title="Pegawai Aktif" value={String(activeAttendances.length)} icon={Users} colorClass="bg-chart-2/10 text-chart-2" subtext="Sedang bertugas saat ini" />
         <SummaryCard title="Menunggu Verifikasi" value={String(submittedCount)} icon={ClipboardCheck} colorClass="bg-amber-500/10 text-amber-500" />
-        <SummaryCard title="Flip Belum Cocok" value="0" icon={AlertTriangle} colorClass="bg-destructive/10 text-destructive" />
+        <SummaryCard title="Flip Belum Cocok" value={String(unmatchedFlipCount)} icon={AlertTriangle} colorClass="bg-destructive/10 text-destructive" />
       </div>
 
       {/* ── Filter Bar ── */}
