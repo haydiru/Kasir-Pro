@@ -129,13 +129,57 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
       return "Laporan tidak ditemukan atau Anda tidak memiliki akses.";
     }
 
-    await prisma.shiftReport.update({
-      where: { id: reportId },
-      data: {
-        status: "Verified",
-        finalAdminVariance: isNaN(variance) ? 0 : variance,
-        adminNotes,
-        verifiedAt: new Date(),
+    await prisma.$transaction(async (tx) => {
+      await tx.shiftReport.update({
+        where: { id: reportId },
+        data: {
+          status: "Verified",
+          finalAdminVariance: isNaN(variance) ? 0 : variance,
+          adminNotes,
+          verifiedAt: new Date(),
+        }
+      });
+
+      let adminAccount = await tx.financialAccount.findFirst({
+        where: { storeId: admin.storeId, userId: admin.id, type: "CASH_ADMIN" }
+      });
+
+      if (!adminAccount) {
+        if (!admin.name || !admin.id) throw new Error("Info admin tidak lengkap.");
+        adminAccount = await tx.financialAccount.create({
+          data: {
+            storeId: admin.storeId,
+            userId: admin.id,
+            name: `Kas Pegangan ${admin.name}`,
+            type: "CASH_ADMIN",
+            balance: 0,
+          }
+        });
+      }
+
+      // Check if it's already logged or if amount is 0
+      const existingTx = await tx.financialTransaction.findUnique({
+        where: { shiftReportId: report.id }
+      });
+
+      if (!existingTx && report.manualCashCount > 0) {
+        await tx.financialTransaction.create({
+          data: {
+            storeId: admin.storeId,
+            accountId: adminAccount.id,
+            userId: admin.id,
+            type: "INCOME",
+            category: "Setoran Shift",
+            amount: report.manualCashCount,
+            description: `Setoran shift ${report.shiftType} dari ${report.date.toISOString().split('T')[0]}`,
+            shiftReportId: report.id
+          }
+        });
+
+        await tx.financialAccount.update({
+          where: { id: adminAccount.id },
+          data: { balance: { increment: report.manualCashCount } }
+        });
       }
     });
 

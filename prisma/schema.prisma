@@ -3,62 +3,67 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model Store {
-  id        String   @id @default(uuid())
-  name      String
-  address   String
-  users     User[]
-  reports   ShiftReport[]
-  shiftSettings ShiftSetting[]
-  attendances Attendance[]
-  flipWebhooks FlipWebhook[]
-  timezone  String   @default("Asia/Jakarta")
-  flipApiKey String?
+  id                    String                 @id @default(uuid())
+  name                  String
+  address               String
+  users                 User[]
+  reports               ShiftReport[]
+  shiftSettings         ShiftSetting[]
+  attendances           Attendance[]
+  flipWebhooks          FlipWebhook[]
+  timezone              String                 @default("Asia/Jakarta")
+  flipApiKey            String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  financialAccounts     FinancialAccount[]
+  financialTransactions FinancialTransaction[]
+}
+
+model User {
+  id                String @id @default(uuid())
+  storeId           String
+  role              String // 'super_admin', 'admin', 'cashier', 'pramuniaga'
+  name              String
+  email             String @unique
+  pin               String // Hashed PIN
+  payrollCycleStart Int
+  payrollCycleEnd   Int
+
+  store               Store                @relation(fields: [storeId], references: [id])
+  attendances         Attendance[]
+  shiftReports        ShiftReport[]
+  digitalTxCreated    DigitalTransaction[] @relation("CreatedDigitalTx")
+  digitalTxUpdated    DigitalTransaction[] @relation("UpdatedDigitalTx")
+  expendituresCreated Expenditure[]        @relation("CreatedExpenditure")
+  expendituresUpdated Expenditure[]        @relation("UpdatedExpenditure")
+
+  financialAccounts   FinancialAccount[]
+  createdTransactions FinancialTransaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model User {
-  id                String       @id @default(uuid())
-  storeId           String
-  role              String       // 'super_admin', 'admin', 'cashier', 'pramuniaga'
-  name              String
-  email             String       @unique
-  pin               String       // Hashed PIN
-  payrollCycleStart Int
-  payrollCycleEnd   Int
-  
-  store             Store        @relation(fields: [storeId], references: [id])
-  attendances       Attendance[]
-  shiftReports      ShiftReport[]
-  digitalTxCreated  DigitalTransaction[] @relation("CreatedDigitalTx")
-  digitalTxUpdated  DigitalTransaction[] @relation("UpdatedDigitalTx")
-  expendituresCreated Expenditure[] @relation("CreatedExpenditure")
-  expendituresUpdated Expenditure[] @relation("UpdatedExpenditure")
-
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-}
-
 model Attendance {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   userId          String
   storeId         String
-  clockIn         DateTime @default(now())
+  clockIn         DateTime  @default(now())
   clockOut        DateTime?
-  shiftType       String   // 'Pagi', 'Malam'
-  actingAsCashier Boolean  @default(false)
+  shiftType       String // 'Pagi', 'Malam'
+  actingAsCashier Boolean   @default(false)
 
-  user            User     @relation(fields: [userId], references: [id])
-  store           Store    @relation(fields: [storeId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  store Store @relation(fields: [storeId], references: [id])
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([storeId])
@@ -66,32 +71,33 @@ model Attendance {
 }
 
 model ShiftReport {
-  id                 String   @id @default(uuid())
+  id                 String  @id @default(uuid())
   userId             String
   storeId            String
-  status             String   // 'Draft', 'Submitted', 'Verified'
-  startingCash       Float    @default(0)
-  posCash            Float    @default(0)
-  posDebit           Float    @default(0)
-  billMoneyReceived  Float    @default(0) // Uang Tagihan Masuk tambahan
-  manualCashCount    Float    @default(0)
+  status             String // 'Draft', 'Submitted', 'Verified'
+  startingCash       Float   @default(0)
+  posCash            Float   @default(0)
+  posDebit           Float   @default(0)
+  billMoneyReceived  Float   @default(0) // Uang Tagihan Masuk tambahan
+  manualCashCount    Float   @default(0)
   finalAdminVariance Float?
   adminNotes         String?
   cashierNote        String?
-  
-  submittedAt        DateTime?
-  verifiedAt         DateTime?
-  date               DateTime @default(now())
-  shiftType          String   // Pagi/Malam
 
-  user               User     @relation(fields: [userId], references: [id])
-  store              Store    @relation(fields: [storeId], references: [id])
-  digitalTransactions DigitalTransaction[]
-  expenditures       Expenditure[]
-  auditLogs          AuditLog[]
+  submittedAt DateTime?
+  verifiedAt  DateTime?
+  date        DateTime  @default(now())
+  shiftType   String // Pagi/Malam
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  user                 User                  @relation(fields: [userId], references: [id])
+  store                Store                 @relation(fields: [storeId], references: [id])
+  digitalTransactions  DigitalTransaction[]
+  expenditures         Expenditure[]
+  auditLogs            AuditLog[]
+  financialTransaction FinancialTransaction?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([storeId])
@@ -100,56 +106,56 @@ model ShiftReport {
 }
 
 model DigitalTransaction {
-  id             String   @id @default(uuid())
-  reportId       String
-  createdBy      String?  // Relasi ke User (Kasir/Pramuniaga pembuat)
-  serviceType    String
-  grossAmount    Float
-  profitAmount   Float
-  detailContact  String
-  flipId         String?
-  isNonCash      Boolean  @default(false)
-  paymentMethod  String?
-  
-  report         ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  creator        User?       @relation("CreatedDigitalTx", fields: [createdBy], references: [id])
-  lastUpdatedBy  String?
-  updater        User?       @relation("UpdatedDigitalTx", fields: [lastUpdatedBy], references: [id])
+  id            String  @id @default(uuid())
+  reportId      String
+  createdBy     String? // Relasi ke User (Kasir/Pramuniaga pembuat)
+  serviceType   String
+  grossAmount   Float
+  profitAmount  Float
+  detailContact String
+  flipId        String?
+  isNonCash     Boolean @default(false)
+  paymentMethod String?
 
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  report        ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  creator       User?       @relation("CreatedDigitalTx", fields: [createdBy], references: [id])
+  lastUpdatedBy String?
+  updater       User?       @relation("UpdatedDigitalTx", fields: [lastUpdatedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Expenditure {
-  id                 String   @id @default(uuid())
+  id                 String  @id @default(uuid())
   reportId           String
-  createdBy          String?  // Relasi ke User (Pramuniaga/Kasir)
+  createdBy          String? // Relasi ke User (Pramuniaga/Kasir)
   supplierName       String
-  amountFromBill     Float    @default(0)
-  amountFromCashier  Float    @default(0)
-  amountFromTransfer Float    @default(0)
+  amountFromBill     Float   @default(0)
+  amountFromCashier  Float   @default(0)
+  amountFromTransfer Float   @default(0)
   receiptUrl         String?
 
-  report             ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  creator            User?       @relation("CreatedExpenditure", fields: [createdBy], references: [id])
-  lastUpdatedBy      String?
-  updater            User?       @relation("UpdatedExpenditure", fields: [lastUpdatedBy], references: [id])
+  report        ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  creator       User?       @relation("CreatedExpenditure", fields: [createdBy], references: [id])
+  lastUpdatedBy String?
+  updater       User?       @relation("UpdatedExpenditure", fields: [lastUpdatedBy], references: [id])
 
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  reportId    String
-  userId      String
-  beforeData  Json
-  afterData   Json
-  editReason  String
+  id         String @id @default(uuid())
+  reportId   String
+  userId     String
+  beforeData Json
+  afterData  Json
+  editReason String
 
-  report      ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  changedAt   DateTime @default(now())
+  changedAt DateTime @default(now())
 }
 
 model FlipWebhook {
@@ -166,8 +172,8 @@ model FlipWebhook {
   excluded        Boolean  @default(false)
   matched         Boolean  @default(false)
 
-  store           Store    @relation(fields: [storeId], references: [id])
-  createdAt       DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id])
+  createdAt DateTime @default(now())
 
   @@unique([flipId, storeId])
   @@index([storeId])
@@ -175,15 +181,63 @@ model FlipWebhook {
 }
 
 model ShiftSetting {
-  id        String   @id @default(uuid())
+  id        String @id @default(uuid())
   storeId   String
-  name      String   // e.g., 'Shift Pagi', 'Shift Malam'
-  startTime String   // e.g., '06:00'
-  endTime   String   // e.g., '14:00'
-  dayOfWeek Int?     // 0-6 (Sunday-Saturday), null = Every day
-  
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String // e.g., 'Shift Pagi', 'Shift Malam'
+  startTime String // e.g., '06:00'
+  endTime   String // e.g., '14:00'
+  dayOfWeek Int? // 0-6 (Sunday-Saturday), null = Every day
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model FinancialAccount {
+  id      String  @id @default(uuid())
+  storeId String
+  userId  String? // Jika CASH_ADMIN, ini wajib diisi (milik seorang admin)
+  name    String // misal: "Kas Pegangan Haidir" atau "Rekening BCA Toko"
+  type    String // "CASH_ADMIN" atau "BANK_STORE"
+  balance Float   @default(0)
+
+  user  User? @relation(fields: [userId], references: [id])
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  transactionsFrom FinancialTransaction[] @relation("FromAccount")
+  transactionsTo   FinancialTransaction[] @relation("ToAccount")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([userId])
+}
+
+model FinancialTransaction {
+  id          String  @id @default(uuid())
+  storeId     String
+  accountId   String
+  toAccountId String?
+  userId      String // Siapa yang mencatat? (Hanya Admin)
+  type        String // 'INCOME', 'EXPENSE', 'TRANSFER'
+  category    String // 'Setoran Shift', 'Belanja', 'Tagihan', 'Transfer Bank', 'Lain-lain'
+  amount      Float
+  description String?
+  receiptUrl  String? // Foto bukti
+
+  shiftReportId String? @unique // Link jika ini hasil setor shift otomatis
+
+  account     FinancialAccount  @relation("FromAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  toAccount   FinancialAccount? @relation("ToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+  store       Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id])
+  shiftReport ShiftReport?      @relation(fields: [shiftReportId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([accountId])
 }
