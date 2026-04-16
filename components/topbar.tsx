@@ -2,8 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Sun, Moon, Bell, Menu } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
 import { useTheme } from "next-themes";
+import { NotificationBell } from "./notification-bell";
 
 const routeLabels: Record<string, string> = {
   "/admin/dashboard": "Dashboard Admin",
@@ -56,10 +57,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       {/* Actions */}
       <div className="flex items-center gap-1">
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative rounded-full">
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
-        </Button>
+        <NotificationBell />
 
         {/* Theme toggle */}
         <Button

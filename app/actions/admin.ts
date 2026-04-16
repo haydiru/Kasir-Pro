@@ -181,6 +181,25 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
           data: { balance: { increment: report.manualCashCount } }
         });
       }
+
+      // ─── ADDITION: Trigger Notification if Admin Notes provided ───
+      if (adminNotes && adminNotes.trim().length > 0) {
+        const reportDate = report.date.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: report.userId,
+            title: "Catatan Verifikasi Baru",
+            message: `Admin memberikan catatan pada laporan ${report.shiftType} tanggal ${reportDate}: "${adminNotes.slice(0, 50)}${adminNotes.length > 50 ? '...' : ''}"`,
+            type: "ADMIN_NOTE",
+            link: "/cashier/history" // Path to where they can see their history
+          }
+        });
+      }
     });
 
     revalidatePath("/admin/verifications");
