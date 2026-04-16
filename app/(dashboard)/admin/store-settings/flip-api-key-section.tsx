@@ -71,11 +71,12 @@ const CONFIG = {
   API_KEY: "${apiKey || "PASTE_API_KEY_DISINI"}",
   STORE_ID: "${storeId}",
   LABEL_DONE: "FlipSynced", // Label Gmail untuk email yang sudah diproses
+  START_DATE: "2026/04/01", // Tanggal awal penarikan data (Format: YYYY/MM/DD)
 };
 
 function forwardFlipEmails() {
-  // Cari email dari Flip yang belum dilabeli
-  const query = 'from:no-reply@flip.id subject:"berhasil" -label:' + CONFIG.LABEL_DONE;
+  // Cari email dari Flip yang belum dilabeli dan setelah tanggal START_DATE
+  const query = \`from:no-reply@flip.id subject:"berhasil" after:\${CONFIG.START_DATE} -label:\${CONFIG.LABEL_DONE}\`;
   const threads = GmailApp.search(query, 0, 20);
 
   if (threads.length === 0) return;
