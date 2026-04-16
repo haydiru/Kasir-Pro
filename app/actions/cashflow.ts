@@ -187,7 +187,7 @@ export async function getCashflowData() {
       ...t,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
-      date: t.date.toISOString(),
+      date: t.createdAt.toISOString(),
     }));
 
     return { success: true, accounts: serializedAccounts, transactions: serializedTransactions };
