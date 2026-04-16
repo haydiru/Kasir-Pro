@@ -23,12 +23,12 @@ interface Transaction {
   type: string;
   category: string;
   amount: number;
-  description?: string;
-  receiptUrl?: string;
+  description?: string | null;
+  receiptUrl?: string | null;
   date: string;
   user: { name: string };
   account: { name: string; type: string };
-  toAccount?: { name: string; type: string };
+  toAccount?: { name: string; type: string } | null;
 }
 
 interface Props {
