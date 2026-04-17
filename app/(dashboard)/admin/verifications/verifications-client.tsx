@@ -133,7 +133,16 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               const reportUnmatchedFlips = unmatchedFlips.filter((fw) => {
                 const txTime = new Date(fw.transactionTime).getTime();
                 const isWithinShift = txTime >= dayStartMs && txTime <= dayEndMs;
-                const isNotInReport = !report.digitalTransactions.some((dt: any) => dt.flipId === fw.flipId);
+                
+                const reportFlipIds = new Set(
+                  report.digitalTransactions
+                    .map((dt: any) => dt.flipId?.replace(/^#/, "") || "")
+                    .filter(Boolean)
+                );
+                
+                const fwId = fw.flipId?.replace(/^#/, "") || "";
+                const isNotInReport = !reportFlipIds.has(fwId);
+                
                 return isWithinShift && isNotInReport;
               });
 

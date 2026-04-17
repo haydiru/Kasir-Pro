@@ -316,6 +316,23 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                 }
             }
 
+            // 2.5 Sync Matching Status in FlipWebhook
+            if (Array.isArray(data.digitalTransactions)) {
+                const flipIds = data.digitalTransactions
+                    .map((d: any) => d.flipId?.replace(/^#/, ""))
+                    .filter(Boolean);
+                
+                if (flipIds.length > 0) {
+                    await tx.flipWebhook.updateMany({
+                        where: {
+                            storeId: session.user.storeId,
+                            flipId: { in: flipIds }
+                        },
+                        data: { matched: true }
+                    });
+                }
+            }
+
             // 3. Sync Expenditures (Manage Deletions first)
             if (Array.isArray(data.expenditures)) {
                 const incomingIds = data.expenditures.map((e: any) => e.id).filter((id: any) => !!id && typeof id === 'string');
