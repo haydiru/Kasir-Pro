@@ -34,6 +34,13 @@ import {
   MessageSquare,
   FileEdit,
   Trash2,
+  Zap,
+  ShoppingBag,
+  CreditCard,
+  ExternalLink,
+  Calculator,
+  AlertCircle,
+  Clock
 } from "lucide-react";
 import { 
   formatCurrency, 
@@ -252,81 +259,223 @@ export function HistoryClient({ initialReports, userRole, timezone }: HistoryCli
             <DialogTitle>Detail Laporan Shift</DialogTitle>
           </DialogHeader>
           
-          {selectedReport && (
-            <div className="space-y-6 pt-4">
-               {/* Summary Info */}
-               <div className="grid grid-cols-2 gap-4 text-sm">
+           {selectedReport && (
+            <div className="space-y-6 pt-2 pb-4">
+               {/* Summary Header */}
+               <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border/50">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status Laporan</p>
+                    <Badge className={cn("rounded-lg px-2 py-0.5 text-[10px] font-bold shadow-none", getStatusColor(selectedReport.status))}>
+                        {selectedReport.status}
+                    </Badge>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Dibuat Oleh</p>
+                    <p className="text-sm font-bold">{selectedReport.user.name}</p>
+                  </div>
+               </div>
+
+               {/* Meta Info Grid */}
+               <div className="grid grid-cols-2 gap-6 px-1">
                  <div>
-                   <p className="text-muted-foreground">Kasir</p>
-                   <p className="font-semibold">{selectedReport.user.name}</p>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-black uppercase tracking-wider">Tanggal & Shift</span>
+                    </div>
+                    <p className="text-sm font-bold">{formatLocalDate(selectedReport.date, timezone)}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{selectedReport.shiftType}</p>
                  </div>
                  <div className="text-right">
-                   <p className="text-muted-foreground">Toko</p>
-                   <p className="font-semibold">{selectedReport.store.name}</p>
-                 </div>
-                 <div>
-                   <p className="text-muted-foreground">Tanggal & Waktu</p>
-                   <p className="font-medium">
-                      {formatLocalDate(selectedReport.date, timezone)}
-                   </p>
-                 </div>
-                 <div className="text-right">
-                   <p className="text-muted-foreground">Status</p>
-                   <Badge className={`mt-1 ${getStatusColor(selectedReport.status)}`}>
-                     {selectedReport.status}
-                   </Badge>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1 justify-end">
+                        <span className="text-[10px] font-black uppercase tracking-wider">Lokasi Toko</span>
+                    </div>
+                    <p className="text-sm font-bold">{selectedReport.store.name}</p>
                  </div>
                </div>
 
-               <Separator />
+               <Separator className="opacity-50" />
 
-               {/* Financial Data */}
-               <div className="space-y-3">
-                 <h4 className="font-semibold text-sm">Data Keuangan</h4>
-                 <div className="grid grid-cols-2 gap-y-2 text-sm">
-                    <div className="text-muted-foreground">Modal Awal Laci</div>
-                    <div className="text-right font-mono font-medium">{formatCurrency(selectedReport.startingCash)}</div>
+               {/* Financial Data Section */}
+               <div className="space-y-4">
+                 <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600">
+                        <Calculator className="h-4 w-4" />
+                    </div>
+                    <h4 className="font-bold text-sm">Ringkasan Keuangan</h4>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 gap-2 p-4 rounded-2xl bg-background border border-border/50 shadow-sm">
+                    <div className="flex justify-between text-sm py-1">
+                        <span className="text-muted-foreground font-medium">Modal Awal Laci</span>
+                        <span className="font-mono font-bold">{formatCurrency(selectedReport.startingCash)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm py-1">
+                        <span className="text-muted-foreground font-medium">POS Tunai</span>
+                        <span className="font-mono font-bold">{formatCurrency(selectedReport.posCash)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm py-1 border-b border-dashed pb-2">
+                        <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                            <CreditCard className="h-3 w-3" /> POS Debit
+                        </span>
+                        <span className="font-mono font-bold">{formatCurrency(selectedReport.posDebit || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm py-1 pt-2">
+                        <span className="text-muted-foreground font-medium">Tagihan Tambahan</span>
+                        <span className="font-mono font-bold">{formatCurrency(selectedReport.billMoneyReceived)}</span>
+                    </div>
                     
-                    <div className="text-muted-foreground">POS Tunai</div>
-                    <div className="text-right font-mono font-medium">{formatCurrency(selectedReport.posCash)}</div>
-                    
-                    <div className="text-muted-foreground">Uang Tagihan Tambahan</div>
-                    <div className="text-right font-mono font-medium">{formatCurrency(selectedReport.billMoneyReceived)}</div>
+                    {/* Digital Profit Total */}
+                    {selectedReport.digitalTransactions?.length > 0 && (
+                        <div className="flex justify-between text-sm py-1">
+                            <span className="text-muted-foreground font-medium">Total Laba Layanan</span>
+                            <span className="font-mono font-bold text-emerald-600">
+                                +{formatCurrency(selectedReport.digitalTransactions.reduce((acc: number, curr: any) => acc + curr.profitAmount, 0))}
+                            </span>
+                        </div>
+                    )}
 
-                    <div className="text-muted-foreground">Cash Manual Hitungan Kasir</div>
-                    <div className="text-right font-mono font-bold mt-2 pt-2 border-t border-dashed">
-                      {formatCurrency(selectedReport.manualCashCount)}
+                    <div className="flex justify-between text-base font-black py-2 mt-2 border-t-2 border-primary/10">
+                        <span className="text-foreground">Hitungan Kasir (Manual)</span>
+                        <span className="font-mono text-primary">{formatCurrency(selectedReport.manualCashCount)}</span>
+                    </div>
+
+                    {/* Admin Variance - Only if verified and has info */}
+                    {selectedReport.status === "Verified" && selectedReport.finalAdminVariance !== null && (
+                        <div className="flex justify-between text-sm py-2 mt-1 px-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                            <span className="text-orange-600 font-bold">Varians Admin (Final)</span>
+                            <span className={cn("font-mono font-black", selectedReport.finalAdminVariance < 0 ? "text-destructive" : "text-emerald-600")}>
+                                {selectedReport.finalAdminVariance > 0 ? "+" : ""}{formatCurrency(selectedReport.finalAdminVariance)}
+                            </span>
+                        </div>
+                    )}
+                 </div>
+               </div>
+
+               {/* Digital Transactions list */}
+               {selectedReport.digitalTransactions?.length > 0 && (
+                 <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600">
+                            <Zap className="h-4 w-4" />
+                        </div>
+                        <h4 className="font-bold text-sm">Layanan Digital</h4>
+                    </div>
+                    <div className="border border-border/50 rounded-2xl overflow-hidden bg-muted/20">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow className="hover:bg-transparent border-0 h-10">
+                                    <TableHead className="text-[10px] font-black uppercase pl-4">Layanan</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase">Tujuan</TableHead>
+                                    <TableHead className="text-[10px] font-black uppercase text-right pr-4">Nominal</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {selectedReport.digitalTransactions.map((tx: any, idx: number) => (
+                                    <TableRow key={idx} className="hover:bg-primary/5 transition-all h-12 border-border/30">
+                                        <TableCell className="pl-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-bold leading-none">{tx.serviceType}</span>
+                                                <span className="text-[9px] text-muted-foreground font-black uppercase mt-1">
+                                                    {tx.isNonCash ? "Non-Tunai" : "Tunai"}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs font-medium text-muted-foreground font-mono">
+                                            {tx.detailContact}
+                                        </TableCell>
+                                        <TableCell className="text-right pr-4 font-mono font-bold text-xs">
+                                            {formatCurrency(tx.grossAmount)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </div>
                  </div>
-               </div>
+               )}
+
+               {/* Expenditures list */}
+               {selectedReport.expenditures?.length > 0 && (
+                 <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600">
+                            <ShoppingBag className="h-4 w-4" />
+                        </div>
+                        <h4 className="font-bold text-sm">Pengeluaran & Belanja</h4>
+                    </div>
+                    <div className="space-y-2">
+                        {selectedReport.expenditures.map((ex: any, idx: number) => (
+                            <div key={idx} className="flex flex-col p-4 rounded-2xl bg-rose-500/[0.02] border border-rose-500/10 hover:border-rose-500/30 transition-all">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="space-y-1">
+                                        <span className="text-xs font-black text-rose-600 uppercase tracking-tighter">Supplier / Barang</span>
+                                        <p className="text-sm font-bold">{ex.supplierName}</p>
+                                    </div>
+                                    <div className="text-right space-y-1">
+                                        <span className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Total Bayar</span>
+                                        <p className="text-sm font-black text-rose-600 font-mono">
+                                            {formatCurrency(ex.amountFromCashier + ex.amountFromBill + ex.amountFromTransfer)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-rose-500/5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                                        <span className="text-[10px] font-bold text-muted-foreground">Tunai: {formatCurrency(ex.amountFromCashier)}</span>
+                                    </div>
+                                    {ex.receiptUrl && (
+                                        <div className="flex justify-end items-center">
+                                            <Button 
+                                                variant="link" 
+                                                size="sm" 
+                                                className="h-auto p-0 text-[10px] gap-1 text-blue-600 hover:text-blue-800"
+                                                asChild
+                                            >
+                                                <a href={ex.receiptUrl} target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-2.5 w-2.5" /> Lihat Bukti
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+               )}
+
+               <Separator className="opacity-50" />
 
                 {/* Cashier Revision Notes */}
                 {selectedReport.cashierNote && (
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-2">
-                     <div className="flex items-center gap-2 text-blue-700 font-medium">
+                  <div className="rounded-2xl bg-indigo-500/5 border border-indigo-500/10 p-4 space-y-3">
+                     <div className="flex items-center gap-2 text-indigo-700 font-bold">
                        <FileEdit className="h-4 w-4" />
-                       <span className="text-sm">Catatan Revisi Kasir</span>
+                       <span className="text-xs uppercase tracking-wider">Log Revisi Kasir</span>
                      </div>
-                     <p className="text-xs text-blue-800 whitespace-pre-wrap font-mono bg-blue-100/50 p-2 rounded">
+                     <p className="text-xs text-indigo-900/80 whitespace-pre-wrap font-mono bg-indigo-500/[0.03] p-3 rounded-xl border border-indigo-500/5 leading-relaxed">
                        {selectedReport.cashierNote}
                      </p>
                   </div>
                 )}
 
-               {/* Notes Details if verified */}
+               {/* Admin Notes if verified */}
                {selectedReport.status === "Verified" && selectedReport.adminNotes && (
-                 <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-700 font-medium">
+                 <div className="rounded-2xl bg-amber-500/5 border border-amber-500/10 p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-amber-700 font-bold">
                       <MessageSquare className="h-4 w-4" />
-                      <span className="text-sm">Catatan Verifikasi Admin</span>
+                      <span className="text-xs uppercase tracking-wider">Catatan Verifikasi Admin</span>
                     </div>
-                    <p className="text-sm text-amber-800 dark:text-amber-500">
-                      {selectedReport.adminNotes}
-                    </p>
+                    <div className="p-3 bg-amber-500/[0.03] rounded-xl border border-amber-500/5">
+                        <p className="text-sm text-amber-900 font-medium italic">
+                            "{selectedReport.adminNotes}"
+                        </p>
+                    </div>
                  </div>
                )}
             </div>
           )}
+
         </DialogContent>
       </Dialog>
     </div>
