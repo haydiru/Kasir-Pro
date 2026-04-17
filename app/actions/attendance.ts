@@ -347,37 +347,36 @@ export async function autoFixMissedCheckouts(): Promise<ActionResponse> {
 
     if (shiftSettings.length === 0) return { success: true };
 
+    const openLogs = await prisma.attendance.findMany({
+      where: { storeId, clockOut: null }
+    });
+
+    if (openLogs.length === 0) return { success: true };
+
     const nowUTC = new Date();
     let fixedCount = 0;
 
-    for (const setting of shiftSettings) {
-      if (!setting.autoCheckoutTime) continue;
+    for (const log of openLogs) {
+      const setting = shiftSettings.find(s => s.name === log.shiftType);
+      if (!setting || !setting.autoCheckoutTime) continue;
 
-      // Compute today's autoCheckoutTime in store timezone as UTC
-      const localDay = formatLocalDate(nowUTC, timezone);
+      // Compute autoCheckoutTime based on the DAY the user clocked in
+      const localDay = formatLocalDate(log.clockIn, timezone);
       const autoCheckoutLocal = `${localDay}T${setting.autoCheckoutTime}:00`;
       const autoCheckoutDate = new Date(autoCheckoutLocal);
-      // Adjust for timezone offset
+
+      // If auto checkout time is before they clocked in (e.g. overnight shift), it's meant for the next day
+      if (autoCheckoutDate.getTime() <= log.clockIn.getTime()) {
+        autoCheckoutDate.setDate(autoCheckoutDate.getDate() + 1);
+      }
+
+      // Convert to exact UTC by preserving the local wall clock time
       const tzDate = new Date(autoCheckoutDate.toLocaleString("en-US", { timeZone: timezone }));
       const diff = autoCheckoutDate.getTime() - tzDate.getTime();
       const autoCheckoutUTC = new Date(autoCheckoutDate.getTime() + diff);
 
-      // Only sweep if we've passed the autoCheckoutTime
-      if (nowUTC < autoCheckoutUTC) continue;
-
-      // Find open (forgotten) attendances for this shift
-      const { start: dayStart } = getTZDateRange(nowUTC, timezone);
-      const openLogs = await prisma.attendance.findMany({
-        where: {
-          storeId,
-          shiftType: setting.name,
-          clockOut: null,
-          clockIn: { gte: dayStart },
-        }
-      });
-
-      for (const log of openLogs) {
-        // Close the attendance at the autoCheckoutTime
+      // If current time is past the auto checkout time, perform auto checkout
+      if (nowUTC >= autoCheckoutUTC) {
         await prisma.attendance.update({
           where: { id: log.id },
           data: { clockOut: autoCheckoutUTC }
@@ -386,7 +385,10 @@ export async function autoFixMissedCheckouts(): Promise<ActionResponse> {
       }
     }
 
-    if (fixedCount > 0) revalidatePath("/attendance");
+    if (fixedCount > 0) {
+      revalidatePath("/attendance");
+      revalidatePath("/admin/attendance");
+    }
     return { success: true, data: { fixedCount } };
   } catch (error) {
     console.error("autoFixMissedCheckouts error:", error);
