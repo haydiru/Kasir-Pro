@@ -376,7 +376,7 @@ export function HistoryClient({ initialReports, userRole, timezone }: HistoryCli
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-bold leading-none">{tx.serviceType}</span>
                                                 <span className="text-[9px] text-muted-foreground font-black uppercase mt-1">
-                                                    {tx.isNonCash ? "Non-Tunai" : "Tunai"}
+                                                    {tx.isNonCash ? `Non-Tunai (${tx.paymentMethod || "Tanpa Ket."})` : "Tunai"}
                                                 </span>
                                             </div>
                                         </TableCell>
@@ -418,13 +418,27 @@ export function HistoryClient({ initialReports, userRole, timezone }: HistoryCli
                                         </p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-rose-500/5">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                                        <span className="text-[10px] font-bold text-muted-foreground">Tunai: {formatCurrency(ex.amountFromCashier)}</span>
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 mt-3 pt-3 border-t border-rose-500/5">
+                                    {ex.amountFromCashier > 0 && (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                                            <span className="text-[10px] font-bold text-muted-foreground">Tunai Kasir: {formatCurrency(ex.amountFromCashier)}</span>
+                                        </div>
+                                    )}
+                                    {ex.amountFromBill > 0 && (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                            <span className="text-[10px] font-bold text-muted-foreground">Uang Tagihan: {formatCurrency(ex.amountFromBill)}</span>
+                                        </div>
+                                    )}
+                                    {ex.amountFromTransfer > 0 && (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                                            <span className="text-[10px] font-bold text-muted-foreground">Transfer: {formatCurrency(ex.amountFromTransfer)}</span>
+                                        </div>
+                                    )}
                                     {ex.receiptUrl && (
-                                        <div className="flex justify-end items-center">
+                                        <div className="flex justify-start items-center sm:justify-end">
                                             <Button 
                                                 variant="link" 
                                                 size="sm" 
