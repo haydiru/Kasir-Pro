@@ -30,6 +30,7 @@ import {
   FileText,
   AlertTriangle,
   Trash2,
+  ExternalLink
 } from "lucide-react";
 import { 
   formatCurrency, 
@@ -170,10 +171,14 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                             <p className="font-mono font-medium">{formatCurrency(report.posDebit)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-xs">Layanan Digital</p>
-                            <p className="font-mono font-medium">
-                              {report.digitalTransactions.length} transaksi
+                            <p className="text-muted-foreground text-xs font-bold text-amber-600 uppercase tracking-tighter">Sisa Tagihan</p>
+                            <p className="font-mono font-bold text-amber-600">
+                              {formatCurrency(report.billMoneyReceived - report.expenditures.reduce((acc: number, curr: any) => acc + (curr.amountFromBill || 0), 0))}
                             </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Uang Tagihan</p>
+                            <p className="font-mono font-medium">{formatCurrency(report.billMoneyReceived)}</p>
                           </div>
                         </div>
 
@@ -210,7 +215,12 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                                 {report.digitalTransactions.map((dt: any) => (
                                   <TableRow key={dt.id}>
                                     <TableCell className="text-xs">
-                                      <Badge variant="outline" className="text-[10px]">{dt.serviceType}</Badge>
+                                      <div className="flex flex-col">
+                                        <Badge variant="outline" className="text-[10px] w-fit">{dt.serviceType}</Badge>
+                                        <span className="text-[9px] text-muted-foreground mt-1 font-bold">
+                                          {dt.isNonCash ? `Non-Tunai (${dt.paymentMethod || "Tanpa Ket."})` : "Tunai"}
+                                        </span>
+                                      </div>
                                     </TableCell>
                                     <TableCell className="text-xs text-muted-foreground">{dt.detailContact}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{formatCurrency(dt.grossAmount)}</TableCell>
@@ -228,20 +238,28 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                               Pengeluaran ({report.expenditures.length})
                             </p>
                             <div className="space-y-1.5">
-                              {report.expenditures.map((ex: any) => {
-                                const total = getExpenditureTotal(ex);
+                               {report.expenditures.map((ex: any) => {
+                                const total = ex.amountFromCashier + ex.amountFromBill + ex.amountFromTransfer;
                                 return (
-                                  <div key={ex.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-xs">
-                                    <div className="flex flex-col gap-2">
+                                  <div key={ex.id} className="flex flex-col rounded-md border px-3 py-2 text-xs bg-muted/20">
+                                    <div className="flex items-center justify-between mb-1">
                                       <div className="flex items-center gap-2">
                                         <FileText className="h-3 w-3 text-muted-foreground" />
-                                        <span className="font-medium">{ex.supplierName}</span>
+                                        <span className="font-bold">{ex.supplierName}</span>
                                       </div>
-                                      <div className="flex items-center gap-3 text-muted-foreground ml-5">
-                                        <span className="font-mono font-semibold text-foreground text-[11px]">
-                                          Total: {formatCurrency(total)}
-                                        </span>
-                                      </div>
+                                      <span className="font-mono font-black text-rose-600">
+                                        {formatCurrency(total)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 ml-5 text-[10px] text-muted-foreground leading-tight">
+                                      {ex.amountFromCashier > 0 && <span>Tunai: {formatCurrency(ex.amountFromCashier)}</span>}
+                                      {ex.amountFromBill > 0 && <span className="text-amber-600 font-bold">Tagihan: {formatCurrency(ex.amountFromBill)}</span>}
+                                      {ex.amountFromTransfer > 0 && <span>Transfer: {formatCurrency(ex.amountFromTransfer)}</span>}
+                                      {ex.receiptUrl && (
+                                        <a href={ex.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 ml-auto font-bold">
+                                          <ExternalLink className="h-2 w-2" /> Bukti
+                                        </a>
+                                      )}
                                     </div>
                                   </div>
                                 );

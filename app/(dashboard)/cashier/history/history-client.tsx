@@ -323,6 +323,14 @@ export function HistoryClient({ initialReports, userRole, timezone }: HistoryCli
                         <span className="text-muted-foreground font-medium">Tagihan Tambahan</span>
                         <span className="font-mono font-bold">{formatCurrency(selectedReport.billMoneyReceived)}</span>
                     </div>
+
+                    {/* Remaining Bill Calculation */}
+                    <div className="flex justify-between text-sm py-1">
+                        <span className="text-muted-foreground font-medium">Sisa Uang Tagihan</span>
+                        <span className="font-mono font-bold text-amber-600">
+                            {formatCurrency(selectedReport.billMoneyReceived - selectedReport.expenditures.reduce((acc: number, curr: any) => acc + curr.amountFromBill, 0))}
+                        </span>
+                    </div>
                     
                     {/* Digital Profit Total */}
                     {selectedReport.digitalTransactions?.length > 0 && (
