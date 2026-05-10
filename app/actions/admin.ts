@@ -5,6 +5,12 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 
+type AdminActionState = {
+  status: "SUCCESS" | "ERROR";
+  message: string;
+  timestamp: number;
+};
+
 // Middleware-like function to check admin access
 async function checkAdminAccess() {
   const session = await auth();
@@ -109,7 +115,7 @@ export async function updateStoreUser(prevState: string | undefined, formData: F
   }
 }
 
-export async function verifyShiftReport(prevState: string | undefined, formData: FormData) {
+export async function verifyShiftReport(prevState: AdminActionState | undefined, formData: FormData): Promise<AdminActionState> {
   try {
     const admin = await checkAdminAccess();
     
@@ -117,7 +123,13 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
     const adminVarianceStr = formData.get("variance") as string;
     const adminNotes = formData.get("notes") as string;
 
-    if (!reportId) return "ID Laporan tidak valid.";
+    if (!reportId) {
+      return {
+        status: "ERROR",
+        message: "ID Laporan tidak valid.",
+        timestamp: Date.now(),
+      };
+    }
 
     const variance = parseFloat(adminVarianceStr);
 
@@ -126,7 +138,11 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
     });
 
     if (!report || report.storeId !== admin.storeId) {
-      return "Laporan tidak ditemukan atau Anda tidak memiliki akses.";
+      return {
+        status: "ERROR",
+        message: "Laporan tidak ditemukan atau Anda tidak memiliki akses.",
+        timestamp: Date.now(),
+      };
     }
 
     await prisma.$transaction(async (tx) => {
@@ -134,6 +150,7 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
         where: { id: reportId },
         data: {
           status: "Verified",
+          verifiedById: admin.id,
           finalAdminVariance: isNaN(variance) ? 0 : variance,
           adminNotes,
           verifiedAt: new Date(),
@@ -203,22 +220,40 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
     });
 
     revalidatePath("/admin/verifications");
-    return "SUCCESS";
+    return {
+      status: "SUCCESS",
+      message: "Laporan berhasil diverifikasi.",
+      timestamp: Date.now(),
+    };
   } catch (error: any) {
-    return `Gagal memverifikasi: ${error.message}`;
+    return {
+      status: "ERROR",
+      message: `Gagal memverifikasi: ${error.message}`,
+      timestamp: Date.now(),
+    };
   }
 }
 
-export async function unverifyShiftReport(prevState: string | undefined, formData: FormData) {
+export async function unverifyShiftReport(prevState: AdminActionState | undefined, formData: FormData): Promise<AdminActionState> {
   try {
     const admin = await checkAdminAccess();
     const reportId = formData.get("reportId") as string;
 
-    if (!reportId) return "ID Laporan tidak valid.";
+    if (!reportId) {
+      return {
+        status: "ERROR",
+        message: "ID Laporan tidak valid.",
+        timestamp: Date.now(),
+      };
+    }
 
     const report = await prisma.shiftReport.findUnique({ where: { id: reportId } });
     if (!report || report.storeId !== admin.storeId) {
-      return "Laporan tidak ditemukan atau Anda tidak memiliki akses.";
+      return {
+        status: "ERROR",
+        message: "Laporan tidak ditemukan atau Anda tidak memiliki akses.",
+        timestamp: Date.now(),
+      };
     }
 
     await prisma.$transaction(async (tx) => {
@@ -241,6 +276,7 @@ export async function unverifyShiftReport(prevState: string | undefined, formDat
         where: { id: reportId },
         data: {
           status: "Submitted",
+          verifiedById: null,
           finalAdminVariance: null,
           verifiedAt: null,
           adminNotes: null,
@@ -249,9 +285,17 @@ export async function unverifyShiftReport(prevState: string | undefined, formDat
     });
 
     revalidatePath("/admin/verifications");
-    return "SUCCESS";
+    return {
+      status: "SUCCESS",
+      message: "Verifikasi laporan dibatalkan.",
+      timestamp: Date.now(),
+    };
   } catch (error: any) {
-    return `Gagal membatalkan verifikasi: ${error.message}`;
+    return {
+      status: "ERROR",
+      message: `Gagal membatalkan verifikasi: ${error.message}`,
+      timestamp: Date.now(),
+    };
   }
 }
 

@@ -25,6 +25,7 @@ export default async function AdminVerificationsPage() {
     },
     include: {
       user: true,
+      verifiedBy: true,
       store: true,
       digitalTransactions: true,
       expenditures: true

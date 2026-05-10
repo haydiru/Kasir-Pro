@@ -38,6 +38,7 @@ model User {
   store               Store                @relation(fields: [storeId], references: [id])
   attendances         Attendance[]
   shiftReports        ShiftReport[]
+  verifiedShiftReports ShiftReport[]       @relation("ShiftReportVerifier")
   digitalTxCreated    DigitalTransaction[] @relation("CreatedDigitalTx")
   digitalTxUpdated    DigitalTransaction[] @relation("UpdatedDigitalTx")
   expendituresCreated Expenditure[]        @relation("CreatedExpenditure")
@@ -75,6 +76,7 @@ model ShiftReport {
   id                 String  @id @default(uuid())
   userId             String
   storeId            String
+  verifiedById       String?
   status             String // 'Draft', 'Submitted', 'Verified'
   startingCash       Float   @default(0)
   posCash            Float   @default(0)
@@ -91,6 +93,7 @@ model ShiftReport {
   shiftType   String // Pagi/Malam
 
   user                 User                  @relation(fields: [userId], references: [id])
+  verifiedBy           User?                 @relation("ShiftReportVerifier", fields: [verifiedById], references: [id])
   store                Store                 @relation(fields: [storeId], references: [id])
   digitalTransactions  DigitalTransaction[]
   expenditures         Expenditure[]
@@ -102,6 +105,7 @@ model ShiftReport {
 
   @@index([userId])
   @@index([storeId])
+  @@index([verifiedById])
   @@index([date])
   @@index([shiftType])
 }

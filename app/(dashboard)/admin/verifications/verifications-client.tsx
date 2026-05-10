@@ -66,23 +66,24 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
   const [unverifyState, unverifyAction, isUnverifying] = useActionState(unverifyShiftReport, undefined);
 
   useEffect(() => {
-    if (verifyState === "SUCCESS") {
+    if (verifyState?.status === "SUCCESS") {
       toast.success("Laporan berhasil diverifikasi", {
         description: `Laporan telah di-approve.`,
       });
       setVerifyDialogOpen(false);
+      setSelectedReport(null);
       router.refresh();
-    } else if (verifyState) {
-      toast.error(verifyState);
+    } else if (verifyState?.status === "ERROR") {
+      toast.error(verifyState.message);
     }
   }, [verifyState, router]);
 
   useEffect(() => {
-    if (unverifyState === "SUCCESS") {
+    if (unverifyState?.status === "SUCCESS") {
       toast.success("Verifikasi laporan dibatalkan");
       router.refresh();
-    } else if (unverifyState) {
-      toast.error(unverifyState);
+    } else if (unverifyState?.status === "ERROR") {
+      toast.error(unverifyState.message);
     }
   }, [unverifyState, router]);
 
@@ -192,7 +193,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                             <p className="font-mono font-medium">{formatCurrency(report.posDebit)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-xs font-bold text-amber-600 uppercase tracking-tighter">Sisa Tagihan</p>
+                            <p className="text-xs font-bold text-amber-600 uppercase tracking-tighter">Sisa Tagihan</p>
                             <p className="font-mono font-bold text-amber-600">
                               {formatCurrency(report.billMoneyReceived - report.expenditures.reduce((acc: number, curr: any) => acc + (curr.amountFromBill || 0), 0))}
                             </p>
@@ -361,6 +362,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                     <TableHead>Shift</TableHead>
                     <TableHead className="text-right">Selisih</TableHead>
                     <TableHead>Catatan</TableHead>
+                      <TableHead>Diverifikasi Oleh</TableHead>
                     <TableHead>Diverifikasi</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -381,6 +383,9 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-40 truncate">
                         {report.adminNotes || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {report.verifiedBy?.name || "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {report.verifiedAt ? formatDateTime(report.verifiedAt.toISOString(), timezone) : "—"}
@@ -420,7 +425,15 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
       )}
 
       {/* Verification Dialog */}
-      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+      <Dialog
+        open={verifyDialogOpen}
+        onOpenChange={(open) => {
+          setVerifyDialogOpen(open);
+          if (!open) {
+            setSelectedReport(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -431,7 +444,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               {selectedReport?.user.name} — {selectedReport ? formatLocalDate(selectedReport.date, timezone) : ""} Shift {selectedReport?.shiftType}
             </DialogDescription>
           </DialogHeader>
-          <form action={verifyAction} className="space-y-4 pt-2">
+          <form key={selectedReport?.id || "verify-form"} action={verifyAction} className="space-y-4 pt-2">
             <input type="hidden" name="reportId" value={selectedReport?.id || ""} />
             
             {selectedReport && (
