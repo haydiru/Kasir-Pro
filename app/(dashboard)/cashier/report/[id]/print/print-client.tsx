@@ -112,28 +112,26 @@ export function PrintClient({ report, timezone }: { report: any, timezone: strin
             </div>
           </div>
 
-          {(report.billMoneyReceived > 0 || expSummary.fromBill > 0) && (
-            <div className="flex-1 border border-amber-200 bg-amber-50/30 rounded overflow-hidden flex flex-col">
-              <div className="px-3 py-1.5 border-b border-amber-200 text-amber-800 text-[10px] font-bold uppercase tracking-widest">
-                Rekap Uang Tagihan
+          <div className="flex-1 border border-amber-200 bg-amber-50/30 rounded overflow-hidden flex flex-col">
+            <div className="px-3 py-1.5 border-b border-amber-200 text-amber-800 text-[10px] font-bold uppercase tracking-widest">
+              Rekap Uang Tagihan
+            </div>
+            <div className="p-3 space-y-1.5 flex-1">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-amber-900/70">Uang Tagihan Masuk</span>
+                <span className="font-mono">{formatCurrency(report.billMoneyReceived || 0)}</span>
               </div>
-              <div className="p-3 space-y-1.5 flex-1">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-amber-900/70">Uang Tagihan Masuk</span>
-                  <span className="font-mono">{formatCurrency(report.billMoneyReceived)}</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-amber-900/70">− Pengeluaran (Tagihan)</span>
-                  <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromBill)}</span>
-                </div>
-                <div className="h-px bg-amber-200/50 my-1" />
-                <div className="flex justify-between items-center font-bold text-amber-900 text-[11px]">
-                  <span>Sisa Uang Tagihan</span>
-                  <span className="font-mono">{formatCurrency(sisaUangTagihan)}</span>
-                </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-amber-900/70">− Pengeluaran (Tagihan)</span>
+                <span className="font-mono text-red-600">−{formatCurrency(expSummary.fromBill || 0)}</span>
+              </div>
+              <div className="h-px bg-amber-200/50 my-1" />
+              <div className="flex justify-between items-center font-bold text-amber-900 text-[11px]">
+                <span>Sisa Uang Tagihan</span>
+                <span className="font-mono">{formatCurrency(sisaUangTagihan)}</span>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* SECTION 3: Hitungan Manual & Variance */}
@@ -167,13 +165,13 @@ export function PrintClient({ report, timezone }: { report: any, timezone: strin
             {report.digitalTransactions.length > 0 && (
               <div className="flex-1">
                 <h3 className="text-[9px] font-bold uppercase border-b border-gray-200 pb-0.5 mb-1">Detail Transaksi Digital</h3>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {report.digitalTransactions.map((tx: any) => (
-                    <div key={tx.id} className="flex justify-between text-[8px] text-gray-600">
-                      <span className="truncate pr-2 max-w-[120px]">
+                    <div key={tx.id} className="flex justify-between gap-2 text-[8px] text-gray-600">
+                      <div className="min-w-0 break-words leading-tight">
                         {tx.serviceType} {tx.detailContact ? `(${tx.detailContact})` : ""}
-                      </span>
-                      <span className="font-mono">{formatCurrency(tx.grossAmount)}</span>
+                      </div>
+                      <div className="shrink-0 font-mono">{formatCurrency(tx.grossAmount)}</div>
                     </div>
                   ))}
                 </div>
