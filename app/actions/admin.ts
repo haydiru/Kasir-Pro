@@ -209,6 +209,52 @@ export async function verifyShiftReport(prevState: string | undefined, formData:
   }
 }
 
+export async function unverifyShiftReport(prevState: string | undefined, formData: FormData) {
+  try {
+    const admin = await checkAdminAccess();
+    const reportId = formData.get("reportId") as string;
+
+    if (!reportId) return "ID Laporan tidak valid.";
+
+    const report = await prisma.shiftReport.findUnique({ where: { id: reportId } });
+    if (!report || report.storeId !== admin.storeId) {
+      return "Laporan tidak ditemukan atau Anda tidak memiliki akses.";
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const existingTx = await tx.financialTransaction.findUnique({
+        where: { shiftReportId: report.id }
+      });
+
+      if (existingTx) {
+        await tx.financialAccount.update({
+          where: { id: existingTx.accountId },
+          data: { balance: { decrement: existingTx.amount } }
+        });
+
+        await tx.financialTransaction.delete({
+          where: { id: existingTx.id }
+        });
+      }
+
+      await tx.shiftReport.update({
+        where: { id: reportId },
+        data: {
+          status: "Submitted",
+          finalAdminVariance: null,
+          verifiedAt: null,
+          adminNotes: null,
+        }
+      });
+    });
+
+    revalidatePath("/admin/verifications");
+    return "SUCCESS";
+  } catch (error: any) {
+    return `Gagal membatalkan verifikasi: ${error.message}`;
+  }
+}
+
 export async function resetUserPin(userId: string) {
   try {
     const admin = await checkAdminAccess();

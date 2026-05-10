@@ -30,7 +30,8 @@ import {
   FileText,
   AlertTriangle,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from "lucide-react";
 import { 
   formatCurrency, 
@@ -44,7 +45,7 @@ import {
   getTZDateRange
 } from "@/lib/utils";
 import { toast } from "sonner";
-import { verifyShiftReport } from "@/app/actions/admin";
+import { verifyShiftReport, unverifyShiftReport } from "@/app/actions/admin";
 import { deleteShiftReport } from "@/app/actions/report";
 import { useRouter } from "next/navigation";
 
@@ -62,6 +63,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
   const router = useRouter();
 
   const [verifyState, verifyAction, isVerifying] = useActionState(verifyShiftReport, undefined);
+  const [unverifyState, unverifyAction, isUnverifying] = useActionState(unverifyShiftReport, undefined);
 
   useEffect(() => {
     if (verifyState === "SUCCESS") {
@@ -69,10 +71,20 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
         description: `Laporan telah di-approve.`,
       });
       setVerifyDialogOpen(false);
+      router.refresh();
     } else if (verifyState) {
       toast.error(verifyState);
     }
-  }, [verifyState]);
+  }, [verifyState, router]);
+
+  useEffect(() => {
+    if (unverifyState === "SUCCESS") {
+      toast.success("Verifikasi laporan dibatalkan");
+      router.refresh();
+    } else if (unverifyState) {
+      toast.error(unverifyState);
+    }
+  }, [unverifyState, router]);
 
   const handleOpenVerify = (report: any) => {
     setSelectedReport(report);
@@ -350,6 +362,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                     <TableHead className="text-right">Selisih</TableHead>
                     <TableHead>Catatan</TableHead>
                     <TableHead>Diverifikasi</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -371,6 +384,31 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {report.verifiedAt ? formatDateTime(report.verifiedAt.toISOString(), timezone) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleOpenVerify(report)}>
+                            <RotateCcw className="mr-1 h-4 w-4" />
+                            Re-verify
+                          </Button>
+                          <form action={unverifyAction} className="inline">
+                            <input type="hidden" name="reportId" value={report.id} />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              disabled={isUnverifying}
+                              onClick={(event) => {
+                                if (!confirm(`Batalkan verifikasi laporan ${report.user.name} pada ${formatLocalDate(report.date, timezone)}?`)) {
+                                  event.preventDefault();
+                                }
+                              }}
+                            >
+                              Batalkan
+                            </Button>
+                          </form>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
