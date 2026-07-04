@@ -7,9 +7,11 @@ import { parseFlipEmail } from "@/lib/flip-parser";
  *
  * Receives email data from Google Apps Script.
  * Headers: x-api-key (must match store.flipApiKey)
- * Body: { subject: string, body: string, storeId: string }
+ * Body: 
+ *   Single object: { subject: string, body: string, storeId: string }
+ *   Or Array: Array<{ subject: string, body: string, storeId: string }>
  *
- * Idempotent: if flipId already exists for the store, skips insert.
+ * Idempotent: if flipId already exists for the store, updates the record (upsert).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -22,22 +24,24 @@ export async function POST(req: NextRequest) {
     }
 
     const json = await req.json();
-    const { subject, body, storeId } = json as {
-      subject?: string;
-      body?: string;
-      storeId?: string;
-    };
+    const items = Array.isArray(json) ? json : [json];
 
-    if (!subject || !body || !storeId) {
+    if (items.length === 0) {
+      return NextResponse.json({ success: true, processed: 0, data: [] });
+    }
+
+    // All items in a batch must belong to the same store
+    const firstStoreId = items[0]?.storeId;
+    if (!firstStoreId) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: subject, body, storeId" },
+        { success: false, error: "Missing storeId in payload" },
         { status: 400 }
       );
     }
 
     // Validate API key against the store
     const store = await prisma.store.findUnique({
-      where: { id: storeId },
+      where: { id: firstStoreId },
       select: { flipApiKey: true },
     });
 
@@ -48,54 +52,86 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse email content
-    const parsed = parseFlipEmail(subject, body);
-    if (!parsed) {
-      return NextResponse.json(
-        { success: false, error: "Could not parse Flip transaction from email" },
-        { status: 422 }
-      );
-    }
+    const results = [];
+    const failed = [];
 
-    // Upsert — idempotent by flipId + storeId
-    const record = await prisma.flipWebhook.upsert({
-      where: {
-        flipId_storeId: {
-          flipId: parsed.flipId,
-          storeId,
+    for (const item of items) {
+      const { subject, body, storeId } = item as {
+        subject?: string;
+        body?: string;
+        storeId?: string;
+      };
+
+      if (!subject || !body || !storeId) {
+        failed.push({
+          subject: subject || "Unknown Subject",
+          error: "Missing required fields: subject, body, storeId",
+        });
+        continue;
+      }
+
+      if (storeId !== firstStoreId) {
+        failed.push({
+          subject,
+          error: "storeId mismatch in batch",
+        });
+        continue;
+      }
+
+      // Parse email content
+      const parsed = parseFlipEmail(subject, body);
+      if (!parsed) {
+        failed.push({
+          subject,
+          error: "Could not parse Flip transaction from email",
+        });
+        continue;
+      }
+
+      // Upsert — idempotent by flipId + storeId
+      const record = await prisma.flipWebhook.upsert({
+        where: {
+          flipId_storeId: {
+            flipId: parsed.flipId,
+            storeId,
+          },
         },
-      },
-      update: {
-        // Update fields if re-sent
-        nominal: parsed.nominal,
-        transactionTime: parsed.transactionTime,
-        customerName: parsed.customerName,
-        customerNumber: parsed.customerNumber,
-        bankOrProvider: parsed.bankOrProvider,
-        emailSubject: parsed.emailSubject,
-      },
-      create: {
-        storeId,
-        flipId: parsed.flipId,
-        serviceType: parsed.serviceType,
-        nominal: parsed.nominal,
-        customerName: parsed.customerName,
-        customerNumber: parsed.customerNumber,
-        bankOrProvider: parsed.bankOrProvider,
-        transactionTime: parsed.transactionTime,
-        emailSubject: parsed.emailSubject,
-      },
-    });
+        update: {
+          nominal: parsed.nominal,
+          transactionTime: parsed.transactionTime,
+          customerName: parsed.customerName,
+          customerNumber: parsed.customerNumber,
+          bankOrProvider: parsed.bankOrProvider,
+          emailSubject: parsed.emailSubject,
+        },
+        create: {
+          storeId,
+          flipId: parsed.flipId,
+          serviceType: parsed.serviceType,
+          nominal: parsed.nominal,
+          customerName: parsed.customerName,
+          customerNumber: parsed.customerNumber,
+          bankOrProvider: parsed.bankOrProvider,
+          transactionTime: parsed.transactionTime,
+          emailSubject: parsed.emailSubject,
+        },
+      });
 
-    return NextResponse.json({
-      success: true,
-      data: {
+      results.push({
         id: record.id,
         flipId: record.flipId,
         serviceType: record.serviceType,
         nominal: record.nominal,
         transactionTime: record.transactionTime,
-      },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      processed: results.length,
+      failed: failed.length,
+      data: results,
+      errors: failed.length > 0 ? failed : undefined,
     });
   } catch (error: any) {
     console.error("flip-email API error:", error);

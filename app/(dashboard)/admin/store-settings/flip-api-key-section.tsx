@@ -63,57 +63,70 @@ export default function FlipApiKeySection({ initialApiKey, storeId, appUrl }: Pr
  * 1. Buat project baru di script.google.com
  * 2. Paste seluruh kode ini
  * 3. Klik ▶ Run, lalu Allow permissions
- * 4. Buat Time-driven trigger: forwardFlipEmails → setiap 5 menit
+ * 4. Buat Time-driven trigger: forwardFlipEmails → setiap 30 menit
  */
 
 const CONFIG = {
   API_URL: "${appUrl}/api/flip-email",
   API_KEY: "${apiKey || "PASTE_API_KEY_DISINI"}",
   STORE_ID: "${storeId}",
-  LABEL_DONE: "FlipSynced", // Label Gmail untuk email yang sudah diproses
-  START_DATE: "2026/04/01", // Tanggal awal penarikan data (Format: YYYY/MM/DD)
 };
 
 function forwardFlipEmails() {
-  // Cari email dari Flip yang belum dilabeli dan setelah tanggal START_DATE
+  // Cari email dari Flip dalam 2 jam terakhir (menggunakan newer_than:2h)
   // Mengabaikan email Top Up Saldo & tagihan Flip Freedom
-  const query = \`from:no-reply@flip.id subject:"berhasil" -subject:"Flip Freedom" -subject:"Top Up Saldo" after:\${CONFIG.START_DATE} -label:\${CONFIG.LABEL_DONE}\`;
-  const threads = GmailApp.search(query, 0, 20);
+  const query = 'from:no-reply@flip.id subject:"berhasil" -subject:"Flip Freedom" -subject:"Top Up Saldo" newer_than:2h';
+  const threads = GmailApp.search(query, 0, 50);
 
-  if (threads.length === 0) return;
+  if (threads.length === 0) {
+    Logger.log("No threads found matching query.");
+    return;
+  }
 
-  // Pastikan label ada
-  let label = GmailApp.getUserLabelByName(CONFIG.LABEL_DONE);
-  if (!label) label = GmailApp.createLabel(CONFIG.LABEL_DONE);
+  const now = new Date();
+  // Filter pesan yang benar-benar diterima dalam 2 jam terakhir (2 jam + 5 menit buffer)
+  const cutoffTime = new Date(now.getTime() - (2 * 60 * 60 * 1000 + 5 * 60 * 1000));
+  
+  const payloadData = [];
 
   for (const thread of threads) {
-    try {
-      const msg = thread.getMessages()[0];
-      const subject = msg.getSubject();
-      const body = msg.getBody();
-
-      const response = UrlFetchApp.fetch(CONFIG.API_URL, {
-        method: "post",
-        contentType: "application/json",
-        headers: { "x-api-key": CONFIG.API_KEY },
-        payload: JSON.stringify({
-          subject: subject,
-          body: body,
-          storeId: CONFIG.STORE_ID,
-        }),
-        muteHttpExceptions: true,
-      });
-
-      const result = JSON.parse(response.getContentText());
-      if (result.success) {
-        thread.addLabel(label);
-        Logger.log("Synced: " + subject);
-      } else {
-        Logger.log("Failed: " + subject + " — " + result.error);
+    const messages = thread.getMessages();
+    for (const msg of messages) {
+      if (msg.getDate() >= cutoffTime) {
+        payloadData.push({
+          subject: msg.getSubject(),
+          body: msg.getBody(),
+          storeId: CONFIG.STORE_ID
+        });
       }
-    } catch (e) {
-      Logger.log("Error: " + e.toString());
     }
+  }
+
+  if (payloadData.length === 0) {
+    Logger.log("No new messages found within the last 2 hours.");
+    return;
+  }
+
+  Logger.log("Sending " + payloadData.length + " message(s) to the app...");
+
+  // Kirim data secara batch ke Webhook
+  try {
+    const response = UrlFetchApp.fetch(CONFIG.API_URL, {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-api-key": CONFIG.API_KEY },
+      payload: JSON.stringify(payloadData),
+      muteHttpExceptions: true,
+    });
+
+    const result = JSON.parse(response.getContentText());
+    if (result.success) {
+      Logger.log("Successfully synced " + result.processed + " transaction(s). Failed: " + result.failed);
+    } else {
+      Logger.log("Failed to sync: " + result.error);
+    }
+  } catch (e) {
+    Logger.log("Network or parser error: " + e.toString());
   }
 }`;
 
@@ -267,7 +280,7 @@ function forwardFlipEmails() {
                   <li>Klik ▶ Run → Izinkan akses Gmail</li>
                   <li>
                     Buat Trigger: <b>Triggers</b> → Add Trigger →{" "}
-                    <code className="bg-muted px-1 rounded text-[10px]">forwardFlipEmails</code> → Time-driven → Every 5 minutes
+                    <code className="bg-muted px-1 rounded text-[10px]">forwardFlipEmails</code> → Time-driven → Every 30 minutes
                   </li>
                 </ol>
               </div>
