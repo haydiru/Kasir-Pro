@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import ShiftClientActions from "./shift-client-actions";
 import StoreUpdateForm from "./store-update-form";
 import FlipApiKeySection from "./flip-api-key-section";
+import GoogleCalendarSection from "./google-calendar-section";
 import { headers } from "next/headers";
 
 export default async function StoreSettingsPage() {
@@ -22,6 +23,7 @@ export default async function StoreSettingsPage() {
   const store = await prisma.store.findUnique({
     where: { id: session.user.storeId },
     include: {
+      googleAuth: true,
       shiftSettings: {
         orderBy: [
           { dayOfWeek: "asc" },
@@ -100,6 +102,11 @@ export default async function StoreSettingsPage() {
             initialApiKey={store.flipApiKey || null}
             storeId={store.id}
             appUrl={appUrl}
+          />
+
+          <GoogleCalendarSection
+            googleAuth={store.googleAuth}
+            storeId={store.id}
           />
         </div>
 

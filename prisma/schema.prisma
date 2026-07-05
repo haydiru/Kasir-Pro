@@ -24,6 +24,8 @@ model Store {
   financialAccounts     FinancialAccount[]
   financialTransactions FinancialTransaction[]
   emptyItems            EmptyItem[]
+  bills                 Bill[]
+  googleAuth            StoreGoogleAuth?
 }
 
 model User {
@@ -50,6 +52,7 @@ model User {
   notifications       Notification[]
   createdEmptyItems   EmptyItem[]          @relation("CreatedEmptyItems")
   processedEmptyItems EmptyItem[]          @relation("ProcessedEmptyItems")
+  billsCreated        Bill[]               @relation("CreatedBills")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -284,5 +287,37 @@ model EmptyItem {
   processor   User?    @relation("ProcessedEmptyItems", fields: [processorId], references: [id])
 
   @@index([storeId])
+  @@index([status])
+}
+
+model StoreGoogleAuth {
+  id           String   @id @default(uuid())
+  storeId      String   @unique
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text // Sangat penting untuk generate token baru otomatis
+  expiryDate   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model Bill {
+  id              String   @id @default(uuid())
+  storeId         String
+  supplierName    String
+  dueDate         DateTime // Tanggal jatuh tempo
+  amount          Float    // Nominal tagihan
+  status          String   @default("BELUM_BAYAR") // "BELUM_BAYAR", "LUNAS"
+  calendarEventId String?  // ID event kalender unik untuk sinkronisasi
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy       User?    @relation("CreatedBills", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([dueDate])
   @@index([status])
 }

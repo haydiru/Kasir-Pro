@@ -30,12 +30,14 @@ const adminNav = [
   { label: "Verifikasi", href: "/admin/verifications", icon: ShieldCheck },
   { label: "Buku Kas", href: "/admin/cashflow", icon: Wallet },
   { label: "Transaksi Flip", href: "/admin/flip-transactions", icon: Smartphone },
+  { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
   { label: "Pengguna", href: "/admin/users", icon: Users },
   { label: "Pengaturan Toko", href: "/admin/store-settings", icon: Settings },
 ];
 
 const cashierNav = [
   { label: "Laporan Shift", href: "/cashier/report", icon: ClipboardList },
+  { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
   { label: "Riwayat", href: "/cashier/history", icon: History },
 ];
 
