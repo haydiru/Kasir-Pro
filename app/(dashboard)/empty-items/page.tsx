@@ -42,7 +42,10 @@ import {
   Square,
   ListPlus,
   FileText,
-  X
+  X,
+  Share2,
+  Copy,
+  Check
 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 
@@ -85,6 +88,10 @@ export default function EmptyItemsPage() {
   // Action Loading states per Item ID or Bulk
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
+
+  // Share Link state
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const fetchItems = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsRefreshing(true);
@@ -398,19 +405,31 @@ export default function EmptyItemsPage() {
           </p>
         </div>
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => fetchItemsSafe(false)}
-          disabled={isRefreshing}
-          className="h-9 w-9 rounded-xl p-0"
-        >
-          <RefreshCw
-            className={`h-4 w-4 text-muted-foreground ${
-              isRefreshing ? "animate-spin text-primary" : ""
-            }`}
-          />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsShareDialogOpen(true)}
+            className="h-9 rounded-xl px-3 gap-1.5 text-xs font-bold"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Bagikan
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fetchItemsSafe(false)}
+            disabled={isRefreshing}
+            className="h-9 w-9 rounded-xl p-0"
+          >
+            <RefreshCw
+              className={`h-4 w-4 text-muted-foreground ${
+                isRefreshing ? "animate-spin text-primary" : ""
+              }`}
+            />
+          </Button>
+        </div>
       </div>
 
       {/* Action Button: Create New Item (Large & Mobile Friendly) */}
@@ -878,6 +897,53 @@ export default function EmptyItemsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Share Link */}
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent className="max-w-xs sm:max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black tracking-tight flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-primary" />
+              Bagikan Link Ceklist
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Salin link di bawah ini dan kirimkan ke orang yang akan membantu belanja. Mereka <strong>tidak perlu login</strong> dan hanya bisa mengubah status (Proses / Selesai), tidak bisa menambah atau menghapus barang.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/empty-items/${session?.user?.storeId || ''}`}
+                className="h-10 rounded-xl bg-muted/30 text-xs font-mono flex-1"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  const url = `${window.location.origin}/share/empty-items/${session?.user?.storeId || ''}`;
+                  navigator.clipboard.writeText(url);
+                  setIsCopied(true);
+                  toast.success("Link berhasil disalin ke clipboard!");
+                  setTimeout(() => setIsCopied(false), 2000);
+                }}
+                className="h-10 rounded-xl px-4 gap-1.5 text-xs font-bold shrink-0"
+              >
+                {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {isCopied ? "Tersalin!" : "Salin"}
+              </Button>
+            </div>
+
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 space-y-1">
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">⚠️ Catatan Keamanan</p>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400/80 leading-relaxed">
+                Siapapun yang memiliki link ini bisa melihat dan memperbarui status ceklist barang kosong toko Anda. Bagikan hanya kepada orang yang Anda percaya.
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
