@@ -32,6 +32,7 @@ const adminNav = [
   { label: "Transaksi Flip", href: "/admin/flip-transactions", icon: Smartphone },
   { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
   { label: "Pengguna", href: "/admin/users", icon: Users },
+  { label: "Master Supplier", href: "/admin/suppliers", icon: Users },
   { label: "Pengaturan Toko", href: "/admin/store-settings", icon: Settings },
 ];
 

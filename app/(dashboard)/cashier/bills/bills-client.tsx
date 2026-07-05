@@ -37,6 +37,7 @@ import {
 import { formatCurrency, formatFullLocalDate, formatLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { createBill, updateBillStatus, deleteBill } from "@/app/actions/bill";
+import SupplierCombobox from "@/components/supplier-combobox";
 
 interface BillItem {
   id: string;
@@ -65,6 +66,7 @@ export default function BillsClient({ initialBills, timezone, isGoogleConnected 
   // Modal State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [supplierName, setSupplierName] = useState("");
+  const [supplierId, setSupplierId] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,6 +143,7 @@ export default function BillsClient({ initialBills, timezone, isGoogleConnected 
     try {
       const res = await createBill({
         supplierName,
+        supplierId: supplierId || undefined,
         dueDate: new Date(dueDate).toISOString(),
         amount: Number(amount),
       });
@@ -150,6 +153,7 @@ export default function BillsClient({ initialBills, timezone, isGoogleConnected 
       } else {
         toast.success(res.success || "Tagihan berhasil disimpan!");
         setSupplierName("");
+        setSupplierId("");
         setAmount("");
         setDueDate("");
         setIsDialogOpen(false);
@@ -491,16 +495,16 @@ export default function BillsClient({ initialBills, timezone, isGoogleConnected 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             {/* Supplier Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="supplierName" className="text-xs font-bold">
+              <Label className="text-xs font-bold">
                 Nama Supplier / Tujuan <span className="text-rose-500">*</span>
               </Label>
-              <Input
-                id="supplierName"
-                placeholder="Contoh: Wings Food, Coca-Cola Distributor"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                required
-                className="h-10 rounded-xl bg-muted/30"
+              <SupplierCombobox
+                selectedId={supplierId}
+                selectedName={supplierName}
+                onChange={(id, name) => {
+                  setSupplierId(id);
+                  setSupplierName(name);
+                }}
               />
             </div>
 

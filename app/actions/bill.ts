@@ -172,6 +172,7 @@ async function deleteCalendarEvent(storeId: string, eventId: string): Promise<vo
 
 export async function createBill(data: {
   supplierName: string;
+  supplierId?: string;
   dueDate: string; // ISO Date String
   amount: number;
 }) {
@@ -201,6 +202,7 @@ export async function createBill(data: {
       data: {
         storeId,
         supplierName: data.supplierName.trim(),
+        supplierId: data.supplierId || null,
         dueDate: parsedDueDate,
         amount: data.amount,
         status: "BELUM_BAYAR",
