@@ -101,8 +101,14 @@ function extractNominal(body: string): number {
  */
 function parseIndonesianDate(dateStr: string): Date {
   const months: Record<string, number> = {
+    // Indonesian
     januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
     juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11,
+    // English full
+    january: 0, february: 1, march: 2, may: 4, june: 5,
+    july: 6, august: 7, october: 9, december: 11,
+    // English/Indonesian short
+    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, agt: 7, aug: 7, sep: 8, okt: 9, oct: 9, nov: 10, des: 11, dec: 11
   };
 
   // Match: "14 April 2026, 14:00 WIB" or "14 April 2026 14:00 WIB"
