@@ -151,6 +151,10 @@ function extractCustomerName(body: string, serviceType: string): string | null {
   if (serviceType === "Transfer") {
     const m = text.match(/Nama Tujuan[^A-Z]*([\w\s.]+?)(?=\s{2,}|Bank|Nomor)/i);
     if (m) return m[1].trim();
+  } else if (serviceType === "Pulsa/Paket Data") {
+    // Extract Produk
+    const m = text.match(/Produk\s+(.+?)(?=\s*Nomor HP|\s*ID Transaksi|\s*Waktu|\s*Nomor Referensi)/i);
+    if (m) return m[1].trim();
   } else {
     // Bill payments
     const m = text.match(/Nama Pelanggan[^A-Z]*([\w\s.]+?)(?=\s{2,}|Alamat|Periode|Jumlah)/i);
@@ -169,7 +173,7 @@ function extractCustomerNumber(body: string, serviceType: string): string | null
     const m = text.match(/Nomor Rekening Tujuan\s*([\d\s]+)/i);
     if (m) return m[1].trim();
   } else {
-    const m = text.match(/(?:Nomor Pelanggan|Nomor Meter\/ID)\s*([\d\s]+)/i);
+    const m = text.match(/(?:Nomor Pelanggan|Nomor Meter\/ID|Nomor HP)\s*([+\d\s\-]+)/i);
     if (m) return m[1].trim();
   }
   return null;
@@ -191,6 +195,14 @@ function extractBankOrProvider(body: string, serviceType: string, subject: strin
     return "Telkom";
   } else if (serviceType === "Listrik") {
     return "PLN";
+  } else if (serviceType === "Pulsa/Paket Data") {
+    const textLower = text.toLowerCase();
+    if (textLower.includes("telkomsel") || textLower.includes("by.u")) return "Telkomsel";
+    if (textLower.includes("indosat") || textLower.includes("im3") || textLower.includes("mentari")) return "Indosat";
+    if (textLower.includes("xl") || textLower.includes("prioritas")) return "XL";
+    if (textLower.includes("axis") || textLower.includes("bronet") || textLower.includes("owsem")) return "Axis";
+    if (textLower.includes("three") || textLower.includes("tri") || textLower.includes(" 3 ")) return "Tri";
+    if (textLower.includes("smartfren")) return "Smartfren";
   }
   return null;
 }
