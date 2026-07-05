@@ -214,6 +214,15 @@ export default async function DashboardPage() {
                             <span className="text-sm font-bold">Riwayat Presensi</span>
                         </div>
                     </Link>
+
+                    <Link href="/empty-items" className="group">
+                        <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-card border border-border/50 shadow-sm transition-all hover:border-primary/50 hover:shadow-md hover:-translate-y-1">
+                            <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-white transition-colors text-amber-600">
+                                <ClipboardList className="h-6 w-6" />
+                            </div>
+                            <span className="text-sm font-bold">Barang Kosong</span>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

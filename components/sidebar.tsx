@@ -45,6 +45,7 @@ const pramuniagaNav = [
 
 const commonNav = [
   { label: "Presensi", href: "/attendance", icon: Clock },
+  { label: "Barang Kosong", href: "/empty-items", icon: ClipboardList },
 ];
 
 interface SidebarProps {

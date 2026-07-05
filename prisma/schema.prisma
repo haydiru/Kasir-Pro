@@ -23,6 +23,7 @@ model Store {
   updatedAt             DateTime               @updatedAt
   financialAccounts     FinancialAccount[]
   financialTransactions FinancialTransaction[]
+  emptyItems            EmptyItem[]
 }
 
 model User {
@@ -47,6 +48,8 @@ model User {
   financialAccounts   FinancialAccount[]
   createdTransactions FinancialTransaction[]
   notifications       Notification[]
+  createdEmptyItems   EmptyItem[]          @relation("CreatedEmptyItems")
+  processedEmptyItems EmptyItem[]          @relation("ProcessedEmptyItems")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -263,4 +266,23 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model EmptyItem {
+  id          String   @id @default(uuid())
+  storeId     String
+  itemName    String
+  status      String   @default("BUTUH") // 'BUTUH', 'PROSES', 'SELESAI'
+  createdById String
+  processorId String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("CreatedEmptyItems", fields: [createdById], references: [id])
+  processor   User?    @relation("ProcessedEmptyItems", fields: [processorId], references: [id])
+
+  @@index([storeId])
+  @@index([status])
 }
