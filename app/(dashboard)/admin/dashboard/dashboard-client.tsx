@@ -14,6 +14,13 @@ import { formatCurrency, formatTime, getRoleLabel, calcExpectedCash } from "@/li
 import { getAdminDashboardStats, type DashboardStatsResult } from "@/app/actions/dashboard";
 import { getPayrollRecap, type PayrollRecapItem } from "@/app/actions/payroll";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // ──── Types ────
 
@@ -123,6 +130,23 @@ export function DashboardClient({
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
   const [isPending, startTransition] = useTransition();
+
+  const [recap, setRecap] = useState<PayrollRecapItem[]>(payrollRecap);
+  const [recapOffset, setRecapOffset] = useState<number>(0);
+  const [isRecapPending, startRecapTransition] = useTransition();
+
+  function handleRecapOffsetChange(val: string) {
+    const offset = Number(val);
+    setRecapOffset(offset);
+    startRecapTransition(async () => {
+      try {
+        const data = await getPayrollRecap(offset);
+        setRecap(data);
+      } catch (err) {
+        toast.error("Gagal memuat rekap absensi");
+      }
+    });
+  }
 
   function handlePreset(days: number) {
     const end = new Date();
@@ -348,12 +372,33 @@ export function DashboardClient({
         <Card className="border-0 shadow-sm lg:col-span-3">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Rekap Absensi (Periode Berjalan)</CardTitle>
-              <Badge variant="secondary" className="font-normal text-xs">Siklus Gaji</Badge>
+              <div className="space-y-1">
+                <CardTitle className="text-base">Rekap Absensi</CardTitle>
+                <p className="text-xs text-muted-foreground">Siklus Gaji Pegawai</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={String(recapOffset)}
+                  onValueChange={handleRecapOffsetChange}
+                  disabled={isRecapPending}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Pilih Periode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Periode Berjalan</SelectItem>
+                    <SelectItem value="-1">1 Periode Lalu</SelectItem>
+                    <SelectItem value="-2">2 Periode Lalu</SelectItem>
+                    <SelectItem value="-3">3 Periode Lalu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {payrollRecap.length === 0 ? (
+            {isRecapPending ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Memuat data...</p>
+            ) : recap.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">Tidak ada data pegawai</p>
             ) : (
               <Table>
@@ -367,7 +412,7 @@ export function DashboardClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payrollRecap.map((item) => (
+                  {recap.map((item) => (
                     <TableRow key={item.userId}>
                       <TableCell className="font-medium">
                         <div>

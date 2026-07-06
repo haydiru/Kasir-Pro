@@ -17,58 +17,93 @@ export interface PayrollRecapItem {
 }
 
 /**
- * Calculates the start and end dates for the current payroll cycle.
+ * Calculates the start and end dates for the payroll cycle with timezone accuracy.
  */
-/**
- * Calculates the start and end dates for the current payroll cycle.
- */
-function getActivePayrollRange(cycleStart: number, cycleEnd: number, timeZone: string) {
-  const now = new Date();
+function createLocalDate(year: number, month: number, day: number, hour: number, minute: number, second: number, ms: number, timeZone: string): Date {
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms));
+  const tzString = utcDate.toLocaleString("en-US", { timeZone, hour12: false });
   
-  // Get components in target TZ
+  const match = tzString.match(/(\d+)\/(\d+)\/(\d+),\s+(\d+):(\d+):(\d+)/);
+  if (!match) return utcDate;
+  
+  const tzMonth = parseInt(match[1]);
+  const tzDay = parseInt(match[2]);
+  const tzYear = parseInt(match[3]);
+  const tzHour = parseInt(match[4]);
+  const tzMinute = parseInt(match[5]);
+  const tzSecond = parseInt(match[6]);
+  
+  const parsedTzDate = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute, tzSecond, ms);
+  const offset = utcDate.getTime() - parsedTzDate;
+  
+  return new Date(utcDate.getTime() + offset);
+}
+
+function getPayrollRange(
+  cycleStart: number,
+  cycleEnd: number,
+  timeZone: string,
+  periodOffset: number = 0,
+  referenceDate: Date = new Date()
+) {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
     month: "numeric",
     day: "numeric",
   });
-  const parts = formatter.formatToParts(now);
+  const parts = formatter.formatToParts(referenceDate);
   const partMap: Record<string, string> = {};
   parts.forEach(p => partMap[p.type] = p.value);
   
-  const year = parseInt(partMap.year);
-  const month = parseInt(partMap.month) - 1; // 0-indexed
-  const day = parseInt(partMap.day);
+  const refYear = parseInt(partMap.year);
+  const refMonth = parseInt(partMap.month); // 1-12
+  const refDay = parseInt(partMap.day);
 
-  let start: Date;
-  let end: Date;
-
-  const getUTC = (s: string) => {
-    const d = new Date(s);
-    const inv = new Date(d.toLocaleString("en-US", { timeZone }));
-    const diff = d.getTime() - inv.getTime();
-    return new Date(d.getTime() + diff);
+  const getRangeForStartMonth = (startYear: number, startMonth: number) => {
+    const start = createLocalDate(startYear, startMonth, cycleStart, 0, 0, 0, 0, timeZone);
+    let end: Date;
+    if (cycleEnd < cycleStart) {
+      let endYear = startYear;
+      let endMonth = startMonth + 1;
+      if (endMonth > 12) {
+        endMonth = 1;
+        endYear += 1;
+      }
+      end = createLocalDate(endYear, endMonth, cycleEnd, 23, 59, 59, 999, timeZone);
+    } else {
+      end = createLocalDate(startYear, startMonth, cycleEnd, 23, 59, 59, 999, timeZone);
+    }
+    return { start, end, startYear, startMonth };
   };
 
-  if (day >= cycleStart) {
-    // Current cycle started this month
-    const startStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(cycleStart).padStart(2, '0')}T00:00:00`;
-    // End is next month's cycleEnd
-    const endStr = `${month === 11 ? year + 1 : year}-${String((month + 1) % 12 + 1).padStart(2, '0')}-${String(cycleEnd).padStart(2, '0')}T23:59:59.999`;
-    start = getUTC(startStr);
-    end = getUTC(endStr);
-  } else {
-    // Current cycle started last month
-    const startStr = `${month === 0 ? year - 1 : year}-${String(month === 0 ? 12 : month).padStart(2, '0')}-${String(cycleStart).padStart(2, '0')}T00:00:00`;
-    const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(cycleEnd).padStart(2, '0')}T23:59:59.999`;
-    start = getUTC(startStr);
-    end = getUTC(endStr);
+  const candA = getRangeForStartMonth(refYear, refMonth);
+  let prevMonth = refMonth - 1;
+  let prevYear = refYear;
+  if (prevMonth < 1) {
+    prevMonth = 12;
+    prevYear -= 1;
+  }
+  const candB = getRangeForStartMonth(prevYear, prevMonth);
+
+  const currentStart = referenceDate.getTime() >= candA.start.getTime() ? candA : candB;
+
+  let targetMonth = currentStart.startMonth + periodOffset;
+  let targetYear = currentStart.startYear;
+  
+  while (targetMonth < 1) {
+    targetMonth += 12;
+    targetYear -= 1;
+  }
+  while (targetMonth > 12) {
+    targetMonth -= 12;
+    targetYear += 1;
   }
 
-  return { start, end };
+  return getRangeForStartMonth(targetYear, targetMonth);
 }
 
-export async function getPayrollRecap() {
+export async function getPayrollRecap(periodOffset: number = 0) {
   const session = await auth();
   if (!session?.user?.storeId) throw new Error("Unauthorized");
   const storeId = session.user.storeId;
@@ -87,7 +122,7 @@ export async function getPayrollRecap() {
   const recap: PayrollRecapItem[] = [];
 
   for (const user of employees) {
-    const { start, end } = getActivePayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone);
+    const { start, end } = getPayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone, periodOffset);
     
     // 2. Fetch all attendance logs in this range
     const logs = await prisma.attendance.findMany({
@@ -147,7 +182,7 @@ export async function getMyPayrollStats() {
   if (!user) throw new Error("User not found");
 
   const timezone = user.store?.timezone || "Asia/Jakarta";
-  const { start, end } = getActivePayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone);
+  const { start, end } = getPayrollRange(user.payrollCycleStart, user.payrollCycleEnd, timezone, 0);
   
   const logs = await prisma.attendance.findMany({
     where: {
