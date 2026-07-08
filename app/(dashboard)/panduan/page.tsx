@@ -308,6 +308,13 @@ export default function PanduanPage() {
                   </p>
                 </div>
               </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">5</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Sinkronisasi Google Calendar</p>
+                  <p>Setiap tagihan yang Anda catat, ubah statusnya, atau hapus akan otomatis diselaraskan dengan Google Calendar dari akun Google (email) yang ditautkan oleh toko (ditandai dengan badge <strong className="text-blue-500">Google Calendar Sinkron</strong>). Pengingat jatuh tempo akan muncul sebagai kegiatan seharian penuh (all-day event) di kalender Gmail toko.</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
