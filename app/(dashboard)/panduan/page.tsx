@@ -289,10 +289,22 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">3</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Catat Pembayaran Tagihan</p>
-                  <p>Setelah nilai tagihan disesuaikan (jika ada retur), serahkan uang pembayaran dan tandai tagihan tersebut sebagai <strong className="text-emerald-600">LUNAS</strong> di sistem.</p>
-                  <p className="text-amber-600 dark:text-amber-400 font-medium mt-1">
-                    ⚠️ PENTING: Jika uang pembayaran diambil dari laci kasir, jangan lupa untuk mencatat pengeluaran ini di form Laporan Shift di bawah opsi &quot;Pengeluaran &gt; Sumber: Uang Laci Kasir&quot; agar kas laci Anda tetap seimbang!
+                  <p className="font-semibold text-foreground">Lunasi Tagihan & Pilih Sumber Dana</p>
+                  <p>Setelah retur (jika ada) diselesaikan, klik tombol <strong className="text-emerald-600">Tandai Lunas</strong>. Sistem akan menampilkan dialog untuk memilih sumber dana pembayaran:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                    <li><strong className="text-foreground">Uang Laci Kasir</strong> — Pembayaran diambil dari uang tunai di laci kasir. Akan memotong saldo laci saat tutup shift.</li>
+                    <li><strong className="text-foreground">Uang Titipan Tagihan</strong> — Menggunakan kas titipan khusus supplier. Tidak mempengaruhi uang laci kasir.</li>
+                    <li><strong className="text-foreground">Transfer Bank</strong> — Dibayar langsung dari rekening bank toko.</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">4</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Sinkronisasi Otomatis ke Laporan Shift</p>
+                  <p>Setelah Anda memilih sumber dana dan mengonfirmasi pembayaran, data pengeluaran tagihan ini akan <strong className="text-foreground">otomatis tercatat di laporan shift aktif</strong> Anda (jika sedang berjalan). Tidak perlu lagi mencatat ulang secara manual di halaman Laporan Shift.</p>
+                  <p className="text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                    ✅ Jika tagihan dibatalkan (ditandai belum lunas kembali), catatan pengeluaran terkait di laporan shift juga akan otomatis dihapus untuk mencegah data ganda.
                   </p>
                 </div>
               </div>
