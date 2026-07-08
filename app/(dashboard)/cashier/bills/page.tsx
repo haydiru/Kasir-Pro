@@ -7,9 +7,6 @@ export default async function BillsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const isAuthorized = ["admin", "super_admin", "cashier"].includes(session.user.role);
-  if (!isAuthorized) redirect("/attendance");
-
   const store = await prisma.store.findUnique({
     where: { id: session.user.storeId },
     include: { googleAuth: true },
@@ -28,6 +25,14 @@ export default async function BillsPage() {
     },
   });
 
+  // Ambil semua barang retur yang belum diselesaikan (PENDING / RETURNED)
+  const pendingReturns = await prisma.returnedItem.findMany({
+    where: {
+      storeId: session.user.storeId,
+      status: { in: ["PENDING", "RETURNED"] },
+    },
+  });
+
   // Serialize dates to prevent Next.js hydration/payload errors
   const serializedBills = bills.map((bill) => ({
     ...bill,
@@ -36,9 +41,16 @@ export default async function BillsPage() {
     updatedAt: bill.updatedAt.toISOString(),
   }));
 
+  const serializedReturns = pendingReturns.map((ret) => ({
+    ...ret,
+    createdAt: ret.createdAt.toISOString(),
+    updatedAt: ret.updatedAt.toISOString(),
+  }));
+
   return (
     <BillsClient
       initialBills={serializedBills}
+      initialPendingReturns={serializedReturns}
       timezone={timezone}
       isGoogleConnected={!!store?.googleAuth}
     />

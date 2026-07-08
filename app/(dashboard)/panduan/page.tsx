@@ -22,7 +22,9 @@ import {
   TrendingUp,
   FileEdit,
   ArrowRightLeft,
-  ListCollapse
+  ListCollapse,
+  Undo,
+  Package
 } from "lucide-react";
 
 export default function PanduanPage() {
@@ -280,11 +282,52 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">2</Badge>
                 <div>
+                  <p className="font-semibold text-foreground">Pencocokan Barang Retur Sebelum Pembayaran</p>
+                  <p>Sebelum melakukan pembayaran tagihan, periksa apakah terdapat peringatan <strong className="text-amber-600">Ada Barang Retur</strong> pada kartu tagihan supplier tersebut. Karyawan wajib menuntaskan/memotong nilai retur ini sebelum menyerahkan uang pembayaran ke supplier.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">3</Badge>
+                <div>
                   <p className="font-semibold text-foreground">Catat Pembayaran Tagihan</p>
-                  <p>Ketika kurir supplier datang menagih pembayaran, serahkan uang pembayaran dan tandai tagihan tersebut sebagai <strong className="text-emerald-600">LUNAS</strong> di sistem.</p>
+                  <p>Setelah nilai tagihan disesuaikan (jika ada retur), serahkan uang pembayaran dan tandai tagihan tersebut sebagai <strong className="text-emerald-600">LUNAS</strong> di sistem.</p>
                   <p className="text-amber-600 dark:text-amber-400 font-medium mt-1">
                     ⚠️ PENTING: Jika uang pembayaran diambil dari laci kasir, jangan lupa untuk mencatat pengeluaran ini di form Laporan Shift di bawah opsi &quot;Pengeluaran &gt; Sumber: Uang Laci Kasir&quot; agar kas laci Anda tetap seimbang!
                   </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Alur Barang Retur */}
+          <Card className="border-0 shadow-sm border-l-4 border-l-rose-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <Undo className="h-5 w-5" />
+                7. Pencatatan Barang Retur
+              </CardTitle>
+              <CardDescription>Mencatat barang cacat, rusak, atau kedaluwarsa yang akan dikembalikan ke supplier.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">1</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Catat Barang Rusak / Expired</p>
+                  <p>Buka menu <strong className="text-foreground">Barang Retur</strong> di sidebar. Klik <strong className="text-foreground">Catat Retur Baru</strong>, lalu pilih supplier, ketik nama produk, jumlah barang, serta alasan retur.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">2</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Pantau & Perbarui Status Retur</p>
+                  <p>Status awal barang retur adalah <strong className="text-rose-600">Pending / Di Toko</strong>. Klik <strong className="text-foreground">Tandai Dikirim Ke Supplier</strong> jika barang sudah dibawa oleh sales. Ketika retur sudah diganti dengan barang baru atau dipotong dari nota tagihan, tandai status sebagai <strong className="text-emerald-600">Selesai (Clear)</strong>.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">3</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Integrasi Otomatis dengan Tagihan</p>
+                  <p>Setiap barang retur berstatus Pending atau Dikirim akan otomatis muncul sebagai peringatan berwarna oranye pada kartu <strong className="text-foreground">Tagihan Supplier</strong> yang bersangkutan untuk mengingatkan kasir/pegawai sebelum melunasi tagihan.</p>
                 </div>
               </div>
             </CardContent>

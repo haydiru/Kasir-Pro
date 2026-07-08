@@ -21,6 +21,7 @@ import {
   FileEdit,
   Smartphone,
   Wallet,
+  Undo,
 } from "lucide-react";
 import { logOut } from "@/app/actions/auth";
 
@@ -30,7 +31,6 @@ const adminNav = [
   { label: "Verifikasi", href: "/admin/verifications", icon: ShieldCheck },
   { label: "Buku Kas", href: "/admin/cashflow", icon: Wallet },
   { label: "Transaksi Flip", href: "/admin/flip-transactions", icon: Smartphone },
-  { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
   { label: "Pengguna", href: "/admin/users", icon: Users },
   { label: "Master Supplier", href: "/admin/suppliers", icon: Users },
   { label: "Pengaturan Toko", href: "/admin/store-settings", icon: Settings },
@@ -38,7 +38,6 @@ const adminNav = [
 
 const cashierNav = [
   { label: "Laporan Shift", href: "/cashier/report", icon: ClipboardList },
-  { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
   { label: "Riwayat", href: "/cashier/history", icon: History },
 ];
 
@@ -49,6 +48,8 @@ const pramuniagaNav = [
 const commonNav = [
   { label: "Presensi", href: "/attendance", icon: Clock },
   { label: "Barang Kosong", href: "/empty-items", icon: ClipboardList },
+  { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
+  { label: "Barang Retur", href: "/retur", icon: Undo },
   { label: "Panduan", href: "/panduan", icon: FileText },
 ];
 

@@ -51,13 +51,23 @@ interface BillItem {
   createdBy?: { name: string } | null;
 }
 
+interface PendingReturnItem {
+  id: string;
+  supplierName: string;
+  productName: string;
+  quantity: number;
+  reason: string | null;
+  status: string;
+}
+
 interface Props {
   initialBills: BillItem[];
+  initialPendingReturns?: PendingReturnItem[];
   timezone: string;
   isGoogleConnected: boolean;
 }
 
-export default function BillsClient({ initialBills, timezone, isGoogleConnected }: Props) {
+export default function BillsClient({ initialBills, initialPendingReturns = [], timezone, isGoogleConnected }: Props) {
   const [bills, setBills] = useState<BillItem[]>(initialBills);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"SEMUA" | "BELUM_BAYAR" | "LUNAS">("BELUM_BAYAR");
@@ -427,6 +437,29 @@ export default function BillsClient({ initialBills, timezone, isGoogleConnected 
                         {formatCurrency(bill.amount)}
                       </div>
                     </div>
+
+                    {/* Warning Barang Retur yang Belum Tuntas */}
+                    {!isLunas && (() => {
+                      const supplierReturns = initialPendingReturns.filter(
+                        (ret) => ret.supplierName.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+                      );
+                      if (supplierReturns.length === 0) return null;
+                      return (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            Ada Barang Retur ({supplierReturns.length})
+                          </p>
+                          <ul className="text-[10px] text-amber-600 dark:text-amber-300 list-disc list-inside font-medium">
+                            {supplierReturns.map((ret) => (
+                              <li key={ret.id} className="truncate">
+                                {ret.productName} (x{ret.quantity}) - <span className="underline">{ret.status === "RETURNED" ? "Telah dikirim" : "Di toko"}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
 
                     {/* Metadata: Jatuh Tempo */}
                     <div className="pt-2 border-t border-dashed border-border/60 space-y-1 text-[11px] text-muted-foreground font-semibold">

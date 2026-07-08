@@ -27,6 +27,7 @@ model Store {
   bills                 Bill[]
   googleAuth            StoreGoogleAuth?
   suppliers             Supplier[]
+  returnedItems         ReturnedItem[]
 }
 
 model User {
@@ -54,6 +55,7 @@ model User {
   createdEmptyItems   EmptyItem[]          @relation("CreatedEmptyItems")
   processedEmptyItems EmptyItem[]          @relation("ProcessedEmptyItems")
   billsCreated        Bill[]               @relation("CreatedBills")
+  returnsCreated      ReturnedItem[]       @relation("CreatedReturns")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,6 +349,7 @@ model Supplier {
 
   store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   bills      Bill[]
+  returnedItems ReturnedItem[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -354,4 +357,26 @@ model Supplier {
   @@unique([storeId, kode])
   @@index([storeId])
   @@index([nama])
+}
+
+model ReturnedItem {
+  id            String   @id @default(uuid())
+  storeId       String
+  supplierName  String
+  supplierId    String?
+  productName   String
+  quantity      Int      @default(1)
+  reason        String?
+  status        String   @default("PENDING") // "PENDING", "RETURNED", "RESOLVED"
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier      Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy     User?     @relation("CreatedReturns", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([supplierId])
+  @@index([status])
 }
