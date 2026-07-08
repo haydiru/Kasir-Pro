@@ -75,6 +75,8 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
 
   // Modal State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [paymentSourceDialogOpen, setPaymentSourceDialogOpen] = useState(false);
+  const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [amount, setAmount] = useState("");
@@ -178,19 +180,43 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
 
   // Update Status Handler
   async function handleToggleStatus(id: string, currentStatus: string) {
-    const newStatus = currentStatus === "BELUM_BAYAR" ? "LUNAS" : "BELUM_BAYAR";
+    if (currentStatus === "BELUM_BAYAR") {
+      setSelectedBillId(id);
+      setPaymentSourceDialogOpen(true);
+    } else {
+      setActionLoadingId(id);
+      try {
+        const res = await updateBillStatus(id, "BELUM_BAYAR");
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success(res.success || "Status tagihan diperbarui");
+        }
+      } catch {
+        toast.error("Gagal memperbarui status");
+      } finally {
+        setActionLoadingId(null);
+      }
+    }
+  }
+
+  async function handleConfirmPayment(source: "CASHIER" | "BILL" | "TRANSFER") {
+    if (!selectedBillId) return;
+    const id = selectedBillId;
+    setPaymentSourceDialogOpen(false);
     setActionLoadingId(id);
     try {
-      const res = await updateBillStatus(id, newStatus);
+      const res = await updateBillStatus(id, "LUNAS", source);
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success(res.success || "Status tagihan diperbarui");
+        toast.success(res.success || "Tagihan berhasil dilunasi!");
       }
     } catch {
-      toast.error("Gagal memperbarui status");
+      toast.error("Gagal melunasi tagihan");
     } finally {
       setActionLoadingId(null);
+      setSelectedBillId(null);
     }
   }
 
@@ -591,6 +617,63 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Pilih Sumber Dana Pembayaran */}
+      <Dialog open={paymentSourceDialogOpen} onOpenChange={setPaymentSourceDialogOpen}>
+        <DialogContent className="max-w-xs sm:max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black tracking-tight">
+              Pilih Sumber Dana Pembayaran
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Pilih sumber dana yang digunakan untuk melunasi tagihan ini. Data pembayaran akan otomatis diteruskan ke laporan shift aktif jika sedang berjalan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 pt-4">
+            <Button
+              onClick={() => handleConfirmPayment("CASHIER")}
+              variant="outline"
+              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
+            >
+              <span className="font-bold text-sm text-foreground">Uang Laci Kasir (Cash Drawer)</span>
+              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Memotong saldo tunai laci kasir saat tutup shift.</span>
+            </Button>
+
+            <Button
+              onClick={() => handleConfirmPayment("BILL")}
+              variant="outline"
+              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
+            >
+              <span className="font-bold text-sm text-foreground">Uang Titipan Tagihan (Bill Money)</span>
+              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Menggunakan kas titipan khusus supplier. Tidak memotong uang laci.</span>
+            </Button>
+
+            <Button
+              onClick={() => handleConfirmPayment("TRANSFER")}
+              variant="outline"
+              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
+            >
+              <span className="font-bold text-sm text-foreground">Transfer Bank Rekening Toko</span>
+              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Dibayar langsung dari rekening bank toko. Tidak memengaruhi uang laci.</span>
+            </Button>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setPaymentSourceDialogOpen(false);
+                setSelectedBillId(null);
+              }}
+              className="w-full text-xs font-semibold rounded-xl"
+            >
+              Batal
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getTZDateRange } from "@/lib/utils";
 
 // Helper untuk mendapatkan Google Access Token yang valid (menyegarkan jika kedaluwarsa)
 async function getGoogleAccessToken(storeId: string): Promise<string | null> {
@@ -234,7 +235,11 @@ export async function createBill(data: {
   }
 }
 
-export async function updateBillStatus(billId: string, newStatus: string) {
+export async function updateBillStatus(
+  billId: string,
+  newStatus: string,
+  paymentSource?: "CASHIER" | "BILL" | "TRANSFER"
+) {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -242,6 +247,9 @@ export async function updateBillStatus(billId: string, newStatus: string) {
     }
 
     const storeId = session.user.storeId;
+    if (!storeId) {
+      return { error: "Store not associated" };
+    }
     
     // Cari tagihan
     const bill = await prisma.bill.findUnique({
@@ -274,7 +282,71 @@ export async function updateBillStatus(billId: string, newStatus: string) {
       );
     }
 
+    // 3. Integrasi ke Laporan Shift Aktif
+    if (newStatus === "LUNAS") {
+      if (!paymentSource) {
+        return { error: "Sumber dana pembayaran harus dipilih" };
+      }
+
+      // Cari active attendance untuk user ini
+      const attendance = await prisma.attendance.findFirst({
+        where: {
+          userId: session.user.id,
+          clockOut: null
+        }
+      });
+
+      if (attendance) {
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { timezone: true }
+        });
+        const timezone = store?.timezone || "Asia/Jakarta";
+        const { start, end } = getTZDateRange(attendance.clockIn, timezone);
+
+        // Cari draft laporan shift aktif untuk user & shift ini
+        const report = await prisma.shiftReport.findFirst({
+          where: {
+            userId: session.user.id,
+            storeId,
+            shiftType: attendance.shiftType,
+            date: {
+              gte: start,
+              lt: end,
+            },
+          }
+        });
+
+        if (report) {
+          // Cari apakah sudah pernah dicatat di shift ini untuk mencegah duplikasi
+          const existingExpenditure = await prisma.expenditure.findFirst({
+            where: { billId }
+          });
+
+          if (!existingExpenditure) {
+            await prisma.expenditure.create({
+              data: {
+                reportId: report.id,
+                createdBy: session.user.id,
+                supplierName: bill.supplierName,
+                amountFromCashier: paymentSource === "CASHIER" ? bill.amount : 0,
+                amountFromBill: paymentSource === "BILL" ? bill.amount : 0,
+                amountFromTransfer: paymentSource === "TRANSFER" ? bill.amount : 0,
+                billId: bill.id,
+              }
+            });
+          }
+        }
+      }
+    } else if (newStatus === "BELUM_BAYAR") {
+      // Hapus pengeluaran terkait jika tagihan dibatalkan menjadi belum lunas
+      await prisma.expenditure.deleteMany({
+        where: { billId }
+      });
+    }
+
     revalidatePath("/cashier/bills");
+    revalidatePath("/cashier/report");
     return { success: "Status tagihan berhasil diperbarui!" };
   } catch (error: any) {
     console.error("Error updating bill status server action:", error);

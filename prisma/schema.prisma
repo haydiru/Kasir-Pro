@@ -149,11 +149,13 @@ model Expenditure {
   amountFromCashier  Float   @default(0)
   amountFromTransfer Float   @default(0)
   receiptUrl         String?
+  billId             String?
 
   report        ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   creator       User?       @relation("CreatedExpenditure", fields: [createdBy], references: [id])
   lastUpdatedBy String?
   updater       User?       @relation("UpdatedExpenditure", fields: [lastUpdatedBy], references: [id])
+  bill          Bill?       @relation(fields: [billId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -321,6 +323,7 @@ model Bill {
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   supplier        Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   createdBy       User?    @relation("CreatedBills", fields: [createdById], references: [id], onDelete: SetNull)
+  expenditures    Expenditure[]
 
   @@index([storeId])
   @@index([dueDate])
