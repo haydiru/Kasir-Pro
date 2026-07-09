@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, TrendingDown, Wallet, Zap } from "lucide-react";
+import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, TrendingDown, Wallet, Zap, Loader2 } from "lucide-react";
 import { formatCurrency, formatTime, getRoleLabel, calcExpectedCash } from "@/lib/utils";
 import { getAdminDashboardStats, type DashboardStatsResult } from "@/app/actions/dashboard";
 import { getPayrollRecap, type PayrollRecapItem } from "@/app/actions/payroll";
@@ -395,51 +395,56 @@ export function DashboardClient({
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            {isRecapPending ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Memuat data...</p>
-            ) : recap.length === 0 ? (
+          <CardContent className="relative">
+            {recap.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">Tidak ada data pegawai</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Periode</TableHead>
-                    <TableHead className="text-center">Hari</TableHead>
-                    <TableHead className="text-center">Jam</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recap.map((item) => (
-                    <TableRow key={item.userId}>
-                      <TableCell className="font-medium">
-                        <div>
-                          <p className="truncate max-w-32">{item.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{getRoleLabel(item.role)}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <span className="bg-primary/5 text-primary px-2 py-0.5 rounded text-[10px] font-medium">{item.periodLabel}</span>
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {item.totalDays} <span className="text-xs font-normal text-muted-foreground">hari</span>
-                      </TableCell>
-                      <TableCell className="text-center font-mono text-sm">
-                        {item.totalHours} <span className="text-xs font-normal text-muted-foreground">jam</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.isCurrentlyActive ? (
-                          <span className="text-xs text-emerald-500 font-medium">● Aktif</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Offline</span>
-                        )}
-                      </TableCell>
+              <div className={`transition-opacity duration-200 ${isRecapPending ? "opacity-50 pointer-events-none" : ""}`}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Periode</TableHead>
+                      <TableHead className="text-center">Hari</TableHead>
+                      <TableHead className="text-center">Jam</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {recap.map((item) => (
+                      <TableRow key={item.userId}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <p className="truncate max-w-32">{item.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{getRoleLabel(item.role)}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span className="bg-primary/5 text-primary px-2 py-0.5 rounded text-[10px] font-medium">{item.periodLabel}</span>
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">
+                          {item.totalDays} <span className="text-xs font-normal text-muted-foreground">hari</span>
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-sm">
+                          {item.totalHours} <span className="text-xs font-normal text-muted-foreground">jam</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.isCurrentlyActive ? (
+                            <span className="text-xs text-emerald-500 font-medium">● Aktif</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Offline</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {isRecapPending && (
+              <div className="absolute inset-0 flex items-center justify-center bg-card/30 backdrop-blur-[1px] rounded-b-xl">
+                <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              </div>
             )}
           </CardContent>
         </Card>
