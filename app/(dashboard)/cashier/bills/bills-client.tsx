@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition, useEffect } from "react";
+import { useState, useMemo, useTransition, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -37,7 +37,15 @@ import {
 import { formatCurrency, formatFullLocalDate, formatLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { createBill, updateBillStatus, deleteBill } from "@/app/actions/bill";
+import { getActiveCashierReports } from "@/app/actions/report";
 import SupplierCombobox from "@/components/supplier-combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface BillItem {
   id: string;
@@ -78,6 +86,30 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
   const [paymentSourceDialogOpen, setPaymentSourceDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
 
+  // Active cashier reports for bill payment targeting
+  const [activeReports, setActiveReports] = useState<any[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState<string>("");
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+
+  const loadActiveReports = useCallback(async () => {
+    setIsLoadingReports(true);
+    try {
+      const res = await getActiveCashierReports();
+      if (res.success && res.data) {
+        setActiveReports(res.data);
+        if (res.data.length === 1) {
+          setSelectedReportId(res.data[0].id);
+        } else {
+          setSelectedReportId("");
+        }
+      }
+    } catch {
+      // silent – will show warning in dialog
+    } finally {
+      setIsLoadingReports(false);
+    }
+  }, []);
+
   // Payment input states
   const [payCashier, setPayCashier] = useState("");
   const [payBill, setPayBill] = useState("");
@@ -105,8 +137,9 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
       setPayCashier(selectedBill.amount.toString());
       setPayBill("");
       setPayTransfer("");
+      loadActiveReports();
     }
-  }, [paymentSourceDialogOpen, selectedBill]);
+  }, [paymentSourceDialogOpen, selectedBill, loadActiveReports]);
   const [supplierName, setSupplierName] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [amount, setAmount] = useState("");
@@ -233,6 +266,10 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
   async function handleConfirmPayment(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedBillId || !selectedBill || !isAllocationValid) return;
+    if (!selectedReportId) {
+      toast.error("Pilih laporan shift kasir tujuan terlebih dahulu.");
+      return;
+    }
     const id = selectedBillId;
     setPaymentSourceDialogOpen(false);
     setActionLoadingId(id);
@@ -241,7 +278,7 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
         cashier: Number(payCashier) || 0,
         bill: Number(payBill) || 0,
         transfer: Number(payTransfer) || 0,
-      });
+      }, selectedReportId);
       if (res.error) {
         toast.error(res.error);
       } else {
@@ -667,7 +704,49 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
             </DialogDescription>
           </DialogHeader>
 
-          {selectedBill && (
+          {/* ── Cashier Report Target Selector ── */}
+          {isLoadingReports ? (
+            <div className="flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+              Memeriksa laporan kasir aktif...
+            </div>
+          ) : activeReports.length === 0 ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-destructive">Laporan Shift Kasir Belum Ada</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Kasir belum membuat Laporan Shift. Koordinasikan dengan Kasir agar membuat laporan terlebih dahulu sebelum melakukan pembayaran tagihan.
+                </p>
+              </div>
+            </div>
+          ) : activeReports.length === 1 ? (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/50 p-3 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              <span className="text-muted-foreground">Masuk ke laporan:</span>
+              <span className="font-bold text-foreground">{activeReports[0].user.name} ({activeReports[0].shiftType})</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Laporan Kasir Tujuan
+              </label>
+              <Select value={selectedReportId} onValueChange={setSelectedReportId}>
+                <SelectTrigger className="h-9 text-xs rounded-xl bg-muted/30">
+                  <SelectValue placeholder="Pilih Kasir tujuan…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeReports.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.user.name} – {r.shiftType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {selectedBill && activeReports.length > 0 && (
             <form onSubmit={handleConfirmPayment} className="space-y-4 pt-2">
               <div className="p-3.5 bg-muted/50 rounded-xl space-y-1">
                 <div className="flex justify-between text-xs font-semibold text-muted-foreground">

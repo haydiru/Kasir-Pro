@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,16 +23,19 @@ import {
   ShoppingBag,
   UploadCloud,
   FileEdit,
-  Save
+  Save,
+  Loader2,
+  UserSquare2,
+  Calculator,
+  AlertCircle,
 } from "lucide-react";
 import { type DigitalTransaction, type Expenditure } from "@/lib/mock-data";
 import { formatCurrency, formatDateTime, getRoleLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { addShiftEntries, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries } from "@/app/actions/report";
-import { useEffect } from "react";
+import { addShiftEntries, updateDigitalEntry, updateExpenditureEntry, deleteShiftEntry, getShiftTeamEntries, getActiveCashierReports } from "@/app/actions/report";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { UserSquare2, Calculator, AlertCircle } from "lucide-react";
+
 
 // Helpers
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -67,6 +70,29 @@ export default function PramuniagaEntriesPage() {
   const { data: session } = useSession();
   const router = useRouter();
 
+  const [activeReports, setActiveReports] = useState<any[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState<string>("");
+  const [isLoadingReports, setIsLoadingReports] = useState(true);
+
+  const loadActiveReports = async () => {
+    setIsLoadingReports(true);
+    try {
+      const res = await getActiveCashierReports();
+      if (res.success && res.data) {
+        setActiveReports(res.data);
+        if (res.data.length === 1) {
+          setSelectedReportId(res.data[0].id);
+        }
+      } else {
+        toast.error(res.error || "Gagal memuat daftar kasir aktif.");
+      }
+    } catch {
+      toast.error("Gagal memuat daftar kasir aktif.");
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
   const loadActiveShiftData = async () => {
     try {
       const res = await getShiftTeamEntries();
@@ -83,6 +109,7 @@ export default function PramuniagaEntriesPage() {
 
   useEffect(() => {
     loadActiveShiftData();
+    loadActiveReports();
   }, []);
 
   // Digital Handlers
@@ -104,6 +131,10 @@ export default function PramuniagaEntriesPage() {
       toast("Data masih kosong", { description: "Belum ada entri untuk disinkronkan." });
       return;
     }
+    if (!selectedReportId) {
+      toast.error("Laporan shift tujuan belum dipilih.");
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -111,7 +142,7 @@ export default function PramuniagaEntriesPage() {
       const res = await addShiftEntries({
         digitalTx,
         expenditures
-      });
+      }, selectedReportId);
 
       if (res.error) {
         toast.error(res.error);
@@ -124,6 +155,7 @@ export default function PramuniagaEntriesPage() {
         setExpenditures([]);
         // Reload history
         loadActiveShiftData();
+        loadActiveReports();
       }
     } catch (err) {
       toast.error("Terjadi kesalahan teknis.");
@@ -144,7 +176,67 @@ export default function PramuniagaEntriesPage() {
         </p>
       </div>
 
-      <div className="grid gap-6">
+      {/* Target Shift Report Selector & Warnings */}
+      {isLoadingReports ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Memeriksa Laporan Shift Kasir aktif...
+          </CardContent>
+        </Card>
+      ) : activeReports.length === 0 ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5 text-destructive flex items-start gap-3.5 shadow-sm animate-in fade-in duration-200">
+          <AlertCircle className="h-5.5 w-5.5 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold leading-none">Laporan Shift Kasir Belum Dibuat</h3>
+            <p className="text-xs text-muted-foreground leading-normal">
+              Saat ini tidak ada laporan shift Kasir yang aktif (Kasir belum melakukan Clock-in/membuat Laporan Shift).
+              Anda tidak dapat memasukkan entri transaksi digital atau pengeluaran sampai Kasir membuat Laporan Shift. Silakan koordinasikan dengan Kasir yang bertugas.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <Card className="border-0 shadow-sm border-l-4 border-l-primary bg-primary/[0.01]">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-primary">Tujuan Sinkronisasi Laporan</h2>
+              {activeReports.length === 1 ? (
+                <p className="text-sm font-black text-foreground">
+                  Kasir: {activeReports[0].user.name} ({activeReports[0].shiftType})
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Terdapat {activeReports.length} laporan shift Kasir yang sedang aktif. Silakan pilih salah satu laporan kasir tujuan di samping.
+                </p>
+              )}
+            </div>
+
+            {activeReports.length > 1 && (
+              <div className="w-full sm:w-64 space-y-1.5 shrink-0">
+                <Label htmlFor="target-report" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pilih Kasir Tujuan</Label>
+                <Select
+                  value={selectedReportId}
+                  onValueChange={setSelectedReportId}
+                >
+                  <SelectTrigger id="target-report" className="h-9 text-xs bg-background">
+                    <SelectValue placeholder="Pilih Laporan Kasir" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeReports.map((report) => (
+                      <SelectItem key={report.id} value={report.id}>
+                        {report.user.name} ({report.shiftType})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReports.length > 0 && (
+        <div className="grid gap-6">
 
         {/* Layanan Digital */}
         <Card className="border-0 shadow-sm border-t-4 border-t-primary/80">
@@ -423,9 +515,12 @@ export default function PramuniagaEntriesPage() {
             Simpan & Sinkronkan
           </Button>
         </div>
+        </div>
+      )}
 
-        {/* RIWAYAT SHIFT AKTIF */}
-        <div className="pt-8 border-t">
+
+      {/* RIWAYAT SHIFT AKTIF */}
+      <div className="pt-8 border-t">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -710,7 +805,6 @@ export default function PramuniagaEntriesPage() {
              </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -242,7 +242,8 @@ export async function updateBillStatus(
     cashier: number;
     bill: number;
     transfer: number;
-  }
+  },
+  targetReportId?: string
 ) {
   try {
     const session = await auth();
@@ -291,56 +292,40 @@ export async function updateBillStatus(
       if (!paymentAmounts) {
         return { error: "Detail jumlah pembayaran harus diisi" };
       }
+      if (!targetReportId) {
+        return { error: "Laporan shift tujuan harus ditentukan." };
+      }
 
-      // Cari active attendance untuk user ini
-      const attendance = await prisma.attendance.findFirst({
+      // Cari draft laporan shift aktif
+      const report = await prisma.shiftReport.findUnique({
         where: {
-          userId: session.user.id,
-          clockOut: null
+          id: targetReportId,
+          storeId,
+          status: "Draft",
         }
       });
 
-      if (attendance) {
-        const store = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: { timezone: true }
-        });
-        const timezone = store?.timezone || "Asia/Jakarta";
-        const { start, end } = getTZDateRange(attendance.clockIn, timezone);
-
-        // Cari draft laporan shift aktif untuk user & shift ini
-        const report = await prisma.shiftReport.findFirst({
-          where: {
-            userId: session.user.id,
-            storeId,
-            shiftType: attendance.shiftType,
-            date: {
-              gte: start,
-              lt: end,
-            },
-          }
+      if (report) {
+        // Cari apakah sudah pernah dicatat di shift ini untuk mencegah duplikasi
+        const existingExpenditure = await prisma.expenditure.findFirst({
+          where: { billId }
         });
 
-        if (report) {
-          // Cari apakah sudah pernah dicatat di shift ini untuk mencegah duplikasi
-          const existingExpenditure = await prisma.expenditure.findFirst({
-            where: { billId }
+        if (!existingExpenditure) {
+          await prisma.expenditure.create({
+            data: {
+              reportId: report.id,
+              createdBy: session.user.id,
+              supplierName: bill.supplierName,
+              amountFromCashier: paymentAmounts.cashier || 0,
+              amountFromBill: paymentAmounts.bill || 0,
+              amountFromTransfer: paymentAmounts.transfer || 0,
+              billId: bill.id,
+            }
           });
-
-          if (!existingExpenditure) {
-            await prisma.expenditure.create({
-              data: {
-                reportId: report.id,
-                createdBy: session.user.id,
-                supplierName: bill.supplierName,
-                amountFromCashier: paymentAmounts.cashier || 0,
-                amountFromBill: paymentAmounts.bill || 0,
-                amountFromTransfer: paymentAmounts.transfer || 0,
-                billId: bill.id,
-              }
-            });
-          }
         }
+      } else {
+        return { error: "Laporan shift tujuan tidak ditemukan atau sudah tidak aktif." };
       }
     } else if (newStatus === "BELUM_BAYAR") {
       // Hapus pengeluaran terkait jika tagihan dibatalkan menjadi belum lunas

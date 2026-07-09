@@ -391,19 +391,29 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
     }
 }
 
-// These are still used by Pramuniaga Entries, let's standardize them too
-export async function addShiftEntries(data: {
-  digitalTx: any[];
-  expenditures: any[];
-}): Promise<ActionResponse> {
+export async function addShiftEntries(
+  data: {
+    digitalTx: any[];
+    expenditures: any[];
+  },
+  targetReportId: string
+): Promise<ActionResponse> {
   const session = await auth();
   if (!session?.user) return { success: false, error: "Unauthorized" };
+  if (!targetReportId) return { success: false, error: "Laporan shift tujuan harus ditentukan." };
 
   try {
-    const res = await getActiveReport();
-    if (!res.success || !res.data) throw new Error(res.error);
-    
-    const { report } = res.data;
+    const report = await prisma.shiftReport.findUnique({
+      where: {
+        id: targetReportId,
+        storeId: session.user.storeId,
+        status: "Draft",
+      }
+    });
+
+    if (!report) {
+      return { success: false, error: "Laporan shift tujuan tidak ditemukan atau sudah tidak aktif." };
+    }
 
     await prisma.$transaction(async (tx) => {
       if (data.digitalTx.length > 0) {
@@ -576,5 +586,54 @@ export async function getShiftTeamEntries(): Promise<ActionResponse> {
   } catch (error: any) {
     console.error("getShiftTeamEntries error:", error);
     return { success: false, error: "Gagal mengambil data riwayat tim" };
+  }
+}
+
+export async function getActiveCashierReports(): Promise<ActionResponse> {
+  const session = await auth();
+  if (!session?.user?.storeId) return { success: false, error: "Unauthorized", data: [] };
+  const storeId = session.user.storeId;
+
+  try {
+    // Find all users who are currently clocked in (active attendance) in this store
+    const activeAttendances = await prisma.attendance.findMany({
+      where: {
+        storeId,
+        clockOut: null,
+      },
+      select: {
+        userId: true,
+        shiftType: true,
+      }
+    });
+
+    if (activeAttendances.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    const activeUserIds = activeAttendances.map(a => a.userId);
+
+    // Find draft reports for these active users
+    const activeReports = await prisma.shiftReport.findMany({
+      where: {
+        storeId,
+        status: "Draft",
+        userId: { in: activeUserIds },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          }
+        }
+      }
+    });
+
+    return { success: true, data: serialize(activeReports) };
+  } catch (error: any) {
+    console.error("getActiveCashierReports error:", error);
+    return { success: false, error: "Gagal mengambil daftar laporan kasir aktif", data: [] };
   }
 }
