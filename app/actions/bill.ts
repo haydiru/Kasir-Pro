@@ -238,7 +238,11 @@ export async function createBill(data: {
 export async function updateBillStatus(
   billId: string,
   newStatus: string,
-  paymentSource?: "CASHIER" | "BILL" | "TRANSFER"
+  paymentAmounts?: {
+    cashier: number;
+    bill: number;
+    transfer: number;
+  }
 ) {
   try {
     const session = await auth();
@@ -284,8 +288,8 @@ export async function updateBillStatus(
 
     // 3. Integrasi ke Laporan Shift Aktif
     if (newStatus === "LUNAS") {
-      if (!paymentSource) {
-        return { error: "Sumber dana pembayaran harus dipilih" };
+      if (!paymentAmounts) {
+        return { error: "Detail jumlah pembayaran harus diisi" };
       }
 
       // Cari active attendance untuk user ini
@@ -329,9 +333,9 @@ export async function updateBillStatus(
                 reportId: report.id,
                 createdBy: session.user.id,
                 supplierName: bill.supplierName,
-                amountFromCashier: paymentSource === "CASHIER" ? bill.amount : 0,
-                amountFromBill: paymentSource === "BILL" ? bill.amount : 0,
-                amountFromTransfer: paymentSource === "TRANSFER" ? bill.amount : 0,
+                amountFromCashier: paymentAmounts.cashier || 0,
+                amountFromBill: paymentAmounts.bill || 0,
+                amountFromTransfer: paymentAmounts.transfer || 0,
                 billId: bill.id,
               }
             });

@@ -289,22 +289,23 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">3</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Lunasi Tagihan & Pilih Sumber Dana</p>
-                  <p>Setelah retur (jika ada) diselesaikan, klik tombol <strong className="text-emerald-600">Tandai Lunas</strong>. Sistem akan menampilkan dialog untuk memilih sumber dana pembayaran:</p>
+                  <p className="font-semibold text-foreground">Lunasi Tagihan & Alokasi Dana (Split Payment)</p>
+                  <p>Setelah retur (jika ada) diselesaikan, klik tombol <strong className="text-emerald-600">Tandai Lunas</strong>. Sistem akan memunculkan formulir alokasi pembayaran untuk membagi total tagihan dari kombinasi sumber dana:</p>
                   <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                    <li><strong className="text-foreground">Uang Laci Kasir</strong> — Pembayaran diambil dari uang tunai di laci kasir. Akan memotong saldo laci saat tutup shift.</li>
-                    <li><strong className="text-foreground">Uang Titipan Tagihan</strong> — Menggunakan kas titipan khusus supplier. Tidak mempengaruhi uang laci kasir.</li>
-                    <li><strong className="text-foreground">Transfer Bank</strong> — Dibayar langsung dari rekening bank toko.</li>
+                    <li><strong className="text-foreground">Uang Laci Kasir (Cash)</strong> — Pembayaran tunai dari laci kasir saat shift berjalan.</li>
+                    <li><strong className="text-foreground">Uang Titipan Tagihan (Bill Money)</strong> — Pembayaran menggunakan kas titipan khusus tagihan supplier.</li>
+                    <li><strong className="text-foreground">Transfer Bank Rekening Toko</strong> — Pembayaran langsung ditransfer dari rekening bank toko.</li>
                   </ul>
+                  <p className="text-xs text-muted-foreground mt-1">Anda dapat mengisi sisa/seluruh tagihan pada salah satu sumber dana secara instan dengan mengklik tombol <strong className="text-primary">Isi Sisa</strong> di samping masing-masing baris input.</p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">4</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Sinkronisasi Otomatis ke Laporan Shift</p>
-                  <p>Setelah Anda memilih sumber dana dan mengonfirmasi pembayaran, data pengeluaran tagihan ini akan <strong className="text-foreground">otomatis tercatat di laporan shift aktif</strong> Anda (jika sedang berjalan). Tidak perlu lagi mencatat ulang secara manual di halaman Laporan Shift.</p>
+                  <p>Setelah alokasi dikonfirmasi, data pengeluaran tagihan akan <strong className="text-foreground">otomatis tercatat di laporan shift aktif</strong> dengan struktur rincian yang sama persis (terbagi berdasarkan Uang Laci, Uang Titipan, dan Transfer Bank). Tidak perlu lagi mencatat ulang secara manual di halaman Laporan Shift.</p>
                   <p className="text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-                    ✅ Jika tagihan dibatalkan (ditandai belum lunas kembali), catatan pengeluaran terkait di laporan shift juga akan otomatis dihapus untuk mencegah data ganda.
+                    ✅ Jika status tagihan dikembalikan menjadi belum lunas, draf pengeluaran terkait di laporan shift akan otomatis dibersihkan tanpa meninggalkan data ganda.
                   </p>
                 </div>
               </div>

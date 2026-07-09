@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -77,6 +77,36 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [paymentSourceDialogOpen, setPaymentSourceDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+
+  // Payment input states
+  const [payCashier, setPayCashier] = useState("");
+  const [payBill, setPayBill] = useState("");
+  const [payTransfer, setPayTransfer] = useState("");
+
+  const selectedBill = useMemo(() => {
+    return initialBills.find((b) => b.id === selectedBillId);
+  }, [initialBills, selectedBillId]);
+
+  const totalAllocated = useMemo(() => {
+    return (Number(payCashier) || 0) + (Number(payBill) || 0) + (Number(payTransfer) || 0);
+  }, [payCashier, payBill, payTransfer]);
+
+  const isAllocationValid = useMemo(() => {
+    if (!selectedBill) return false;
+    const cashierVal = Number(payCashier) || 0;
+    const billVal = Number(payBill) || 0;
+    const transferVal = Number(payTransfer) || 0;
+    if (cashierVal < 0 || billVal < 0 || transferVal < 0) return false;
+    return Math.abs(totalAllocated - selectedBill.amount) < 0.01;
+  }, [selectedBill, payCashier, payBill, payTransfer, totalAllocated]);
+
+  useEffect(() => {
+    if (paymentSourceDialogOpen && selectedBill) {
+      setPayCashier(selectedBill.amount.toString());
+      setPayBill("");
+      setPayTransfer("");
+    }
+  }, [paymentSourceDialogOpen, selectedBill]);
   const [supplierName, setSupplierName] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [amount, setAmount] = useState("");
@@ -200,13 +230,18 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
     }
   }
 
-  async function handleConfirmPayment(source: "CASHIER" | "BILL" | "TRANSFER") {
-    if (!selectedBillId) return;
+  async function handleConfirmPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedBillId || !selectedBill || !isAllocationValid) return;
     const id = selectedBillId;
     setPaymentSourceDialogOpen(false);
     setActionLoadingId(id);
     try {
-      const res = await updateBillStatus(id, "LUNAS", source);
+      const res = await updateBillStatus(id, "LUNAS", {
+        cashier: Number(payCashier) || 0,
+        bill: Number(payBill) || 0,
+        transfer: Number(payTransfer) || 0,
+      });
       if (res.error) {
         toast.error(res.error);
       } else {
@@ -625,55 +660,144 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
         <DialogContent className="max-w-xs sm:max-w-md rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-black tracking-tight">
-              Pilih Sumber Dana Pembayaran
+              Pelunasan & Alokasi Pembayaran
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Pilih sumber dana yang digunakan untuk melunasi tagihan ini. Data pembayaran akan otomatis diteruskan ke laporan shift aktif jika sedang berjalan.
+              Tentukan nominal pembayaran dari masing-masing sumber dana. Jumlah harus pas dengan total tagihan agar dapat disimpan.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 pt-4">
-            <Button
-              onClick={() => handleConfirmPayment("CASHIER")}
-              variant="outline"
-              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
-            >
-              <span className="font-bold text-sm text-foreground">Uang Laci Kasir (Cash Drawer)</span>
-              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Memotong saldo tunai laci kasir saat tutup shift.</span>
-            </Button>
+          {selectedBill && (
+            <form onSubmit={handleConfirmPayment} className="space-y-4 pt-2">
+              <div className="p-3.5 bg-muted/50 rounded-xl space-y-1">
+                <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                  <span>Total Tagihan:</span>
+                  <span>Total Dialokasikan:</span>
+                </div>
+                <div className="flex justify-between font-mono font-black text-sm">
+                  <span className="text-foreground">{formatCurrency(selectedBill.amount)}</span>
+                  <span className={isAllocationValid ? "text-emerald-600" : "text-rose-500"}>
+                    {formatCurrency(totalAllocated)}
+                  </span>
+                </div>
+                {!isAllocationValid && (
+                  <p className="text-[10px] text-rose-500 font-semibold text-right mt-1">
+                    {totalAllocated > selectedBill.amount
+                      ? `Kelebihan ${formatCurrency(totalAllocated - selectedBill.amount)}`
+                      : `Kekurangan ${formatCurrency(selectedBill.amount - totalAllocated)}`}
+                  </p>
+                )}
+              </div>
 
-            <Button
-              onClick={() => handleConfirmPayment("BILL")}
-              variant="outline"
-              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
-            >
-              <span className="font-bold text-sm text-foreground">Uang Titipan Tagihan (Bill Money)</span>
-              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Menggunakan kas titipan khusus supplier. Tidak memotong uang laci.</span>
-            </Button>
+              {/* Uang Laci Kasir */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="payCashier" className="text-xs font-bold">
+                    Uang Laci Kasir (Cash)
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      const currentAllocatedExcludingThis = (Number(payBill) || 0) + (Number(payTransfer) || 0);
+                      const rem = Math.max(0, selectedBill.amount - currentAllocatedExcludingThis);
+                      setPayCashier(rem.toString());
+                    }}
+                    className="h-6 text-[10px] font-bold text-primary px-2 hover:bg-primary/5 rounded"
+                  >
+                    Isi Sisa
+                  </Button>
+                </div>
+                <Input
+                  id="payCashier"
+                  type="number"
+                  placeholder="0"
+                  value={payCashier}
+                  onChange={(e) => setPayCashier(e.target.value)}
+                  className="h-10 rounded-xl bg-muted/30 font-mono"
+                />
+              </div>
 
-            <Button
-              onClick={() => handleConfirmPayment("TRANSFER")}
-              variant="outline"
-              className="h-16 flex flex-col items-start justify-center p-4 rounded-xl border border-muted-foreground/15 hover:border-primary hover:bg-primary/5 text-left"
-            >
-              <span className="font-bold text-sm text-foreground">Transfer Bank Rekening Toko</span>
-              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">Dibayar langsung dari rekening bank toko. Tidak memengaruhi uang laci.</span>
-            </Button>
-          </div>
+              {/* Uang Titipan Tagihan */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="payBill" className="text-xs font-bold">
+                    Uang Titipan Tagihan (Bill Money)
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      const currentAllocatedExcludingThis = (Number(payCashier) || 0) + (Number(payTransfer) || 0);
+                      const rem = Math.max(0, selectedBill.amount - currentAllocatedExcludingThis);
+                      setPayBill(rem.toString());
+                    }}
+                    className="h-6 text-[10px] font-bold text-primary px-2 hover:bg-primary/5 rounded"
+                  >
+                    Isi Sisa
+                  </Button>
+                </div>
+                <Input
+                  id="payBill"
+                  type="number"
+                  placeholder="0"
+                  value={payBill}
+                  onChange={(e) => setPayBill(e.target.value)}
+                  className="h-10 rounded-xl bg-muted/30 font-mono"
+                />
+              </div>
 
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setPaymentSourceDialogOpen(false);
-                setSelectedBillId(null);
-              }}
-              className="w-full text-xs font-semibold rounded-xl"
-            >
-              Batal
-            </Button>
-          </DialogFooter>
+              {/* Transfer Bank */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="payTransfer" className="text-xs font-bold">
+                    Transfer Bank Rekening Toko
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      const currentAllocatedExcludingThis = (Number(payCashier) || 0) + (Number(payBill) || 0);
+                      const rem = Math.max(0, selectedBill.amount - currentAllocatedExcludingThis);
+                      setPayTransfer(rem.toString());
+                    }}
+                    className="h-6 text-[10px] font-bold text-primary px-2 hover:bg-primary/5 rounded"
+                  >
+                    Isi Sisa
+                  </Button>
+                </div>
+                <Input
+                  id="payTransfer"
+                  type="number"
+                  placeholder="0"
+                  value={payTransfer}
+                  onChange={(e) => setPayTransfer(e.target.value)}
+                  className="h-10 rounded-xl bg-muted/30 font-mono"
+                />
+              </div>
+
+              <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setPaymentSourceDialogOpen(false);
+                    setSelectedBillId(null);
+                  }}
+                  className="w-full sm:w-auto text-xs font-semibold rounded-xl"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!isAllocationValid}
+                  className="w-full sm:w-auto text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  Konfirmasi Pelunasan
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
