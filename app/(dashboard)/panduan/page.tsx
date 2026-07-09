@@ -197,8 +197,8 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-indigo-200 text-indigo-600 bg-indigo-50">3</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Periksa Pendapatan Tagihan Masuk</p>
-                  <p>Jika ada titipan uang dari kurir/supplier masuk, isikan di kolom <strong className="text-foreground">Uang Tagihan Masuk</strong>.</p>
+                  <p className="font-semibold text-foreground">Input Uang Titipan Tagihan (Jika Ada)</p>
+                  <p>Jika Owner/Pemilik Toko memberikan uang tunai khusus kepada Kasir atau Admin untuk keperluan membayar tagihan supplier selama shift berjalan, masukkan jumlah uang tersebut di kolom <strong className="text-foreground">Uang Tagihan Masuk</strong>. Uang titipan ini digunakan untuk membayar tagihan, dan sisanya (jika ada) akan tetap terhitung di akhir shift.</p>
                 </div>
               </div>
               <div className="flex gap-3">
