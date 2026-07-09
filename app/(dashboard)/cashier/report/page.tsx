@@ -246,6 +246,10 @@ export default function CashierReportPage() {
   useEffect(() => {
     if (status === "Submitted" || !reportId) return;
 
+    // Skip auto-saving if there's any empty supplier name to prevent database clutter/validation errors
+    const hasEmptySupplier = expenditures.some((ex) => !ex.supplierName || ex.supplierName.trim() === "");
+    if (hasEmptySupplier) return;
+
     // Build a lightweight snapshot of current form state
     const snapshot = JSON.stringify({
       startingCash, posCash, posDebit, billMoneyReceived, manualCashCount,
@@ -301,6 +305,15 @@ export default function CashierReportPage() {
   // Submit
   const handleSubmit = async () => {
     if (!reportId) return;
+
+    const hasEmptySupplier = expenditures.some((ex) => !ex.supplierName || ex.supplierName.trim() === "");
+    if (hasEmptySupplier) {
+      toast.error("Nama supplier harus diisi!", {
+        description: "Mohon isi nama supplier pada semua baris pengeluaran, atau hapus baris yang kosong jika tidak digunakan."
+      });
+      return;
+    }
+
     setIsLoading(true);
     const res = await saveCashierReport({
         id: reportId,
@@ -329,6 +342,17 @@ export default function CashierReportPage() {
   const handleSave = async (isAuto = false, isRevisionSubmit = false) => {
     // Prevent auto-save if already submitted and not in revision mode
     if (!reportId || (status === "Submitted" && !isRevising)) return;
+
+    // Validation for manual save or revision submit
+    if (!isAuto) {
+      const hasEmptySupplier = expenditures.some((ex) => !ex.supplierName || ex.supplierName.trim() === "");
+      if (hasEmptySupplier) {
+        toast.error("Nama supplier harus diisi!", {
+          description: "Mohon isi nama supplier pada semua baris pengeluaran, atau hapus baris yang kosong jika tidak digunakan."
+        });
+        return;
+      }
+    }
     
     if (!isAuto) setAutoSaving(true);
     

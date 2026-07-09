@@ -244,6 +244,14 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             if (!existing) throw new Error("Laporan tidak ditemukan");
             if (existing.status === "Verified") throw new Error("Laporan sudah diverifikasi admin dan tidak bisa diubah");
 
+            // Server-side validation: if saving (submitting or draft), reject any empty supplier names in expenditures
+            if (Array.isArray(data.expenditures)) {
+                const hasEmptySupplier = data.expenditures.some((e: any) => !e.supplierName || e.supplierName.trim() === "");
+                if (hasEmptySupplier) {
+                    throw new Error("Nama supplier pada semua pengeluaran harus diisi");
+                }
+            }
+
             // Handle revision note
             let newCashierNote = existing.cashierNote || "";
             if (data.editReason) {
@@ -401,6 +409,13 @@ export async function addShiftEntries(
   const session = await auth();
   if (!session?.user) return { success: false, error: "Unauthorized" };
   if (!targetReportId) return { success: false, error: "Laporan shift tujuan harus ditentukan." };
+
+  if (Array.isArray(data.expenditures) && data.expenditures.length > 0) {
+    const hasEmptySupplier = data.expenditures.some((e) => !e.supplierName || e.supplierName.trim() === "");
+    if (hasEmptySupplier) {
+      return { success: false, error: "Semua pengeluaran harus memiliki nama supplier" };
+    }
+  }
 
   try {
     const report = await prisma.shiftReport.findUnique({

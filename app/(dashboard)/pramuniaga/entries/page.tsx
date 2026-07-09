@@ -135,6 +135,14 @@ export default function PramuniagaEntriesPage() {
       toast.error("Laporan shift tujuan belum dipilih.");
       return;
     }
+
+    const hasEmptySupplier = expenditures.some((ex) => !ex.supplierName || ex.supplierName.trim() === "");
+    if (hasEmptySupplier) {
+      toast.error("Nama supplier harus diisi!", {
+        description: "Mohon isi nama supplier pada semua baris pengeluaran, atau hapus baris yang kosong jika tidak digunakan."
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
