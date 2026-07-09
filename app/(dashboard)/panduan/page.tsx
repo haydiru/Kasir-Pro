@@ -198,7 +198,7 @@ export default function PanduanPage() {
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-indigo-200 text-indigo-600 bg-indigo-50">3</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Input Uang Titipan Tagihan (Jika Ada)</p>
-                  <p>Jika Owner/Pemilik Toko memberikan uang tunai khusus kepada Kasir atau Admin untuk keperluan membayar tagihan supplier selama shift berjalan, masukkan jumlah uang tersebut di kolom <strong className="text-foreground">Uang Tagihan Masuk</strong>. Uang titipan ini digunakan untuk membayar tagihan, dan sisanya (jika ada) akan tetap terhitung di akhir shift.</p>
+                  <p>Isikan kolom <strong className="text-foreground">Uang Tagihan Masuk</strong> jika Owner/Pemilik Toko memberikan uang tunai khusus kepada kasir atau admin di awal/selama shift untuk dipakai membayar tagihan. Uang ini digunakan khusus untuk membayar tagihan supplier, sehingga jika di akhir shift masih ada sisa, sisa uang tersebut akan tetap dilaporkan dan terhitung sebagai sisa uang tagihan.</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -311,6 +311,13 @@ export default function PanduanPage() {
               </div>
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">5</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Visualisasi &amp; Manajemen via Kalender Tagihan</p>
+                  <p>Gunakan tombol switch <strong className="text-foreground">Tampilan Kalender</strong> untuk melihat seluruh tagihan bulanan secara visual. Setiap tanggal menunjukkan total tagihan dan indikator warna beban keuangan (hijau untuk lunas, biru/kuning/merah untuk beban rendah hingga tinggi). Anda dapat mengklik tanggal mana saja untuk membuka detail tagihan, melakukan pembayaran langsung, atau menjadwalkan ulang tanggal jatuh tempo dengan tombol <strong className="text-primary">Jadwal Ulang</strong> agar beban kas terdistribusi rata.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">6</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Sinkronisasi Google Calendar</p>
                   <p>Setiap tagihan yang Anda catat, ubah statusnya, atau hapus akan otomatis diselaraskan dengan Google Calendar dari akun Google (email) yang ditautkan oleh toko (ditandai dengan badge <strong className="text-blue-500">Google Calendar Sinkron</strong>). Pengingat jatuh tempo akan muncul sebagai kegiatan seharian penuh (all-day event) di kalender Gmail toko.</p>

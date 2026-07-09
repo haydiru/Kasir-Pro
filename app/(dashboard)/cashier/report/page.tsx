@@ -567,7 +567,7 @@ export default function CashierReportPage() {
                 placeholder="0"
               />
               <p className="text-[10px] text-muted-foreground">
-                Uang tagihan yang diterima, direkap terpisah dari modal kasir
+                Uang dari Owner khusus untuk pembayaran tagihan supplier (bisa bersisa)
               </p>
             </div>
           </div>

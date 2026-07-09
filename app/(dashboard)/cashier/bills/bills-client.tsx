@@ -32,11 +32,13 @@ import {
   Search,
   Filter,
   DollarSign,
-  Undo
+  Undo,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { formatCurrency, formatFullLocalDate, formatLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
-import { createBill, updateBillStatus, deleteBill } from "@/app/actions/bill";
+import { createBill, updateBillStatus, deleteBill, rescheduleBill } from "@/app/actions/bill";
 import { getActiveCashierReports } from "@/app/actions/report";
 import SupplierCombobox from "@/components/supplier-combobox";
 import {
@@ -85,6 +87,17 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [paymentSourceDialogOpen, setPaymentSourceDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+
+  // View state & Calendar states
+  const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("LIST");
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Rescheduling states
+  const [reschedulingBillId, setReschedulingBillId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [isRescheduleLoading, setIsRescheduleLoading] = useState(false);
 
   // Active cashier reports for bill payment targeting
   const [activeReports, setActiveReports] = useState<any[]>([]);
@@ -292,6 +305,41 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
     }
   }
 
+  const MONTHS_ID = useMemo(() => [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ], []);
+
+  function formatCompactCurrency(val: number) {
+    if (val === 0) return "Rp 0";
+    if (val < 1000) return `Rp ${val}`;
+    if (val < 1000000) {
+      const rb = val / 1000;
+      return `Rp ${rb.toFixed(0)}rb`;
+    }
+    const jt = val / 1000000;
+    return `Rp ${jt.toFixed(jt % 1 === 0 ? 0 : 1)}jt`;
+  }
+
+  async function handleRescheduleBill(billId: string) {
+    if (!rescheduleDate) return;
+    setIsRescheduleLoading(true);
+    try {
+      const res = await rescheduleBill(billId, new Date(rescheduleDate).toISOString());
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(res.success || "Tanggal jatuh tempo berhasil diubah!");
+        setReschedulingBillId(null);
+        setRescheduleDate("");
+      }
+    } catch {
+      toast.error("Gagal menjadwalkan ulang tagihan.");
+    } finally {
+      setIsRescheduleLoading(false);
+    }
+  }
+
   // Delete Handler
   async function handleDeleteBill(id: string) {
     if (!confirm("Hapus tagihan supplier ini secara permanen?")) return;
@@ -323,6 +371,55 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
       return matchesSearch && matchesStatus;
     });
   }, [initialBills, searchQuery, statusFilter]);
+
+  // Pre-aggregate bills by due date for calendar view
+  const billsByDate = useMemo(() => {
+    const agg: Record<string, { count: number; totalAmount: number; unpaidTotal: number; bills: BillItem[] }> = {};
+    
+    filteredBills.forEach((bill) => {
+      const dateStr = getLocalDateString(bill.dueDate);
+      if (!agg[dateStr]) {
+        agg[dateStr] = { count: 0, totalAmount: 0, unpaidTotal: 0, bills: [] };
+      }
+      agg[dateStr].count += 1;
+      agg[dateStr].totalAmount += bill.amount;
+      if (bill.status === "BELUM_BAYAR") {
+        agg[dateStr].unpaidTotal += bill.amount;
+      }
+      agg[dateStr].bills.push(bill);
+    });
+    
+    return agg;
+  }, [filteredBills, timezone]);
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    const day = new Date(year, month, 1).getDay();
+    return day === 0 ? 6 : day - 1;
+  };
+
+  const gridDays = useMemo(() => {
+    const daysInCurrentMonth = getDaysInMonth(currentYear, currentMonth);
+    const firstDayIndex = getFirstDayOfMonth(currentYear, currentMonth);
+    const prevMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const daysInPrevMonth = getDaysInMonth(prevYear, prevMonthIndex);
+    const days: { date: Date; isCurrentMonth: boolean; key: string }[] = [];
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      days.push({ date: new Date(prevYear, prevMonthIndex, d), isCurrentMonth: false, key: `prev-${d}` });
+    }
+    for (let i = 1; i <= daysInCurrentMonth; i++) {
+      days.push({ date: new Date(currentYear, currentMonth, i), isCurrentMonth: true, key: `curr-${i}` });
+    }
+    const remainingDays = 42 - days.length;
+    const nextMonthIndex = currentMonth === 11 ? 0 : currentMonth + 1;
+    const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({ date: new Date(nextYear, nextMonthIndex, i), isCurrentMonth: false, key: `next-${i}` });
+    }
+    return days;
+  }, [currentYear, currentMonth]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12 animate-in fade-in duration-300">
@@ -411,204 +508,375 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
       </div>
 
       {/* Filter and Search controls */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari supplier..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 rounded-xl bg-card border-muted-foreground/10 text-sm"
-          />
-        </div>
-
-        <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl w-fit self-end sm:self-auto">
-          <Button
-            variant={statusFilter === "BELUM_BAYAR" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("BELUM_BAYAR")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Belum Lunas
-          </Button>
-          <Button
-            variant={statusFilter === "LUNAS" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("LUNAS")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Lunas
-          </Button>
-          <Button
-            variant={statusFilter === "SEMUA" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("SEMUA")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Semua
-          </Button>
-        </div>
-      </div>
-
-      {/* Bills list */}
-      <div className="space-y-4">
-        {filteredBills.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-muted/20 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground space-y-2">
-            <AlertCircle className="h-8 w-8 text-muted-foreground/60" />
-            <p className="text-sm font-bold">
-              {searchQuery ? "Tagihan tidak ditemukan" : "Tidak ada tagihan supplier"}
-            </p>
-            <p className="text-xs max-w-xs">
-              {searchQuery
-                ? "Cobalah mencari dengan nama supplier lain."
-                : "Semua pembayaran lunas! Gunakan tombol di atas untuk mencatatkan tagihan baru."}
-            </p>
+      <div className="flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center bg-card p-3 rounded-2xl border border-muted-foreground/10">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari supplier..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 rounded-xl bg-card border-muted-foreground/10 text-sm"
+            />
           </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredBills.map((bill) => {
-              const isLunas = bill.status === "LUNAS";
-              const isLoading = actionLoadingId === bill.id;
-              
-              // Cek status kedaluwarsa (Overdue)
-              const todayStr = getLocalDateString(new Date());
-              const billDateStr = getLocalDateString(bill.dueDate);
-              const isOverdue = !isLunas && billDateStr < todayStr;
+
+          <div className="flex gap-1 p-1 bg-muted/60 rounded-xl w-fit self-start">
+            <Button
+              variant={statusFilter === "BELUM_BAYAR" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("BELUM_BAYAR")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Belum Lunas
+            </Button>
+            <Button
+              variant={statusFilter === "LUNAS" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("LUNAS")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Lunas
+            </Button>
+            <Button
+              variant={statusFilter === "SEMUA" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("SEMUA")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Semua
+            </Button>
+          </div>
+        </div>
+
+        {/* View Mode Switcher */}
+        <div className="flex gap-1.5 p-1 bg-primary/5 border border-primary/10 rounded-xl w-fit shrink-0 self-start md:self-auto">
+          <Button
+            type="button"
+            variant={viewMode === "LIST" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("LIST")}
+            className="h-8 text-xs font-bold rounded-lg"
+          >
+            Tampilan Daftar
+          </Button>
+          <Button
+            type="button"
+            variant={viewMode === "CALENDAR" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("CALENDAR")}
+        className="h-8 text-xs font-bold rounded-lg"
+      >
+        Tampilan Kalender
+      </Button>
+    </div>
+  </div>
+
+  {viewMode === "CALENDAR" ? (
+    <div className="space-y-6">
+      {/* Calendar Header Card */}
+      <Card className="border-0 shadow-sm bg-card border border-muted-foreground/10">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (currentMonth === 0) {
+                    setCurrentMonth(11);
+                    setCurrentYear(currentYear - 1);
+                  } else {
+                    setCurrentMonth(currentMonth - 1);
+                  }
+                }}
+                className="h-8 w-8 rounded-lg"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h2 className="text-sm sm:text-base font-bold text-foreground min-w-32 text-center capitalize">
+                {MONTHS_ID[currentMonth]} {currentYear}
+              </h2>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (currentMonth === 11) {
+                    setCurrentMonth(0);
+                    setCurrentYear(currentYear + 1);
+                  } else {
+                    setCurrentMonth(currentMonth + 1);
+                  }
+                }}
+                className="h-8 w-8 rounded-lg"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCurrentYear(new Date().getFullYear());
+                setCurrentMonth(new Date().getMonth());
+              }}
+              className="text-xs h-8 rounded-lg font-bold"
+            >
+              Bulan Ini
+            </Button>
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {/* Day of Week Headers */}
+            {["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map((day) => (
+              <div
+                key={day}
+                className="text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground pb-2"
+              >
+                {day}
+              </div>
+            ))}
+
+            {/* Calendar Days */}
+            {gridDays.map(({ date, isCurrentMonth, key }) => {
+              const dateStr = getLocalDateString(date);
+              const data = billsByDate[dateStr];
+              const dayNum = date.getDate();
+              const isToday = getLocalDateString(new Date()) === dateStr;
+
+              let cellBg = "bg-muted/10";
+              let borderStyle = "border border-muted-foreground/5";
+              let textStyle = isCurrentMonth ? "text-foreground font-semibold" : "text-muted-foreground/35";
+              let heatColor = "";
+
+              if (isToday) {
+                borderStyle = "border-2 border-primary shadow-sm";
+              }
+
+              if (data && data.count > 0) {
+                if (data.unpaidTotal === 0) {
+                  // All paid
+                  cellBg = "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.02]";
+                  borderStyle = isToday ? "border-2 border-primary" : "border border-emerald-500/20";
+                  heatColor = "bg-emerald-500";
+                } else if (data.unpaidTotal < 1500000) {
+                  // Low burden
+                  cellBg = "bg-blue-500/[0.04] dark:bg-blue-500/[0.02]";
+                  borderStyle = isToday ? "border-2 border-primary" : "border border-blue-500/20";
+                  heatColor = "bg-blue-500";
+                } else if (data.unpaidTotal < 5000000) {
+                  // Medium burden
+                  cellBg = "bg-amber-500/[0.06] dark:bg-amber-500/[0.03]";
+                  borderStyle = isToday ? "border-2 border-primary" : "border border-amber-500/20";
+                  heatColor = "bg-amber-500 animate-pulse-slow";
+                } else {
+                  // High burden
+                  cellBg = "bg-rose-500/[0.08] dark:bg-rose-500/[0.04]";
+                  borderStyle = isToday ? "border-2 border-primary" : "border border-rose-500/30";
+                  heatColor = "bg-rose-600 animate-pulse-slow";
+                }
+              }
 
               return (
-                <Card
-                  key={bill.id}
-                  className={`overflow-hidden border-0 shadow-sm transition-all duration-200 ${
-                    isLunas
-                      ? "border-l-4 border-l-emerald-500 bg-emerald-500/[0.02] border border-emerald-500/10"
-                      : isOverdue
-                      ? "border-l-4 border-l-rose-500 bg-rose-500/[0.04] border border-rose-500/10 animate-pulse-slow"
-                      : "border-l-4 border-l-blue-500 bg-blue-500/[0.02] border border-blue-500/10"
-                  }`}
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => {
+                    setSelectedDate(dateStr);
+                  }}
+                  className={`min-h-[64px] sm:min-h-[90px] p-1.5 sm:p-2 rounded-xl transition-all duration-200 hover:scale-[1.02] flex flex-col justify-between items-start text-left focus:outline-none hover:shadow-md hover:bg-muted/30 ${cellBg} ${borderStyle}`}
                 >
-                  <CardContent className="p-4.5 space-y-4">
-                    {/* Header: Status badge & delete */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-1.5">
-                        {isLunas ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
-                            Lunas
-                          </Badge>
-                        ) : isOverdue ? (
-                          <Badge variant="destructive" className="text-[9px] py-0 h-4 font-bold uppercase text-white animate-bounce-slow">
-                            Terlewat / Overdue
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-blue-600 hover:bg-blue-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
-                            Belum Bayar
-                          </Badge>
-                        )}
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`text-xs ${textStyle} ${isToday ? "bg-primary text-primary-foreground px-1.5 py-0.5 rounded-md text-[10px] font-bold" : ""}`}>
+                      {dayNum}
+                    </span>
+                    {heatColor && (
+                      <span className={`h-2 w-2 rounded-full ${heatColor}`} />
+                    )}
+                  </div>
 
-                        {bill.calendarEventId && (
-                          <Badge variant="outline" className="text-[9px] py-0 h-4 font-bold gap-1 border-blue-200 text-blue-600 dark:text-blue-400">
-                            <Calendar className="h-2 w-2" />
-                            Google Calendar
-                          </Badge>
-                        )}
+                  {data && data.count > 0 && (
+                    <div className="w-full mt-1.5 space-y-1">
+                      {/* Desktop labels */}
+                      <div className="hidden sm:block">
+                        <p className="text-[9px] font-bold text-muted-foreground leading-none">
+                          {data.count} Tagihan
+                        </p>
+                        <p className={`text-[10px] font-extrabold font-mono mt-0.5 leading-none ${data.unpaidTotal > 0 ? "text-foreground" : "text-emerald-600 line-through opacity-80"}`}>
+                          {formatCompactCurrency(data.totalAmount)}
+                        </p>
                       </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={isLoading}
-                        onClick={() => handleDeleteBill(bill.id)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg -mt-1 -mr-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Nominal & Supplier */}
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">
-                        Supplier / Tujuan
-                      </p>
-                      <h3 className="text-lg font-black tracking-tight leading-tight text-foreground">
-                        {bill.supplierName}
-                      </h3>
-                      <div className="text-xl font-mono font-black text-primary pt-1">
-                        {formatCurrency(bill.amount)}
+                      {/* Mobile label */}
+                      <div className="block sm:hidden w-full text-center">
+                        <span className={`inline-block text-[8px] font-black px-1 py-0.2 rounded-md ${data.unpaidTotal === 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"}`}>
+                          {data.count}t
+                        </span>
                       </div>
                     </div>
-
-                    {/* Warning Barang Retur yang Belum Tuntas */}
-                    {!isLunas && (() => {
-                      const supplierReturns = initialPendingReturns.filter(
-                        (ret) => ret.supplierName.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
-                      );
-                      if (supplierReturns.length === 0) return null;
-                      return (
-                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
-                          <p className="text-[11px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            Ada Barang Retur ({supplierReturns.length})
-                          </p>
-                          <ul className="text-[10px] text-amber-600 dark:text-amber-300 list-disc list-inside font-medium">
-                            {supplierReturns.map((ret) => (
-                              <li key={ret.id} className="truncate">
-                                {ret.productName} (x{ret.quantity}) - <span className="underline">{ret.status === "RETURNED" ? "Telah dikirim" : "Di toko"}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Metadata: Jatuh Tempo */}
-                    <div className="pt-2 border-t border-dashed border-border/60 space-y-1 text-[11px] text-muted-foreground font-semibold">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground/75" />
-                        <span>Jatuh Tempo: {formatFullLocalDate(bill.dueDate, timezone)}</span>
-                      </div>
-                      {bill.createdBy && (
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5 text-muted-foreground/75" />
-                          <span>Dicatat Oleh: {bill.createdBy.name}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action button */}
-                    <div className="pt-1">
-                      {isLunas ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isLoading}
-                          onClick={() => handleToggleStatus(bill.id, bill.status)}
-                          className="w-full text-xs font-semibold py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5"
-                        >
-                          <Undo className="h-3.5 w-3.5" />
-                          Tandai Belum Lunas
-                        </Button>
-                      ) : (
-                        <Button
-                          size="lg"
-                          disabled={isLoading}
-                          onClick={() => handleToggleStatus(bill.id, bill.status)}
-                          className="w-full text-sm font-black py-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-4.5 w-4.5" />
-                          )}
-                          Tandai Lunas
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
+
+          {/* Legend & Guide */}
+          <div className="mt-8 pt-6 border-t border-muted-foreground/10 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Panduan Alokasi &amp; Arus Kas Tagihan
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs leading-normal">
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-500/[0.02] border border-emerald-500/10">
+                <span className="h-3 w-3 rounded-full bg-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-emerald-600">Semua Lunas</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Semua tagihan pada tanggal ini sudah diselesaikan.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-500/[0.02] border border-blue-500/10">
+                <span className="h-3 w-3 rounded-full bg-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-blue-600">{"Beban Rendah (< Rp 1,5jt)"}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Total tagihan kecil, relatif aman untuk menjadwalkan tagihan baru.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/[0.02] border border-amber-500/10">
+                <span className="h-3 w-3 rounded-full bg-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-600">{"Beban Sedang (Rp 1,5jt - 5jt)"}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Beban menengah. Perhatikan arus kas sebelum menjadwalkan tambahan.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-500/[0.02] border border-rose-500/10">
+                <span className="h-3 w-3 rounded-full bg-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-rose-600">{"Beban Tinggi (\u2265 Rp 5jt)"}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Tagihan menumpuk! Pindahkan sebagian jatuh tempo ke tanggal lain.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredBills.length === 0 ? (
+            <div className="text-center py-16 px-4 bg-muted/20 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground space-y-2">
+              <AlertCircle className="h-8 w-8 text-muted-foreground/60" />
+              <p className="text-sm font-bold">
+                {searchQuery ? "Tagihan tidak ditemukan" : "Tidak ada tagihan supplier"}
+              </p>
+              <p className="text-xs max-w-xs">
+                {searchQuery
+                  ? "Cobalah mencari dengan nama supplier lain."
+                  : "Semua pembayaran lunas! Gunakan tombol di atas untuk mencatatkan tagihan baru."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {filteredBills.map((bill) => {
+                const isLunas = bill.status === "LUNAS";
+                const isLoading = actionLoadingId === bill.id;
+                const todayStr = getLocalDateString(new Date());
+                const billDateStr = getLocalDateString(bill.dueDate);
+                const isOverdue = !isLunas && billDateStr < todayStr;
+
+                return (
+                  <Card
+                    key={bill.id}
+                    className={`overflow-hidden border-0 shadow-sm transition-all duration-200 ${
+                      isLunas
+                        ? "border-l-4 border-l-emerald-500 bg-emerald-500/[0.02] border border-emerald-500/10"
+                        : isOverdue
+                        ? "border-l-4 border-l-rose-500 bg-rose-500/[0.04] border border-rose-500/10 animate-pulse-slow"
+                        : "border-l-4 border-l-blue-500 bg-blue-500/[0.02] border border-blue-500/10"
+                    }`}
+                  >
+                    <CardContent className="p-4.5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex gap-1.5">
+                          {isLunas ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[9px] py-0 h-4 font-bold uppercase text-white">Lunas</Badge>
+                          ) : isOverdue ? (
+                            <Badge variant="destructive" className="text-[9px] py-0 h-4 font-bold uppercase text-white animate-bounce-slow">Terlewat / Overdue</Badge>
+                          ) : (
+                            <Badge className="bg-blue-600 hover:bg-blue-700 text-[9px] py-0 h-4 font-bold uppercase text-white">Belum Bayar</Badge>
+                          )}
+                          {bill.calendarEventId && (
+                            <Badge variant="outline" className="text-[9px] py-0 h-4 font-bold gap-1 border-blue-200 text-blue-600 dark:text-blue-400">
+                              <Calendar className="h-2 w-2" />
+                              Google Calendar
+                            </Badge>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="icon" disabled={isLoading} onClick={() => handleDeleteBill(bill.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg -mt-1 -mr-1">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Supplier / Tujuan</p>
+                        <h3 className="text-lg font-black tracking-tight leading-tight text-foreground">{bill.supplierName}</h3>
+                        <div className="text-xl font-mono font-black text-primary pt-1">{formatCurrency(bill.amount)}</div>
+                      </div>
+
+                      {!isLunas && (() => {
+                        const supplierReturns = initialPendingReturns.filter(
+                          (ret) => ret.supplierName.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+                        );
+                        if (supplierReturns.length === 0) return null;
+                        return (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
+                            <p className="text-[11px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <AlertCircle className="h-3.5 w-3.5" />
+                              Ada Barang Retur ({supplierReturns.length})
+                            </p>
+                            <ul className="text-[10px] text-amber-600 dark:text-amber-300 list-disc list-inside font-medium">
+                              {supplierReturns.map((ret) => (
+                                <li key={ret.id} className="truncate">
+                                  {ret.productName} (x{ret.quantity}) - <span className="underline">{ret.status === "RETURNED" ? "Telah dikirim" : "Di toko"}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="pt-2 border-t border-dashed border-border/60 space-y-1 text-[11px] text-muted-foreground font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground/75" />
+                          <span>Jatuh Tempo: {formatFullLocalDate(bill.dueDate, timezone)}</span>
+                        </div>
+                        {bill.createdBy && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-muted-foreground/75" />
+                            <span>Dicatat Oleh: {bill.createdBy.name}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-1">
+                        {isLunas ? (
+                          <Button variant="outline" size="sm" disabled={isLoading} onClick={() => handleToggleStatus(bill.id, bill.status)} className="w-full text-xs font-semibold py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5">
+                            <Undo className="h-3.5 w-3.5" />
+                            Tandai Belum Lunas
+                          </Button>
+                        ) : (
+                          <Button size="lg" disabled={isLoading} onClick={() => handleToggleStatus(bill.id, bill.status)} className="w-full text-sm font-black py-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5">
+                            {isLoading ? (<Loader2 className="h-4.5 w-4.5 animate-spin" />) : (<CheckCircle2 className="h-4.5 w-4.5" />)}
+                            Tandai Lunas
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Dialog: Catat Tagihan Baru */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -877,6 +1145,140 @@ export default function BillsClient({ initialBills, initialPendingReturns = [], 
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Detail Tagihan Per Tanggal */}
+      <Dialog open={!!selectedDate} onOpenChange={(open) => { if (!open) { setSelectedDate(null); setReschedulingBillId(null); } }}>
+        <DialogContent className="max-w-xs sm:max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black tracking-tight">
+              Tagihan Jatuh Tempo
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Detail tagihan untuk tanggal {selectedDate && new Date(selectedDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+            {selectedDate && (!billsByDate[selectedDate] || billsByDate[selectedDate].bills.length === 0) ? (
+              <p className="text-xs text-muted-foreground text-center py-6">Tidak ada tagihan untuk tanggal ini.</p>
+            ) : (
+              selectedDate && billsByDate[selectedDate].bills.map((bill) => {
+                const isLunas = bill.status === "LUNAS";
+                const isRescheduling = reschedulingBillId === bill.id;
+                
+                return (
+                  <div key={bill.id} className="rounded-xl border p-3.5 bg-card space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-foreground leading-tight">{bill.supplierName}</p>
+                        <p className="text-sm font-black font-mono text-primary">{formatCurrency(bill.amount)}</p>
+                      </div>
+                      <Badge className={isLunas ? "bg-emerald-600 text-white text-[9px] font-bold uppercase" : "bg-blue-600 text-white text-[9px] font-bold uppercase"}>
+                        {isLunas ? "Lunas" : "Belum Lunas"}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-muted-foreground/5 justify-between">
+                      <div className="flex items-center gap-1.5">
+                        {!isLunas ? (
+                          <Button
+                            size="sm"
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(null); // Close calendar detail
+                              setSelectedBillId(bill.id);
+                              setPaymentSourceDialogOpen(true); // Open payment dialog
+                            }}
+                            className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5"
+                          >
+                            Bayar
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleToggleStatus(bill.id, bill.status)}
+                            className="h-7 text-[10px] font-semibold text-muted-foreground rounded-lg px-2.5"
+                          >
+                            Batal Lunas
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            if (isRescheduling) {
+                              setReschedulingBillId(null);
+                            } else {
+                              setReschedulingBillId(bill.id);
+                              setRescheduleDate(bill.dueDate.split("T")[0]);
+                            }
+                          }}
+                          className="h-7 text-[10px] font-semibold text-primary hover:bg-primary/5 rounded-lg px-2.5"
+                        >
+                          {isRescheduling ? "Batal" : "Jadwal Ulang"}
+                        </Button>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        onClick={() => {
+                          handleDeleteBill(bill.id);
+                          setSelectedDate(null);
+                        }}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive rounded-lg"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    {isRescheduling && (
+                      <div className="p-3 bg-muted/40 rounded-lg space-y-2 border border-dashed border-primary/20 animate-in slide-in-from-top duration-200">
+                        <Label htmlFor={`new-date-${bill.id}`} className="text-[10px] font-bold text-muted-foreground">Pilih Tanggal Jatuh Tempo Baru</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id={`new-date-${bill.id}`}
+                            type="date"
+                            value={rescheduleDate}
+                            onChange={(e) => setRescheduleDate(e.target.value)}
+                            className="h-8 text-xs bg-background"
+                          />
+                          <Button
+                            size="sm"
+                            type="button"
+                            disabled={isRescheduleLoading}
+                            onClick={() => handleRescheduleBill(bill.id)}
+                            className="h-8 text-xs font-bold"
+                          >
+                            {isRescheduleLoading ? "..." : "Simpan"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setSelectedDate(null);
+                setReschedulingBillId(null);
+              }}
+              className="w-full text-xs font-bold rounded-xl"
+            >
+              Tutup
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

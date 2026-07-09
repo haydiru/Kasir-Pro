@@ -381,3 +381,55 @@ export async function deleteBill(billId: string) {
     return { error: "Gagal menghapus tagihan dari sistem." };
   }
 }
+
+export async function rescheduleBill(billId: string, newDueDate: string) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return { error: "Unauthorized" };
+    }
+
+    const storeId = session.user.storeId;
+    if (!storeId) {
+      return { error: "Store not associated" };
+    }
+
+    const bill = await prisma.bill.findUnique({
+      where: { id: billId },
+    });
+
+    if (!bill) {
+      return { error: "Tagihan tidak ditemukan" };
+    }
+
+    if (bill.storeId !== storeId) {
+      return { error: "Akses ditolak" };
+    }
+
+    const parsedDueDate = new Date(newDueDate);
+
+    // 1. Update bill due date
+    const updatedBill = await prisma.bill.update({
+      where: { id: billId },
+      data: { dueDate: parsedDueDate },
+    });
+
+    // 2. Update Google Calendar event if it exists
+    if (updatedBill.calendarEventId) {
+      await updateCalendarEvent(
+        storeId,
+        updatedBill.calendarEventId,
+        updatedBill.supplierName,
+        updatedBill.amount,
+        updatedBill.dueDate,
+        updatedBill.status
+      );
+    }
+
+    revalidatePath("/cashier/bills");
+    return { success: "Tanggal jatuh tempo berhasil diubah!" };
+  } catch (error: any) {
+    console.error("Error rescheduling bill:", error);
+    return { error: "Gagal memperbarui jadwal jatuh tempo." };
+  }
+}
