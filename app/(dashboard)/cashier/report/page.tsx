@@ -663,8 +663,9 @@ export default function CashierReportPage() {
                 const isNewRow = !tx.createdBy; // Just created in this session, not yet saved
                 const isCreator = tx.createdBy === session?.user?.id;
                 const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole);
-                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier);
+                const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
+                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
+                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
 
                 return (
                   <div key={tx.id} className="rounded-lg border p-4 space-y-3">
@@ -826,8 +827,9 @@ export default function CashierReportPage() {
                 const isNewRow = !ex.createdBy; // Just created in this session, not yet saved
                 const isCreator = ex.createdBy === session?.user?.id;
                 const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole);
-                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier);
+                const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
+                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
+                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
 
                 return (
                   <div key={ex.id} className="rounded-lg border p-4 space-y-3">

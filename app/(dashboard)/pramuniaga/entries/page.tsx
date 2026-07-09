@@ -548,7 +548,7 @@ export default function PramuniagaEntriesPage() {
                   ) : (
                     <div className="divide-y max-h-[400px] overflow-y-auto">
                       {syncedDigitalTx.map((tx) => {
-                        const isOwner = tx.createdBy === session?.user?.id;
+                        const isOwner = tx.createdBy === session?.user?.id || session?.user?.role === "admin" || session?.user?.role === "super_admin";
                         const isEditing = editingId === tx.id;
 
                         if (isEditing) {
@@ -680,7 +680,7 @@ export default function PramuniagaEntriesPage() {
                     <div className="divide-y max-h-[400px] overflow-y-auto">
                       {syncedExpenditures.map((ex) => {
                         const total = ex.amountFromBill + ex.amountFromCashier + ex.amountFromTransfer;
-                        const isOwner = ex.createdBy === session?.user?.id;
+                        const isOwner = ex.createdBy === session?.user?.id || session?.user?.role === "admin" || session?.user?.role === "super_admin";
                         const isEditing = editingId === ex.id;
 
                         if (isEditing) {
