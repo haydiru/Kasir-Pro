@@ -339,12 +339,23 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">2</Badge>
                 <div>
+                  <p className="font-semibold text-foreground">Pengelompokan per Supplier & Update Massal (Bulk/Batch)</p>
+                  <p>Daftar barang retur otomatis dikelompokkan berdasarkan nama perusahaan/supplier. Anda dapat memproses banyak barang sekaligus dengan mencentang kotak pilihan:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                    <li><strong className="text-foreground">Bulk Update Per Supplier</strong> — Klik tombol <strong className="text-foreground">Kirim Semua</strong> atau <strong className="text-foreground">Selesaikan Semua</strong> pada header kelompok supplier untuk memproses seluruh retur di perusahaan tersebut sekaligus.</li>
+                    <li><strong className="text-foreground">Bulk Update Terpilih</strong> — Centang beberapa barang secara acak, lalu gunakan <strong className="text-foreground">Floating Action Bar</strong> yang muncul di bagian bawah layar untuk mengirim atau menyelesaikan barang terpilih secara massal.</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">3</Badge>
+                <div>
                   <p className="font-semibold text-foreground">Pantau & Perbarui Status Retur</p>
                   <p>Status awal barang retur adalah <strong className="text-rose-600">Pending / Di Toko</strong>. Klik <strong className="text-foreground">Tandai Dikirim Ke Supplier</strong> jika barang sudah dibawa oleh sales. Ketika retur sudah diganti dengan barang baru atau dipotong dari nota tagihan, tandai status sebagai <strong className="text-emerald-600">Selesai (Clear)</strong>.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">3</Badge>
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">4</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Integrasi Otomatis dengan Tagihan</p>
                   <p>Setiap barang retur berstatus Pending atau Dikirim akan otomatis muncul sebagai peringatan berwarna oranye pada kartu <strong className="text-foreground">Tagihan Supplier</strong> yang bersangkutan untuk mengingatkan kasir/pegawai sebelum melunasi tagihan.</p>

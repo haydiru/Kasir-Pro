@@ -153,3 +153,60 @@ export async function getReturnedItems() {
     return { error: "Gagal memuat daftar barang retur.", data: [] };
   }
 }
+
+export async function bulkUpdateReturnedItemStatus(itemIds: string[], newStatus: string) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return { error: "Unauthorized" };
+    }
+
+    const storeId = session.user.storeId;
+    if (!storeId) {
+      return { error: "User tidak diasosiasikan dengan toko mana pun" };
+    }
+
+    await prisma.returnedItem.updateMany({
+      where: {
+        id: { in: itemIds },
+        storeId,
+      },
+      data: { status: newStatus },
+    });
+
+    revalidatePath("/retur");
+    revalidatePath("/cashier/bills");
+    return { success: `Status ${itemIds.length} barang retur berhasil diperbarui!` };
+  } catch (error: any) {
+    console.error("Error bulk updating returned items status:", error);
+    return { error: "Gagal memperbarui status barang retur secara massal." };
+  }
+}
+
+export async function bulkDeleteReturnedItems(itemIds: string[]) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return { error: "Unauthorized" };
+    }
+
+    const storeId = session.user.storeId;
+    if (!storeId) {
+      return { error: "User tidak diasosiasikan dengan toko mana pun" };
+    }
+
+    await prisma.returnedItem.deleteMany({
+      where: {
+        id: { in: itemIds },
+        storeId,
+      },
+    });
+
+    revalidatePath("/retur");
+    revalidatePath("/cashier/bills");
+    return { success: `${itemIds.length} barang retur berhasil dihapus!` };
+  } catch (error: any) {
+    console.error("Error bulk deleting returned items:", error);
+    return { error: "Gagal menghapus barang retur secara massal." };
+  }
+}

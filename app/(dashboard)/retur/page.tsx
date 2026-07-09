@@ -41,6 +41,8 @@ import {
   updateReturnedItemStatus,
   deleteReturnedItem,
   getReturnedItems,
+  bulkUpdateReturnedItemStatus,
+  bulkDeleteReturnedItems,
 } from "@/app/actions/retur";
 import SupplierCombobox from "@/components/supplier-combobox";
 
@@ -63,6 +65,7 @@ export default function ReturPage() {
   const [statusFilter, setStatusFilter] = useState<"SEMUA" | "PENDING" | "RETURNED" | "RESOLVED">("PENDING");
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Modal State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -201,12 +204,119 @@ export default function ReturPage() {
         toast.error(res.error);
       } else {
         toast.success(res.success || "Barang retur berhasil dihapus");
+        setSelectedIds((prev) => prev.filter((item) => item !== id));
         loadData();
       }
     } catch {
       toast.error("Gagal menghapus barang retur");
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  // Multi-select helpers
+  const handleToggleSelectItem = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectSupplier = (supplierName: string, groupItems: ReturnedItem[]) => {
+    const itemIds = groupItems.map((item) => item.id);
+    const allSelected = itemIds.every((id) => selectedIds.includes(id));
+
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !itemIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => {
+        const newSelection = [...prev];
+        itemIds.forEach((id) => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+    }
+  };
+
+  // Bulk Actions
+  async function handleBulkUpdateStatus(newStatus: string) {
+    if (selectedIds.length === 0) return;
+    setIsLoading(true);
+    try {
+      const res = await bulkUpdateReturnedItemStatus(selectedIds, newStatus);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(res.success || "Status berhasil diperbarui secara massal");
+        setSelectedIds([]);
+        loadData();
+      }
+    } catch {
+      toast.error("Gagal memproses batch update");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Hapus permanen ${selectedIds.length} barang retur terpilih?`)) return;
+    setIsLoading(true);
+    try {
+      const res = await bulkDeleteReturnedItems(selectedIds);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(res.success || "Barang retur berhasil dihapus secara massal");
+        setSelectedIds([]);
+        loadData();
+      }
+    } catch {
+      toast.error("Gagal menghapus data secara massal");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Batch action for a single supplier group
+  async function handleSupplierBatchAction(groupItems: ReturnedItem[], action: "RETURNED" | "RESOLVED" | "DELETE") {
+    const ids = groupItems.map((item) => item.id);
+    if (ids.length === 0) return;
+
+    if (action === "DELETE") {
+      if (!confirm(`Hapus permanen semua retur (${ids.length}) dari supplier ini?`)) return;
+      setIsLoading(true);
+      try {
+        const res = await bulkDeleteReturnedItems(ids);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success(res.success);
+          setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+          loadData();
+        }
+      } catch {
+        toast.error("Gagal menghapus data");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(true);
+      try {
+        const res = await bulkUpdateReturnedItemStatus(ids, action);
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success(res.success);
+          loadData();
+        }
+      } catch {
+        toast.error("Gagal memperbarui status");
+      } finally {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -223,8 +333,21 @@ export default function ReturPage() {
     });
   }, [items, searchQuery, statusFilter]);
 
+  // Group items by supplierName
+  const groupedItems = useMemo(() => {
+    const groups: { [supplierName: string]: ReturnedItem[] } = {};
+    filteredItems.forEach((item) => {
+      const key = item.supplierName.trim();
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(item);
+    });
+    return groups;
+  }, [filteredItems]);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-12 animate-in fade-in duration-300">
+    <div className="mx-auto max-w-4xl space-y-6 pb-24 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -294,9 +417,9 @@ export default function ReturPage() {
         </div>
       </div>
 
-      {/* Items list */}
-      <div className="space-y-4">
-        {isLoading ? (
+      {/* Items list grouped by supplier */}
+      <div className="space-y-6">
+        {isLoading && items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <p className="text-sm text-muted-foreground font-medium">Memuat data barang retur...</p>
@@ -314,145 +437,260 @@ export default function ReturPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredItems.map((item) => {
-              const isResolved = item.status === "RESOLVED";
-              const isReturned = item.status === "RETURNED";
-              const isPending = item.status === "PENDING";
-              const isLoading = actionLoadingId === item.id;
+          <div className="space-y-8">
+            {Object.entries(groupedItems).map(([supplierName, groupItems]) => {
+              const supplierItemIds = groupItems.map((i) => i.id);
+              const allSelected = supplierItemIds.every((id) => selectedIds.includes(id));
+              const someSelected = supplierItemIds.some((id) => selectedIds.includes(id)) && !allSelected;
+
+              // Filter actions based on what's available
+              const hasPending = groupItems.some((i) => i.status === "PENDING");
+              const hasReturned = groupItems.some((i) => i.status === "RETURNED");
 
               return (
-                <Card
-                  key={item.id}
-                  className={`overflow-hidden border-0 shadow-sm transition-all duration-200 ${
-                    isResolved
-                      ? "border-l-4 border-l-emerald-500 bg-emerald-500/[0.02] border border-emerald-500/10"
-                      : isReturned
-                      ? "border-l-4 border-l-amber-500 bg-amber-500/[0.02] border border-amber-500/10"
-                      : "border-l-4 border-l-rose-500 bg-rose-500/[0.02] border border-rose-500/10"
-                  }`}
-                >
-                  <CardContent className="p-4.5 space-y-4">
-                    {/* Header: Status badge & delete */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-1.5">
-                        {isResolved ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
-                            Selesai / Clear
-                          </Badge>
-                        ) : isReturned ? (
-                          <Badge className="bg-amber-600 hover:bg-amber-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
-                            Telah Dikirim
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-rose-600 hover:bg-rose-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
-                            Pending / Di Toko
-                          </Badge>
-                        )}
-                      </div>
+                <div key={supplierName} className="space-y-3 animate-in fade-in duration-200">
+                  {/* Supplier Group Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/30 dark:bg-muted/10 p-3 rounded-xl border border-border/80">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        className="h-4.5 w-4.5 rounded border-muted-foreground/30 text-primary focus:ring-primary accent-primary cursor-pointer"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate = someSelected;
+                          }
+                        }}
+                        onChange={() => handleToggleSelectSupplier(supplierName, groupItems)}
+                      />
+                      <h2 className="text-sm font-black text-foreground flex items-center gap-1.5">
+                        {supplierName}
+                        <Badge variant="secondary" className="text-[10px] font-bold py-0 px-1.5 h-4.5 bg-muted-foreground/10 text-muted-foreground">
+                          {groupItems.length}
+                        </Badge>
+                      </h2>
+                    </div>
 
+                    {/* Per-Company Bulk Actions */}
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                      {hasPending && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSupplierBatchAction(groupItems, "RETURNED")}
+                          className="h-7 text-[10px] font-bold text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 px-2 rounded-lg"
+                        >
+                          Kirim Semua
+                        </Button>
+                      )}
+                      {hasReturned && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSupplierBatchAction(groupItems, "RESOLVED")}
+                          className="h-7 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 px-2 rounded-lg"
+                        >
+                          Selesaikan Semua
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        disabled={isLoading}
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg -mt-1 -mr-1"
+                        onClick={() => handleSupplierBatchAction(groupItems, "DELETE")}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                  </div>
 
-                    {/* Product & Supplier */}
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">
-                        Supplier: {item.supplierName}
-                      </p>
-                      <h3 className="text-base font-black tracking-tight leading-tight text-foreground flex justify-between">
-                        <span>{item.productName}</span>
-                        <span className="text-primary font-mono">x{item.quantity}</span>
-                      </h3>
-                      {item.reason && (
-                        <p className="text-xs text-muted-foreground mt-1 bg-muted/40 p-2 rounded">
-                          Alasan: {item.reason}
-                        </p>
-                      )}
-                    </div>
+                  {/* Supplier Cards Grid */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {groupItems.map((item) => {
+                      const isResolved = item.status === "RESOLVED";
+                      const isReturned = item.status === "RETURNED";
+                      const isPending = item.status === "PENDING";
+                      const isItemLoading = actionLoadingId === item.id;
+                      const isSelected = selectedIds.includes(item.id);
 
-                    {/* Metadata */}
-                    <div className="pt-2 border-t border-dashed border-border/60 space-y-1 text-[11px] text-muted-foreground font-semibold">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground/75" />
-                        <span>Dicatat: {formatFullLocalDate(item.createdAt, "Asia/Jakarta")}</span>
-                      </div>
-                      {item.createdBy && (
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5 text-muted-foreground/75" />
-                          <span>Oleh: {item.createdBy.name}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="pt-1 flex gap-2">
-                      {isResolved ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isLoading}
-                          onClick={() => handleRevertStatus(item.id, item.status)}
-                          className="w-full text-xs font-semibold py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5"
+                      return (
+                        <Card
+                          key={item.id}
+                          className={`overflow-hidden border-0 shadow-sm transition-all duration-200 relative ${
+                            isSelected ? "ring-2 ring-primary/60 bg-primary/[0.01]" : ""
+                          } ${
+                            isResolved
+                              ? "border-l-4 border-l-emerald-500 bg-emerald-500/[0.02] border border-emerald-500/10"
+                              : isReturned
+                              ? "border-l-4 border-l-amber-500 bg-amber-500/[0.02] border border-amber-500/10"
+                              : "border-l-4 border-l-rose-500 bg-rose-500/[0.02] border border-rose-500/10"
+                          }`}
                         >
-                          <Undo className="h-3.5 w-3.5" />
-                          Kembalikan ke Dikirim
-                        </Button>
-                      ) : isReturned ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => handleRevertStatus(item.id, item.status)}
-                            className="text-xs font-semibold px-3 py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent"
-                          >
-                            <Undo className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => handleUpdateStatus(item.id, item.status)}
-                            className="flex-1 text-xs font-bold py-4.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-1"
-                          >
-                            {isLoading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            )}
-                            Selesai (Clear)
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          size="sm"
-                          disabled={isLoading}
-                          onClick={() => handleUpdateStatus(item.id, item.status)}
-                          className="w-full text-xs font-bold py-4.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center justify-center gap-1"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          )}
-                          Tandai Dikirim Ke Supplier
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                          <CardContent className="p-4.5 space-y-4">
+                            {/* Header: Checkbox & Status */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-muted-foreground/30 text-primary focus:ring-primary accent-primary cursor-pointer"
+                                  checked={isSelected}
+                                  onChange={() => handleToggleSelectItem(item.id)}
+                                />
+                                {isResolved ? (
+                                  <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
+                                    Selesai / Clear
+                                  </Badge>
+                                ) : isReturned ? (
+                                  <Badge className="bg-amber-600 hover:bg-amber-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
+                                    Telah Dikirim
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-rose-600 hover:bg-rose-700 text-[9px] py-0 h-4 font-bold uppercase text-white">
+                                    Pending / Di Toko
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isItemLoading}
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg -mt-1 -mr-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Product Info */}
+                            <div className="space-y-1">
+                              <h3 className="text-base font-black tracking-tight leading-tight text-foreground flex justify-between">
+                                <span>{item.productName}</span>
+                                <span className="text-primary font-mono">x{item.quantity}</span>
+                              </h3>
+                              {item.reason && (
+                                <p className="text-xs text-muted-foreground mt-1 bg-muted/40 p-2 rounded">
+                                  Alasan: {item.reason}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Metadata */}
+                            <div className="pt-2 border-t border-dashed border-border/60 space-y-1 text-[11px] text-muted-foreground font-semibold">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="h-3.5 w-3.5 text-muted-foreground/75" />
+                                <span>Dicatat: {formatFullLocalDate(item.createdAt, "Asia/Jakarta")}</span>
+                              </div>
+                              {item.createdBy && (
+                                <div className="flex items-center gap-1.5">
+                                  <User className="h-3.5 w-3.5 text-muted-foreground/75" />
+                                  <span>Oleh: {item.createdBy.name}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="pt-1 flex gap-2">
+                              {isResolved ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isItemLoading}
+                                  onClick={() => handleRevertStatus(item.id, item.status)}
+                                  className="w-full text-xs font-semibold py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5"
+                                >
+                                  <Undo className="h-3.5 w-3.5" />
+                                  Kembalikan ke Dikirim
+                                </Button>
+                              ) : isReturned ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isItemLoading}
+                                    onClick={() => handleRevertStatus(item.id, item.status)}
+                                    className="text-xs font-semibold px-3 py-4.5 rounded-lg border-muted-foreground/20 text-muted-foreground hover:bg-accent"
+                                  >
+                                    <Undo className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    disabled={isItemLoading}
+                                    onClick={() => handleUpdateStatus(item.id, item.status)}
+                                    className="flex-1 text-xs font-bold py-4.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-1"
+                                  >
+                                    {isItemLoading ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    )}
+                                    Selesai (Clear)
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  disabled={isItemLoading}
+                                  onClick={() => handleUpdateStatus(item.id, item.status)}
+                                  className="w-full text-xs font-bold py-4.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center justify-center gap-1"
+                                >
+                                  {isItemLoading ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                  )}
+                                  Tandai Dikirim Ke Supplier
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-card border border-border/80 shadow-2xl rounded-2xl py-3.5 px-5 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-xs font-black text-foreground">
+            {selectedIds.length} Barang Terpilih
+          </span>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => handleBulkUpdateStatus("RETURNED")}
+              className="h-8 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg gap-1"
+            >
+              <ArrowRight className="h-3 w-3" />
+              Kirim ke Supplier
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleBulkUpdateStatus("RESOLVED")}
+              className="h-8 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Tandai Selesai
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleBulkDelete}
+              className="h-8 text-[11px] font-bold rounded-lg gap-1"
+            >
+              <Trash2 className="h-3 w-3" />
+              Hapus
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Dialog: Catat Retur Baru */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
