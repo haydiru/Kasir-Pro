@@ -45,9 +45,49 @@ import {
   X,
   Share2,
   Copy,
-  Check
+  Check,
+  ArrowUpDown,
+  List,
+  LayoutGrid,
+  Calendar
 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+
+// Helper: Format tanggal ramah untuk orang tua / awam
+function formatFriendlyDate(dateStr: string) {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    const isToday = date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+      
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+      
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
+    
+    if (isToday) {
+      return `Hari Ini, ${timeStr}`;
+    }
+    if (isYesterday) {
+      return `Kemarin, ${timeStr}`;
+    }
+    
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${timeStr}`;
+  } catch (e) {
+    return dateStr;
+  }
+}
 
 interface UserCompact {
   name: string;
@@ -92,6 +132,23 @@ export default function EmptyItemsPage() {
   // Share Link state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Sorting and View Mode states
+  const [sortBy, setSortBy] = useState<"TERBARU" | "TERLAMA" | "NAMA_ASC" | "NAMA_DESC">("TERBARU");
+  const [viewMode, setViewMode] = useState<"COMPACT" | "DETAILED">("COMPACT");
+
+  // Load view mode preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("kasirpro_empty_items_view_mode");
+    if (saved === "DETAILED" || saved === "COMPACT") {
+      setViewMode(saved);
+    }
+  }, []);
+
+  const changeViewMode = (mode: "COMPACT" | "DETAILED") => {
+    setViewMode(mode);
+    localStorage.setItem("kasirpro_empty_items_view_mode", mode);
+  };
 
   const fetchItems = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsRefreshing(true);
@@ -317,9 +374,9 @@ export default function EmptyItemsPage() {
     }
   };
 
-  // --- Helpers for Filtering ---
+  // --- Helpers for Filtering & Sorting ---
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    let result = items.filter((item) => {
       const matchesSearch = item.itemName
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
@@ -331,7 +388,26 @@ export default function EmptyItemsPage() {
         return matchesSearch && item.status === "SELESAI";
       }
     });
-  }, [items, searchQuery, activeTab]);
+
+    // Apply sorting
+    result.sort((a, b) => {
+      if (sortBy === "TERBARU") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "TERLAMA") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (sortBy === "NAMA_ASC") {
+        return a.itemName.localeCompare(b.itemName, "id");
+      }
+      if (sortBy === "NAMA_DESC") {
+        return b.itemName.localeCompare(a.itemName, "id");
+      }
+      return 0;
+    });
+
+    return result;
+  }, [items, searchQuery, activeTab, sortBy]);
 
   // Count active items
   const activeCount = useMemo(() => {
@@ -448,13 +524,53 @@ export default function EmptyItemsPage() {
       {/* Search & Bulk Select Header */}
       <div className="space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4.5 w-4.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-3.5 h-4.5 w-4.5 text-muted-foreground" />
           <Input
             placeholder="Cari nama barang..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-11 rounded-xl bg-card border-muted-foreground/10 text-sm"
           />
+        </div>
+
+        {/* Filtering, Sorting & View Mode Control Bar */}
+        <div className="flex items-center justify-between gap-2 px-1 py-0.5 bg-slate-100 dark:bg-card/50 p-2 rounded-xl border border-border/40">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-bold">
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="TERBARU">Permintaan Terbaru</option>
+              <option value="TERLAMA">Permintaan Terlama</option>
+              <option value="NAMA_ASC">Nama (A-Z)</option>
+              <option value="NAMA_DESC">Nama (Z-A)</option>
+            </select>
+          </div>
+
+          {/* View Mode Toggle Buttons */}
+          <div className="flex items-center gap-1 border-l border-border/80 pl-2">
+            <Button
+              variant={viewMode === "COMPACT" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => changeViewMode("COMPACT")}
+              className="h-7 w-7 rounded-lg"
+              title="Daftar Ringkas"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "DETAILED" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => changeViewMode("DETAILED")}
+              className="h-7 w-7 rounded-lg"
+              title="Daftar Detail"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {filteredItems.length > 0 && (
@@ -517,7 +633,147 @@ export default function EmptyItemsPage() {
                   : "Ketuk tombol di atas jika Anda menemukan barang kosong di rak."}
               </p>
             </div>
+          ) : viewMode === "COMPACT" ? (
+            /* COMPACT LIST VIEW: Minimalist, dense list layout for quick overview and easy handling */
+            <div className="bg-white dark:bg-card rounded-2xl border border-border shadow-sm overflow-hidden divide-y divide-border/60">
+              {filteredItems.map((item) => {
+                const isButuh = item.status === "BUTUH";
+                const isProses = item.status === "PROSES";
+                const isSelesai = item.status === "SELESAI";
+                const isLoadingItem = actionLoading[item.id];
+                const isSelected = selectedIds.includes(item.id);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between p-3 gap-3 transition-colors ${
+                      isSelected ? "bg-primary/[0.03]" : "hover:bg-slate-50/50 dark:hover:bg-slate-900/30"
+                    } ${isSelesai ? "bg-emerald-500/[0.01]" : isProses ? "bg-amber-500/[0.01]" : ""}`}
+                  >
+                    {/* Left Checkbox & Text */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="shrink-0 flex items-center justify-center p-0.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(item.id)}
+                          className="h-6 w-6 rounded border-muted-foreground/45 text-primary focus:ring-primary cursor-pointer transition"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`text-base font-extrabold tracking-tight break-all ${isSelesai ? "line-through text-muted-foreground/70" : "text-foreground"}`}>
+                            {item.itemName}
+                          </span>
+                          {isProses && (
+                            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-none font-extrabold text-[9px] h-4 py-0 px-1.5 uppercase">
+                              Proses
+                            </Badge>
+                          )}
+                          {isSelesai && (
+                            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-none font-extrabold text-[9px] h-4 py-0 px-1.5 uppercase">
+                              Selesai
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Metadata row */}
+                        <div className="text-[11px] text-muted-foreground font-semibold flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                          <span className="flex items-center gap-0.5">
+                            ⏰ {formatFriendlyDate(item.createdAt)}
+                          </span>
+                          <span>• {item.createdBy.name}</span>
+                          {item.notes && (
+                            <span className="text-foreground/90 bg-muted/70 px-1.5 py-0.5 rounded text-[10px] inline-block max-w-[180px] truncate">
+                              📝 {item.notes}
+                            </span>
+                          )}
+                          {isProses && item.processor && (
+                            <span className="text-amber-600 dark:text-amber-400 font-extrabold bg-amber-500/10 px-1.5 py-0.5 rounded text-[9px]">
+                              👨‍🍳 {item.processor.name}
+                            </span>
+                          )}
+                          {isSelesai && item.processor && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10 px-1.5 py-0.5 rounded text-[9px]">
+                              ✔ {item.processor.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action buttons (only if no bulk selection active) */}
+                    {selectedIds.length === 0 && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isButuh && (
+                          <Button
+                            size="sm"
+                            disabled={isLoadingItem}
+                            onClick={() => handleStatusUpdate(item.id, "PROSES")}
+                            className="h-8 px-3 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-extrabold text-xs gap-1 shadow-sm"
+                          >
+                            {isLoadingItem ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
+                            Ambil
+                          </Button>
+                        )}
+
+                        {isProses && (
+                          <>
+                            <Button
+                              size="sm"
+                              disabled={isLoadingItem}
+                              onClick={() => handleStatusUpdate(item.id, "SELESAI")}
+                              className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs gap-1 shadow-sm"
+                            >
+                              {isLoadingItem ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                              Selesai
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={isLoadingItem}
+                              onClick={() => handleStatusUpdate(item.id, "BUTUH")}
+                              className="h-8 px-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold"
+                            >
+                              Batal
+                            </Button>
+                          </>
+                        )}
+
+                        {isSelesai && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isLoadingItem}
+                            onClick={() => handleStatusUpdate(item.id, "BUTUH")}
+                            className="h-8 w-8 rounded-xl p-0 hover:bg-slate-100 hover:text-foreground text-muted-foreground"
+                            title="Laporkan lagi"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {/* Trash Delete Action */}
+                        {(isSelesai || session?.user?.id === item.createdById || session?.user?.role === "admin" || session?.user?.role === "super_admin") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isLoadingItem}
+                            onClick={() => handleDelete(item.id)}
+                            className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* DETAILED CARD VIEW: Original layout */
             filteredItems.map((item) => {
               const isButuh = item.status === "BUTUH";
               const isProses = item.status === "PROSES";
@@ -603,7 +859,7 @@ export default function EmptyItemsPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
-                          <span>Waktu: {formatDateTime(item.createdAt)}</span>
+                          <span>Waktu: {formatFriendlyDate(item.createdAt)}</span>
                         </div>
                         {isProses && item.processor && (
                           <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 mt-0.5 bg-amber-500/10 px-2 py-0.5 rounded w-max">
@@ -619,7 +875,7 @@ export default function EmptyItemsPage() {
                         )}
                       </div>
 
-                      {/* Action Button: (Mobile Friendly - Large Click Targets) */}
+                      {/* Action Button */}
                       <div className="pt-1">
                         {isButuh && (
                           <Button

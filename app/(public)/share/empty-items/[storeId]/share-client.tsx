@@ -30,6 +30,10 @@ import {
   X,
   CheckSquare,
   LogIn,
+  ArrowUpDown,
+  List,
+  LayoutGrid,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +55,43 @@ interface Props {
 }
 
 const STORAGE_KEY = "kasirpro_share_worker_name";
+const VIEW_MODE_KEY = "kasirpro_share_view_mode";
+
+// Helper: Format tanggal ramah untuk orang tua / awam
+function formatFriendlyDate(dateStr: string) {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    const isToday = date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+      
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+      
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
+    
+    if (isToday) {
+      return `Hari Ini, ${timeStr}`;
+    }
+    if (isYesterday) {
+      return `Kemarin, ${timeStr}`;
+    }
+    
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${timeStr}`;
+  } catch (e) {
+    return dateStr;
+  }
+}
 
 export default function ShareClient({ storeId, storeName, timezone }: Props) {
   const [items, setItems] = useState<EmptyItem[]>([]);
@@ -58,11 +99,25 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
   const [activeTab, setActiveTab] = useState<"AKTIF" | "SELESAI">("AKTIF");
   const [isLoadingList, setIsLoadingList] = useState(true);
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState<"TERBARU" | "TERLAMA" | "NAMA_ASC" | "NAMA_DESC">("TERBARU");
+
+  // View Mode: COMPACT (default) or DETAILED
+  const [viewMode, setViewMode] = useState<"COMPACT" | "DETAILED">("COMPACT");
+
   // Worker identity (persisted in localStorage)
   const [workerName, setWorkerName] = useState("");
   const [isNameSet, setIsNameSet] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
+
+  // Buffer state to run actions after worker inputs name
+  const [pendingAction, setPendingAction] = useState<{
+    type: "SINGLE" | "BULK";
+    itemId?: string;
+    status?: string;
+    ids?: string[];
+  } | null>(null);
 
   // Selection for bulk actions
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -71,16 +126,24 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [isBulkLoading, setIsBulkLoading] = useState(false);
 
-  // Load saved name from localStorage on mount
+  // Load saved name and viewMode on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && saved.trim()) {
-      setWorkerName(saved);
+    const savedName = localStorage.getItem(STORAGE_KEY);
+    if (savedName && savedName.trim()) {
+      setWorkerName(savedName);
       setIsNameSet(true);
-    } else {
-      setShowWelcome(true);
+    }
+    
+    const savedViewMode = localStorage.getItem(VIEW_MODE_KEY);
+    if (savedViewMode === "DETAILED" || savedViewMode === "COMPACT") {
+      setViewMode(savedViewMode);
     }
   }, []);
+
+  const changeViewMode = (mode: "COMPACT" | "DETAILED") => {
+    setViewMode(mode);
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  };
 
   // Fetch Items
   const fetchItems = async (showLoading = false) => {
@@ -105,8 +168,8 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
     return () => clearInterval(interval);
   }, [storeId]);
 
-  // Save name handler
-  const handleSaveName = (e: React.FormEvent) => {
+  // Save name handler and auto-run pending action
+  const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameInput.trim()) {
       toast.error("Silakan masukkan nama Anda");
@@ -117,7 +180,55 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
     setWorkerName(name);
     setIsNameSet(true);
     setShowWelcome(false);
-    toast.success(`Selamat datang, ${name}! 👋`);
+    toast.success(`Identitas disimpan: ${name} 👋`);
+
+    // Execute pending action if any
+    if (pendingAction) {
+      const currentWorkerName = name;
+      if (pendingAction.type === "SINGLE" && pendingAction.itemId && pendingAction.status) {
+        setLoadingItemId(pendingAction.itemId);
+        try {
+          const res = await fetch("/api/share/empty-items", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itemId: pendingAction.itemId,
+              status: pendingAction.status,
+              workerName: currentWorkerName,
+            }),
+          });
+          if (res.ok) {
+            toast.success("Tugas berhasil diperbarui!");
+            fetchItems(false);
+          }
+        } catch {
+          toast.error("Terjadi kesalahan koneksi.");
+        } finally {
+          setLoadingItemId(null);
+        }
+      } else if (pendingAction.type === "BULK" && pendingAction.ids && pendingAction.status) {
+        setIsBulkLoading(true);
+        try {
+          await Promise.allSettled(
+            pendingAction.ids.map((itemId) =>
+              fetch("/api/share/empty-items", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ itemId, status: pendingAction.status, workerName: currentWorkerName }),
+              })
+            )
+          );
+          toast.success("Batch tugas berhasil diperbarui!");
+          setSelectedIds([]);
+          fetchItems(false);
+        } catch {
+          toast.error("Gagal memproses batch.");
+        } finally {
+          setIsBulkLoading(false);
+        }
+      }
+      setPendingAction(null);
+    }
   };
 
   // Change name
@@ -126,7 +237,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
     setShowWelcome(true);
   };
 
-  // Helper: Ekstrak nama pemroses dari catatan
+  // Helper: Ekstrak nama pemroses
   const getProcessorName = (item: EmptyItem) => {
     if (item.processor) return item.processor.name;
     if (item.notes && item.notes.startsWith("[Diproses oleh: ")) {
@@ -144,6 +255,13 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
 
   // --- Single item status update ---
   const handleUpdateStatus = async (itemId: string, status: string) => {
+    if (!isNameSet) {
+      setPendingAction({ type: "SINGLE", itemId, status });
+      setNameInput("");
+      setShowWelcome(true);
+      return;
+    }
+
     setLoadingItemId(itemId);
     try {
       const res = await fetch("/api/share/empty-items", {
@@ -173,9 +291,16 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
   // --- Bulk status update ---
   const handleBulkUpdate = async (status: string) => {
     if (selectedIds.length === 0) return;
+    
+    if (!isNameSet) {
+      setPendingAction({ type: "BULK", ids: [...selectedIds], status });
+      setNameInput("");
+      setShowWelcome(true);
+      return;
+    }
+
     setIsBulkLoading(true);
     try {
-      // Execute all updates in parallel
       const results = await Promise.allSettled(
         selectedIds.map((itemId) =>
           fetch("/api/share/empty-items", {
@@ -190,8 +315,8 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
 
       if (successCount > 0) {
         toast.success(
-          status === "PROSES" ? `${successCount} tugas berhasil diambil!` :
-          status === "SELESAI" ? `${successCount} tugas ditandai selesai!` :
+          status === "PROSES" ? `${successCount} tugas diambil!` :
+          status === "SELESAI" ? `${successCount} tugas diselesaikan!` :
           `${successCount} tugas dikembalikan.`
         );
         setSelectedIds([]);
@@ -206,35 +331,73 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
     }
   };
 
-  // --- Selection helpers ---
+  // Checkbox toggle (auto prompts for name if checking a box)
+  const handleCheckboxToggle = (id: string) => {
+    if (!isNameSet) {
+      setPendingAction({ type: "BULK", ids: [id], status: activeTab === "AKTIF" ? "PROSES" : "BUTUH" });
+      setNameInput("");
+      setShowWelcome(true);
+      return;
+    }
+    toggleSelect(id);
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+  // Filter, Search, and Sort items
+  const filteredAndSortedItems = useMemo(() => {
+    let result = items.filter((item) => {
       const matchesSearch = item.itemName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTab = activeTab === "AKTIF"
         ? item.status === "BUTUH" || item.status === "PROSES"
         : item.status === "SELESAI";
       return matchesSearch && matchesTab;
     });
-  }, [items, searchQuery, activeTab]);
+
+    // Sorting logic
+    result.sort((a, b) => {
+      if (sortBy === "TERBARU") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "TERLAMA") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (sortBy === "NAMA_ASC") {
+        return a.itemName.localeCompare(b.itemName, "id");
+      }
+      if (sortBy === "NAMA_DESC") {
+        return b.itemName.localeCompare(a.itemName, "id");
+      }
+      return 0;
+    });
+
+    return result;
+  }, [items, searchQuery, activeTab, sortBy]);
 
   const isAllSelected = useMemo(() => {
-    if (filteredItems.length === 0) return false;
-    return filteredItems.every((item) => selectedIds.includes(item.id));
-  }, [filteredItems, selectedIds]);
+    if (filteredAndSortedItems.length === 0) return false;
+    return filteredAndSortedItems.every((item) => selectedIds.includes(item.id));
+  }, [filteredAndSortedItems, selectedIds]);
 
   const toggleSelectAll = () => {
+    if (!isNameSet) {
+      const allIds = filteredAndSortedItems.map(item => item.id);
+      setPendingAction({ type: "BULK", ids: allIds, status: activeTab === "AKTIF" ? "PROSES" : "BUTUH" });
+      setNameInput("");
+      setShowWelcome(true);
+      return;
+    }
+
     if (isAllSelected) {
-      const filteredItemIds = filteredItems.map((item) => item.id);
+      const filteredItemIds = filteredAndSortedItems.map((item) => item.id);
       setSelectedIds((prev) => prev.filter((id) => !filteredItemIds.includes(id)));
     } else {
       const newSelections = [...selectedIds];
-      filteredItems.forEach((item) => {
+      filteredAndSortedItems.forEach((item) => {
         if (!newSelections.includes(item.id)) newSelections.push(item.id);
       });
       setSelectedIds(newSelections);
@@ -258,12 +421,12 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 pb-32 font-sans">
-      <div className="mx-auto max-w-xl space-y-5">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 pb-36 font-sans">
+      <div className="mx-auto max-w-xl space-y-4">
 
         {/* Header Toko */}
-        <div className="text-center space-y-2 pt-6">
-          <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/10 mb-1">
+        <div className="text-center space-y-2 pt-4">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/10 mb-0.5">
             <ClipboardList className="h-5.5 w-5.5" />
           </div>
           <h1 className="text-xl font-black tracking-tight text-foreground">
@@ -274,26 +437,31 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
           </Badge>
 
           {/* Worker Identity Badge */}
-          {isNameSet && (
-            <div className="flex items-center justify-center gap-2 pt-1">
+          {isNameSet ? (
+            <div className="flex items-center justify-center gap-2 pt-0.5">
               <Badge
-                className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold text-[10px] px-3 py-1 rounded-full gap-1.5 cursor-pointer hover:bg-emerald-500/20 transition"
+                className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-extrabold text-[10px] px-3 py-1 rounded-full gap-1.5 cursor-pointer hover:bg-emerald-500/20 transition"
                 onClick={handleChangeName}
               >
                 <User className="h-3 w-3" />
-                Masuk sebagai: {workerName}
+                Pekerja: {workerName} (Ketuk untuk ubah)
+              </Badge>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 pt-0.5">
+              <Badge
+                className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-extrabold text-[10px] px-3 py-1 rounded-full gap-1.5 cursor-pointer hover:bg-rose-500/20 transition"
+                onClick={() => setShowWelcome(true)}
+              >
+                ⚠️ Ketuk di sini untuk input nama Anda
               </Badge>
             </div>
           )}
-
-          <p className="text-[10px] text-muted-foreground max-w-xs mx-auto leading-relaxed">
-            Halaman ini dapat diakses oleh siapa saja. Anda bisa mengambil tugas belanja dan menandai barang selesai dibeli.
-          </p>
         </div>
 
-        {/* Tab & Search */}
-        <div className="space-y-3">
-          <div className="flex gap-1.5 p-1 bg-white dark:bg-card border border-border/80 rounded-xl shadow-sm">
+        {/* Tab & Search & Settings bar */}
+        <div className="space-y-2.5">
+          <div className="flex gap-1.5 p-1 bg-white dark:bg-card border border-border/85 rounded-xl shadow-sm">
             <Button
               variant={activeTab === "AKTIF" ? "secondary" : "ghost"}
               onClick={() => setActiveTab("AKTIF")}
@@ -313,24 +481,64 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Cari barang kosong..."
+              placeholder="Cari barang..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-10 rounded-xl bg-white dark:bg-card border-border shadow-sm text-sm"
             />
           </div>
 
+          {/* Filtering, Sorting & View Mode Controls */}
+          <div className="flex items-center justify-between gap-2 px-1 py-0.5 bg-slate-100 dark:bg-card/50 p-2 rounded-xl border border-border/40">
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-bold">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="TERBARU" className="bg-card">Permintaan Terbaru</option>
+                <option value="TERLAMA" className="bg-card">Permintaan Terlama</option>
+                <option value="NAMA_ASC" className="bg-card">Nama (A-Z)</option>
+                <option value="NAMA_DESC" className="bg-card">Nama (Z-A)</option>
+              </select>
+            </div>
+
+            {/* View Mode Toggle Buttons */}
+            <div className="flex items-center gap-1 border-l border-border/80 pl-2">
+              <Button
+                variant={viewMode === "COMPACT" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => changeViewMode("COMPACT")}
+                className="h-7 w-7 rounded-lg"
+                title="Daftar Ringkas"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "DETAILED" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => changeViewMode("DETAILED")}
+                className="h-7 w-7 rounded-lg"
+                title="Daftar Detail"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           {/* Select All */}
-          {isNameSet && filteredItems.length > 0 && (
+          {filteredAndSortedItems.length > 0 && (
             <div className="flex items-center justify-between px-1">
               <label className="flex items-center gap-2.5 text-xs font-bold text-muted-foreground cursor-pointer p-2 rounded-lg hover:bg-muted/40 transition-colors">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
                   onChange={toggleSelectAll}
-                  className="h-5 w-5 rounded border-muted-foreground/30 text-primary focus:ring-primary cursor-pointer"
+                  className="h-5.5 w-5.5 rounded border-muted-foreground/30 text-primary focus:ring-primary cursor-pointer"
                 />
-                Pilih Semua ({filteredItems.length})
+                Pilih Semua ({filteredAndSortedItems.length})
               </label>
               {selectedIds.length > 0 && (
                 <Button
@@ -353,7 +561,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
               <Loader2 className="h-7 w-7 text-primary animate-spin" />
               <p className="text-xs text-muted-foreground font-semibold">Memuat daftar barang...</p>
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : filteredAndSortedItems.length === 0 ? (
             <div className="text-center py-16 px-4 bg-white dark:bg-card rounded-2xl border border-dashed border-border shadow-sm flex flex-col items-center justify-center text-muted-foreground space-y-2">
               <AlertCircle className="h-7 w-7 text-muted-foreground/60" />
               <p className="text-xs font-bold">
@@ -367,9 +575,123 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
                   : "Belum ada barang yang selesai dibeli."}
               </p>
             </div>
+          ) : viewMode === "COMPACT" ? (
+            /* COMPACT LIST VIEW: Minimalist, dense, highly scannable rows. Very readable and quick. */
+            <div className="bg-white dark:bg-card rounded-2xl border border-border/80 shadow-sm overflow-hidden divide-y divide-border/60">
+              {filteredAndSortedItems.map((item) => {
+                const cleanNotes = getCleanNotes(item.notes);
+                const processorName = getProcessorName(item);
+                const isStatusProses = item.status === "PROSES";
+                const isStatusSelesai = item.status === "SELESAI";
+                const isLoading = loadingItemId === item.id;
+                const isSelected = selectedIds.includes(item.id);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between p-3 gap-3 transition-colors ${
+                      isSelected ? "bg-primary/[0.03]" : "hover:bg-slate-50/50 dark:hover:bg-slate-900/30"
+                    } ${isStatusSelesai ? "bg-emerald-500/[0.01]" : isStatusProses ? "bg-amber-500/[0.01]" : ""}`}
+                  >
+                    {/* Left Checkbox */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="shrink-0 flex items-center justify-center p-0.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleCheckboxToggle(item.id)}
+                          className="h-6 w-6 rounded border-muted-foreground/45 text-primary focus:ring-primary cursor-pointer transition"
+                        />
+                      </div>
+
+                      {/* Content */}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`text-base font-extrabold tracking-tight break-all ${isStatusSelesai ? "line-through text-muted-foreground/70" : "text-foreground"}`}>
+                            {item.itemName}
+                          </span>
+                          {isStatusProses && (
+                            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-none font-extrabold text-[9px] h-4 py-0 px-1.5 uppercase">
+                              Proses
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Metadata row */}
+                        <div className="text-[11px] text-muted-foreground font-semibold flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                          <span className="flex items-center gap-0.5">
+                            ⏰ {formatFriendlyDate(item.createdAt)}
+                          </span>
+                          {cleanNotes && (
+                            <span className="text-foreground/90 bg-muted/70 px-1.5 py-0.5 rounded text-[10px] inline-block max-w-[200px] truncate">
+                              📝 {cleanNotes}
+                            </span>
+                          )}
+                          {processorName && (
+                            <span className="text-amber-600 dark:text-amber-400 font-extrabold bg-amber-500/10 px-1.5 py-0.5 rounded text-[9px]">
+                              👨‍🍳 {processorName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action buttons (only if no bulk selection active) */}
+                    {selectedIds.length === 0 && (
+                      <div className="shrink-0">
+                        {isStatusSelesai ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isLoading}
+                            onClick={() => handleUpdateStatus(item.id, "BUTUH")}
+                            className="h-8 w-8 rounded-xl p-0 hover:bg-slate-100 hover:text-foreground text-muted-foreground"
+                            title="Batal Selesai"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        ) : isStatusProses ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              disabled={isLoading}
+                              onClick={() => handleUpdateStatus(item.id, "SELESAI")}
+                              className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs gap-1 shadow-sm"
+                            >
+                              {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                              Selesai
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={isLoading}
+                              onClick={() => handleUpdateStatus(item.id, "BUTUH")}
+                              className="h-8 px-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold"
+                            >
+                              Batal
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={isLoading}
+                            onClick={() => handleUpdateStatus(item.id, "PROSES")}
+                            className="h-8 px-3 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-extrabold text-xs gap-1 shadow-sm"
+                          >
+                            {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
+                            Ambil
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* DETAILED CARD VIEW: Traditional card view */
             <div className="space-y-3.5">
-              {filteredItems.map((item) => {
+              {filteredAndSortedItems.map((item) => {
                 const cleanNotes = getCleanNotes(item.notes);
                 const processorName = getProcessorName(item);
                 const isStatusProses = item.status === "PROSES";
@@ -390,20 +712,18 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
                   >
                     <CardContent className="p-4 flex items-start gap-3">
                       {/* Checkbox */}
-                      {isNameSet && (
-                        <div className="pt-1.5 shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(item.id)}
-                            className="h-5 w-5 rounded border-muted-foreground/30 text-primary focus:ring-primary cursor-pointer"
-                          />
-                        </div>
-                      )}
+                      <div className="pt-1.5 shrink-0 flex items-center justify-center p-0.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleCheckboxToggle(item.id)}
+                          className="h-6 w-6 rounded border-muted-foreground/30 text-primary focus:ring-primary cursor-pointer transition"
+                        />
+                      </div>
 
                       <div className="flex-1 space-y-3 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h3 className={`text-sm font-black tracking-tight leading-tight ${isStatusSelesai ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                          <h3 className={`text-base font-extrabold tracking-tight leading-tight ${isStatusSelesai ? "line-through text-muted-foreground/75" : "text-foreground"}`}>
                             {item.itemName}
                           </h3>
                           <div>
@@ -424,21 +744,27 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
                         </div>
 
                         {cleanNotes && (
-                          <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/40 p-1.5 rounded border border-border/40 w-fit">
+                          <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/40 p-2 rounded border border-border/40 w-fit">
                             📝 {cleanNotes}
                           </p>
                         )}
 
+                        {/* Time Requested */}
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-semibold">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
+                          <span>Diminta: {formatFriendlyDate(item.createdAt)}</span>
+                        </div>
+
                         {/* Processor info */}
                         {processorName && (
-                          <div className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/5 px-2 py-1 rounded-lg w-fit border border-amber-500/10">
+                          <div className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-extrabold bg-amber-500/5 px-2 py-1 rounded-lg w-fit border border-amber-500/10">
                             <User className="h-3 w-3" />
                             <span>Diproses oleh: {processorName}</span>
                           </div>
                         )}
 
                         {/* Single Action Buttons (only if no bulk selection active) */}
-                        {isNameSet && selectedIds.length === 0 && (
+                        {selectedIds.length === 0 && (
                           <div className="pt-1.5 border-t border-dashed border-border/80 flex gap-2">
                             {isStatusSelesai ? (
                               <Button
@@ -496,7 +822,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
       </div>
 
       {/* Floating Bulk Action Bar */}
-      {isNameSet && selectedIds.length > 0 && (
+      {selectedIds.length > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-4 z-50 flex flex-col gap-3 animate-in slide-in-from-bottom-6 duration-300">
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-xs font-black tracking-tight flex items-center gap-1.5 text-primary">
@@ -603,7 +929,10 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowWelcome(false)}
+                  onClick={() => {
+                    setShowWelcome(false);
+                    setPendingAction(null);
+                  }}
                   className="w-full sm:w-auto text-xs font-semibold rounded-xl"
                 >
                   Batal
