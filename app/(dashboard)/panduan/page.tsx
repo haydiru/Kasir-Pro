@@ -257,6 +257,9 @@ export default function PanduanPage() {
                 <div>
                   <p className="font-semibold text-foreground">Gunakan Link Publik untuk Kurir/Sales</p>
                   <p>Administrator dapat membagikan link publik Barang Kosong kepada sales supplier atau kurir pengantar barang agar mereka mengetahui produk apa saja yang kosong di toko secara real-time tanpa perlu masuk ke dalam aplikasi.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Kurir luar/umum tidak perlu login, hanya perlu input nama sekali saja di HP mereka. Mereka juga dapat memilih banyak barang sekaligus (bulk action) untuk memproses belanjaan secara instan.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -267,7 +270,7 @@ export default function PanduanPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2 text-violet-600 dark:text-violet-400">
                 <FileText className="h-5 w-5" />
-                6. Tagihan Supplier & Invoice
+                6. Tagihan Supplier & Autocomplete
               </CardTitle>
               <CardDescription>Memantau dan menyelesaikan tagihan dari sales supplier yang jatuh tempo.</CardDescription>
             </CardHeader>
@@ -275,19 +278,26 @@ export default function PanduanPage() {
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">1</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Pantau Batas Waktu (Due Date)</p>
-                  <p>Buka menu <strong className="text-foreground">Tagihan Supplier</strong>. Setiap invoice tercatat memiliki tanggal jatuh tempo. Tagihan yang mendekati tanggal jatuh tempo akan ditandai dengan warna peringatan merah.</p>
+                  <p className="font-semibold text-foreground">Pencatatan Cepat dengan Autocomplete</p>
+                  <p>Mulai mengetik nama supplier di kolom pencarian. Sistem akan memunculkan dropdown supplier yang ada di database. Jika supplier belum terdaftar, Anda dapat menambahkan supplier baru secara instan di latar belakang dengan satu klik langsung dari dropdown.</p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">2</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Pantau Batas Waktu (Due Date)</p>
+                  <p>Setiap invoice tercatat memiliki tanggal jatuh tempo. Tagihan yang mendekati tanggal jatuh tempo akan ditandai dengan warna peringatan merah.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">3</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Pencocokan Barang Retur Sebelum Pembayaran</p>
                   <p>Sebelum melakukan pembayaran tagihan, periksa apakah terdapat peringatan <strong className="text-amber-600">Ada Barang Retur</strong> pada kartu tagihan supplier tersebut. Karyawan wajib menuntaskan/memotong nilai retur ini sebelum menyerahkan uang pembayaran ke supplier.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">3</Badge>
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">4</Badge>
                 <div>
                   <p className="font-semibold text-foreground">Lunasi Tagihan & Alokasi Dana (Split Payment)</p>
                   <p>Setelah retur (jika ada) diselesaikan, klik tombol <strong className="text-emerald-600">Tandai Lunas</strong>. Sistem akan memunculkan formulir alokasi pembayaran untuk membagi total tagihan dari kombinasi sumber dana:</p>
@@ -300,27 +310,10 @@ export default function PanduanPage() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">4</Badge>
-                <div>
-                  <p className="font-semibold text-foreground">Sinkronisasi Otomatis ke Laporan Shift</p>
-                  <p>Setelah alokasi dikonfirmasi, data pengeluaran tagihan akan <strong className="text-foreground">otomatis tercatat di laporan shift aktif</strong> dengan struktur rincian yang sama persis (terbagi berdasarkan Uang Laci, Uang Titipan, dan Transfer Bank). Tidak perlu lagi mencatat ulang secara manual di halaman Laporan Shift.</p>
-                  <p className="text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-                    ✅ Jika status tagihan dikembalikan menjadi belum lunas, draf pengeluaran terkait di laporan shift akan otomatis dibersihkan tanpa meninggalkan data ganda.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
                 <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">5</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Visualisasi &amp; Manajemen via Kalender Tagihan</p>
-                  <p>Gunakan tombol switch <strong className="text-foreground">Tampilan Kalender</strong> untuk melihat seluruh tagihan bulanan secara visual. Setiap tanggal menunjukkan total tagihan dan indikator warna beban keuangan (hijau untuk lunas, biru/kuning/merah untuk beban rendah hingga tinggi). Anda dapat mengklik tanggal mana saja untuk membuka detail tagihan, melakukan pembayaran langsung, atau menjadwalkan ulang tanggal jatuh tempo dengan tombol <strong className="text-primary">Jadwal Ulang</strong> agar beban kas terdistribusi rata.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-violet-200 text-violet-600 bg-violet-50">6</Badge>
-                <div>
-                  <p className="font-semibold text-foreground">Sinkronisasi Google Calendar</p>
-                  <p>Setiap tagihan yang Anda catat, ubah statusnya, atau hapus akan otomatis diselaraskan dengan Google Calendar dari akun Google (email) yang ditautkan oleh toko (ditandai dengan badge <strong className="text-blue-500">Google Calendar Sinkron</strong>). Pengingat jatuh tempo akan muncul sebagai kegiatan seharian penuh (all-day event) di kalender Gmail toko.</p>
+                  <p className="font-semibold text-foreground">Sinkronisasi Otomatis ke Laporan Shift & Kalender</p>
+                  <p>Setelah alokasi dikonfirmasi, data pengeluaran tagihan akan <strong className="text-foreground">otomatis tercatat di laporan shift aktif</strong>. Tagihan juga akan disinkronisasikan ke Google Calendar toko yang terhubung secara otomatis.</p>
                 </div>
               </div>
             </CardContent>
@@ -354,18 +347,38 @@ export default function PanduanPage() {
                   </ul>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Alur Laporan Belanja Pegawai (Petty Cash) */}
+          <Card className="border-0 shadow-sm border-l-4 border-l-teal-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-teal-600 dark:text-teal-400">
+                <Wallet className="h-5 w-5" />
+                8. Laporan Belanja Pegawai (Petty Cash)
+              </CardTitle>
+              <CardDescription>Melaporkan pengeluaran belanja operasional di luar laporan laci kasir.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
               <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">3</Badge>
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">1</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Pantau & Perbarui Status Retur</p>
-                  <p>Status awal barang retur adalah <strong className="text-rose-600">Pending / Di Toko</strong>. Klik <strong className="text-foreground">Tandai Dikirim Ke Supplier</strong> jika barang sudah dibawa oleh sales. Ketika retur sudah diganti dengan barang baru atau dipotong dari nota tagihan, tandai status sebagai <strong className="text-emerald-600">Selesai (Clear)</strong>.</p>
+                  <p className="font-semibold text-foreground">Pantau Saldo Pegangan Anda</p>
+                  <p>Buka menu <strong className="text-foreground">Laporan Belanja Pegawai</strong>. Di bagian atas, lihat statistik sisa saldo operasional belanja aktif yang Anda pegang saat ini.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-rose-200 text-rose-600 bg-rose-50">4</Badge>
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">2</Badge>
                 <div>
-                  <p className="font-semibold text-foreground">Integrasi Otomatis dengan Tagihan</p>
-                  <p>Setiap barang retur berstatus Pending atau Dikirim akan otomatis muncul sebagai peringatan berwarna oranye pada kartu <strong className="text-foreground">Tagihan Supplier</strong> yang bersangkutan untuk mengingatkan kasir/pegawai sebelum melunasi tagihan.</p>
+                  <p className="font-semibold text-foreground">Laporkan Belanja & Foto Nota</p>
+                  <p>Setiap belanja selesai dilakukan, klik <strong className="text-foreground">Buat Laporan Belanja</strong>. Tuliskan nama tempat belanja (wajib), total nominal (wajib), dan ambil foto nota belanja secara langsung menggunakan kamera HP Anda (wajib).</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">3</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Kompresi Gambar Otomatis</p>
+                  <p>Ukuran foto yang besar akan dikompresi secara otomatis oleh sistem di HP Anda agar upload cepat dan hemat kuota, dengan jaminan teks nota belanja tetap terlihat sangat jelas untuk disetujui owner.</p>
                 </div>
               </div>
             </CardContent>
@@ -478,6 +491,40 @@ export default function PanduanPage() {
                 <div>
                   <p className="font-semibold text-foreground">Pindah Saldo Ke Bank Toko (Setoran Bank)</p>
                   <p>Ketika Anda menyetor uang tunai kas pegangan Anda ke bank toko, catat mutasi ini dengan memilih tipe transaksi <strong className="text-foreground">TRANSFER</strong>. Masukkan nominal uang yang disetor dari dompet <strong className="text-foreground">Kas Pegangan</strong> ke <strong className="text-foreground">Rekening Bank Toko (Rekening Bersama)</strong>.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Petty Cash & Distribusi Uang Belanja */}
+          <Card className="border-0 shadow-sm border-l-4 border-l-teal-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-teal-700 dark:text-teal-300">
+                <Wallet className="h-5 w-5" />
+                4. Pengelolaan Petty Cash & Distribusi Uang Belanja
+              </CardTitle>
+              <CardDescription>Membagikan dana belanja dan memantau saldo operasional di tangan pegawai.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">1</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Beri Uang Belanja Operasional</p>
+                  <p>Masuk ke menu <strong className="text-foreground">Laporan Belanja Pegawai</strong>. Klik tombol <strong className="text-foreground">Beri Uang Operasional</strong>, pilih nama pegawai penerima, masukkan nominal uang, metode penyaluran (Cash / Transfer), serta unggah foto bukti transfer (jika ditransfer, opsional).</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">2</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Pantau Statistik & Saldo Aktif Pegawai</p>
+                  <p>Pada tabel statistik di halaman tersebut, Owner dapat melihat total uang yang diberikan kepada setiap pegawai, total yang telah dibelanjakan (berdasarkan laporan belanja pegawai), serta sisa saldo operasional yang masih dipegang pegawai bersangkutan.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Badge variant="outline" className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-teal-200 text-teal-600 bg-teal-50">3</Badge>
+                <div>
+                  <p className="font-semibold text-foreground">Verifikasi Bukti Nota Belanja Karyawan</p>
+                  <p>Tinjau daftar belanjaan pegawai di bawah tab <strong className="text-foreground">Laporan Belanja</strong>. Klik tombol <strong className="text-foreground">Nota</strong> di baris pengeluaran untuk memunculkan pop-up bukti nota belanjaan fisik yang diunggah pegawai guna keperluan pencatatan dan audit.</p>
                 </div>
               </div>
             </CardContent>

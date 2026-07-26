@@ -9,6 +9,9 @@ Sistem manajemen shift dan pelaporan harian untuk minimarket modern. Dibangun de
 - **Presensi Karyawan**: Sistem Clock-In/Clock-Out yang sinkron dengan jadwal toko.
 - **Laporan Shift Otomatis**: Rekapitulasi transaksi, pengeluaran, dan kas awal/akhir per shift.
 - **Manajemen User**: Pengaturan peran Kasir, Pramuniaga, dan Admin.
+- **Master Supplier & Excel Import**: Memungkinkan CRUD data supplier, autocomplete data supplier saat pencatatan tagihan, serta import data supplier massal via template Excel.
+- **Barang Kosong & Shareable Link**: Ceklist barang kosong rak yang dapat diakses publik tanpa login oleh kurir/sales untuk menandai status pembelian secara massal (bulk action), dilengkapi session ingatan nama pekerja.
+- **Laporan Belanja Pegawai (Petty Cash)**: Pencatatan alokasi dana operasional owner ke pegawai (bukti transfer opsional) dan pelaporan belanja dengan bukti nota wajib yang dikompresi otomatis secara client-side agar hemat kuota.
 
 ## 🛠️ Tech Stack
 
