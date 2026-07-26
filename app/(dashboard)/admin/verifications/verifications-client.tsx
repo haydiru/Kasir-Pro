@@ -61,37 +61,22 @@ function findMatchedFlip(dt: any, flipWebhooks: any[]) {
   if (!flipWebhooks || flipWebhooks.length === 0) return null;
 
   const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
+  if (!cleanFlipId) return null;
 
-  // If cashier entered a Flip ID, match strictly by Flip ID (exact or partial)
-  if (cleanFlipId) {
-    // 1. Exact match
-    const exact = flipWebhooks.find((fw) => {
-      const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
-      return fwId === cleanFlipId;
-    });
-    if (exact) return exact;
+  // 1. Exact match
+  const exact = flipWebhooks.find((fw) => {
+    const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
+    return fwId === cleanFlipId;
+  });
+  if (exact) return exact;
 
-    // 2. Alphanumeric prefix / partial match
-    const partial = flipWebhooks.find((fw) => {
-      const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
-      if (!fwId) return false;
-      return cleanFlipId.startsWith(fwId) || fwId.startsWith(cleanFlipId);
-    });
-    if (partial) return partial;
-
-    // Cashier entered an ID but it does not exist in Flip records (wrong/typo ID)
-    return null;
-  }
-
-  // If cashier didn't enter any Flip ID, try matching by phone number
-  const cleanContact = dt.detailContact?.replace(/\D/g, "");
-  if (cleanContact && cleanContact.length >= 8) {
-    const byPhone = flipWebhooks.find((fw) => {
-      const fwPhone = (fw.customerNumber || "").replace(/\D/g, "");
-      return fwPhone && fwPhone.length >= 8 && (fwPhone.endsWith(cleanContact) || cleanContact.endsWith(fwPhone));
-    });
-    if (byPhone) return byPhone;
-  }
+  // 2. Alphanumeric prefix / partial match
+  const partial = flipWebhooks.find((fw) => {
+    const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
+    if (!fwId) return false;
+    return cleanFlipId.startsWith(fwId) || fwId.startsWith(cleanFlipId);
+  });
+  if (partial) return partial;
 
   return null;
 }
