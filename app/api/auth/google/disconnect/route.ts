@@ -20,12 +20,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hapus data Google OAuth dari database
+    const body = await req.json().catch(() => ({}));
+    const type = body.type || req.nextUrl.searchParams.get("type") || "CALENDAR";
+
+    // Hapus data Google OAuth dari database berdasarkan (storeId, type)
     await prisma.storeGoogleAuth.deleteMany({
-      where: { storeId },
+      where: { storeId, type },
     });
 
-    return NextResponse.json({ success: true, message: "Koneksi Google Calendar berhasil diputuskan" });
+    return NextResponse.json({ success: true, message: `Koneksi Google ${type} berhasil diputuskan` });
   } catch (error: any) {
     console.error("POST /api/auth/google/disconnect error:", error);
     return NextResponse.json(

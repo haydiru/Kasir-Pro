@@ -10,6 +10,7 @@ import ShiftClientActions from "./shift-client-actions";
 import StoreUpdateForm from "./store-update-form";
 import FlipApiKeySection from "./flip-api-key-section";
 import GoogleCalendarSection from "./google-calendar-section";
+import GmailFlipSection from "./gmail-flip-section";
 import { headers } from "next/headers";
 
 export default async function StoreSettingsPage() {
@@ -50,6 +51,9 @@ export default async function StoreSettingsPage() {
       </div>
     );
   }
+
+  const calendarAuth = store.googleAuth.find((a) => a.type === "CALENDAR") || null;
+  const gmailAuth = store.googleAuth.find((a) => a.type === "GMAIL") || null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10">
@@ -98,15 +102,20 @@ export default async function StoreSettingsPage() {
              </p>
           </div>
 
+          <GmailFlipSection
+            gmailAuth={gmailAuth}
+            storeId={store.id}
+          />
+
+          <GoogleCalendarSection
+            googleAuth={calendarAuth}
+            storeId={store.id}
+          />
+
           <FlipApiKeySection
             initialApiKey={store.flipApiKey || null}
             storeId={store.id}
             appUrl={appUrl}
-          />
-
-          <GoogleCalendarSection
-            googleAuth={store.googleAuth}
-            storeId={store.id}
           />
         </div>
 

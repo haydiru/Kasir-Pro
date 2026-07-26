@@ -6,7 +6,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const code = searchParams.get("code");
     const errorParam = searchParams.get("error");
-    const storeId = searchParams.get("state"); // storeId dikirim via state parameter
+    const stateParam = searchParams.get("state") || "";
+    const [storeId, type = "CALENDAR"] = stateParam.split(":");
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     const redirectSettingsUrl = `${appUrl}/admin/store-settings`;
@@ -64,9 +65,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${redirectSettingsUrl}?error=store_not_found`);
     }
 
-    // Upsert token Google OAuth toko ke database
+    // Upsert token Google OAuth toko ke database berdasarkan (storeId, type)
     await prisma.storeGoogleAuth.upsert({
-      where: { storeId },
+      where: {
+        storeId_type: { storeId, type },
+      },
       update: {
         accessToken: tokens.access_token,
         // Refresh token hanya dikirim Google pada authorization pertama,
@@ -76,13 +79,15 @@ export async function GET(req: NextRequest) {
       },
       create: {
         storeId,
+        type,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || "",
         expiryDate,
       },
     });
 
-    return NextResponse.redirect(`${redirectSettingsUrl}?success=google_connected`);
+    const successFlag = type === "GMAIL" ? "gmail_connected" : "google_connected";
+    return NextResponse.redirect(`${redirectSettingsUrl}?success=${successFlag}`);
   } catch (error: any) {
     console.error("Error in Google OAuth callback handler:", error);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;

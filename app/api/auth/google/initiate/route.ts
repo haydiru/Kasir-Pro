@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     const redirectUri = `${appUrl}/api/auth/google/callback`;
     const storeId = session.user.storeId;
+    const type = req.nextUrl.searchParams.get("type") || "CALENDAR";
 
     if (!storeId) {
       return NextResponse.json(
@@ -30,15 +31,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Bangun URL OAuth Consent Google
+    // Tentukan scope berdasarkan tipe integrasi
+    const scope = type === "GMAIL"
+      ? "https://www.googleapis.com/auth/gmail.readonly"
+      : "https://www.googleapis.com/auth/calendar.events";
+
+    // Bangun URL OAuth Consent Google (state menyimpan storeId:type)
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_type=code` +
-      `&scope=${encodeURIComponent("https://www.googleapis.com/auth/calendar.events")}` +
+      `&scope=${encodeURIComponent(scope)}` +
       `&access_type=offline` +
       `&prompt=consent` +
-      `&state=${encodeURIComponent(storeId)}`;
+      `&state=${encodeURIComponent(`${storeId}:${type}`)}`;
 
     return NextResponse.redirect(googleAuthUrl);
   } catch (error: any) {

@@ -7,9 +7,9 @@ async function main() {
     select: { id: true, name: true }
   });
 
-  const title = "✨ Fitur Baru: Petty Cash & Supplier!";
-  const message = "Telah hadir fitur Laporan Belanja Pegawai (Petty Cash) dengan kompresi foto otomatis, Autocomplete Supplier & Impor Excel, serta Share Link Barang Kosong Rak. Klik untuk membaca Panduan Lengkap.";
-  const link = "/panduan";
+  const title = "✨ Fitur Baru: Direct Gmail Flip Sync!";
+  const message = "Integrasi langsung Gmail Flip kini aktif! Anda dapat menghubungkan akun Gmail toko untuk menarik transaksi Flip secara langsung. Bebas dari kendala email subjek sama pada hari yang sama. Klik untuk melihat Pengaturan Toko.";
+  const link = "/admin/store-settings";
   const type = "SYSTEM";
 
   console.log(`Menemukan ${users.length} pengguna di database.`);

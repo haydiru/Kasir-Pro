@@ -25,7 +25,7 @@ model Store {
   financialTransactions FinancialTransaction[]
   emptyItems            EmptyItem[]
   bills                 Bill[]
-  googleAuth            StoreGoogleAuth?
+  googleAuth            StoreGoogleAuth[]
   suppliers             Supplier[]
   returnedItems         ReturnedItem[]
   employeeShoppingFunds    EmployeeShoppingFund[]
@@ -301,7 +301,8 @@ model EmptyItem {
 
 model StoreGoogleAuth {
   id           String   @id @default(uuid())
-  storeId      String   @unique
+  storeId      String
+  type         String   @default("CALENDAR") // "CALENDAR" atau "GMAIL"
   accessToken  String   @db.Text
   refreshToken String   @db.Text // Sangat penting untuk generate token baru otomatis
   expiryDate   DateTime
@@ -309,6 +310,9 @@ model StoreGoogleAuth {
   updatedAt    DateTime @updatedAt
 
   store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, type])
+  @@index([storeId])
 }
 
 model Bill {

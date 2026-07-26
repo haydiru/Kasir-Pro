@@ -8,7 +8,7 @@ import { getTZDateRange } from "@/lib/utils";
 // Helper untuk mendapatkan Google Access Token yang valid (menyegarkan jika kedaluwarsa)
 async function getGoogleAccessToken(storeId: string): Promise<string | null> {
   const googleAuth = await prisma.storeGoogleAuth.findUnique({
-    where: { storeId },
+    where: { storeId_type: { storeId, type: "CALENDAR" } },
   });
 
   if (!googleAuth) return null;
@@ -50,7 +50,7 @@ async function getGoogleAccessToken(storeId: string): Promise<string | null> {
     const expiryDate = new Date(Date.now() + (data.expires_in || 3600) * 1000);
 
     await prisma.storeGoogleAuth.update({
-      where: { storeId },
+      where: { storeId_type: { storeId, type: "CALENDAR" } },
       data: {
         accessToken: data.access_token,
         expiryDate,
