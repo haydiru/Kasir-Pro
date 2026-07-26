@@ -28,6 +28,8 @@ model Store {
   googleAuth            StoreGoogleAuth?
   suppliers             Supplier[]
   returnedItems         ReturnedItem[]
+  employeeShoppingFunds    EmployeeShoppingFund[]
+  employeeShoppingExpenses EmployeeShoppingExpense[]
 }
 
 model User {
@@ -56,6 +58,8 @@ model User {
   processedEmptyItems EmptyItem[]          @relation("ProcessedEmptyItems")
   billsCreated        Bill[]               @relation("CreatedBills")
   returnsCreated      ReturnedItem[]       @relation("CreatedReturns")
+  shoppingFundsReceived EmployeeShoppingFund[]
+  shoppingExpensesMade  EmployeeShoppingExpense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -383,3 +387,40 @@ model ReturnedItem {
   @@index([supplierId])
   @@index([status])
 }
+
+model EmployeeShoppingFund {
+  id            String   @id @default(uuid())
+  storeId       String
+  userId        String   // Pegawai penerima dana
+  amount        Float    // Nominal dana yang diberikan
+  paymentMethod String   // "CASH" | "TRANSFER"
+  evidenceUrl   String?  // Foto bukti serah terima/transfer (opsional)
+  notes         String?  // Catatan owner (misal: "Untuk belanja mingguan", dll)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([userId])
+}
+
+model EmployeeShoppingExpense {
+  id          String   @id @default(uuid())
+  storeId     String
+  userId      String   // Pegawai yang membelanjakan
+  companyName String   // Tempat belanja/nama perusahaan (wajib)
+  totalPrice  Float    // Total pengeluaran (wajib)
+  receiptUrl  String   // Foto nota/struk belanja (wajib)
+  notes       String?  // Catatan belanja (opsional)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([userId])
+}
+

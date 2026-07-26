@@ -49,6 +49,7 @@ const commonNav = [
   { label: "Presensi", href: "/attendance", icon: Clock },
   { label: "Barang Kosong", href: "/empty-items", icon: ClipboardList },
   { label: "Tagihan Supplier", href: "/cashier/bills", icon: FileText },
+  { label: "Laporan Belanja Pegawai", href: "/shopping-funds", icon: Wallet },
   { label: "Barang Retur", href: "/retur", icon: Undo },
   { label: "Panduan", href: "/panduan", icon: FileText },
 ];
