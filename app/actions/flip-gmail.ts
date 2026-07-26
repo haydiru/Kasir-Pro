@@ -136,10 +136,10 @@ export async function syncFlipEmailsForStore(storeId: string, force = false) {
     // Catat waktu penarikan terbaru
     lastSyncMap.set(storeId, now);
 
-    // 1. Cari pesan dari Gmail API yang relevan dengan transaksi Flip
-    const query = encodeURIComponent("from:flip.id OR subject:Flip OR subject:Transfer OR subject:Pembelian");
+    // 1. Cari pesan dari Gmail API yang persis dengan filter AppsScript (hanya email Flip resmi bernilai berhasil)
+    const query = encodeURIComponent('from:no-reply@flip.id subject:"berhasil" -subject:"Flip Freedom" -subject:"Top Up Saldo"');
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=30`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=50`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -232,6 +232,24 @@ export async function syncFlipEmailsForStore(storeId: string, force = false) {
           emailSubject: parsed.emailSubject,
         },
       });
+    }
+
+    // 5. Bersihkan data sampah terdahulu yang tidak sesuai kriteria
+    try {
+      await prisma.flipWebhook.deleteMany({
+        where: {
+          storeId,
+          OR: [
+            { flipId: "FFFFFF" },
+            { emailSubject: { contains: "Top Up Saldo" } },
+            { emailSubject: { contains: "Flip Freedom" } },
+            { customerName: { contains: "email ini" } },
+            { customerName: { contains: "rahasia" } },
+          ],
+        },
+      });
+    } catch (cleanErr) {
+      console.warn("Soft cleanup error:", cleanErr);
     }
 
     revalidatePath("/admin/flip-transactions");

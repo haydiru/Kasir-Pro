@@ -250,15 +250,37 @@ function extractBankOrProvider(body: string, serviceType: string, subject: strin
  * Main parser: takes email subject + HTML body, returns parsed data.
  */
 export function parseFlipEmail(subject: string, body: string): FlipParsedData | null {
+  const sLower = subject.toLowerCase();
+
+  // Guard 1: Must be a successful transaction email
+  if (!sLower.includes("berhasil")) return null;
+
+  // Guard 2: Exclude store balance Top Up Saldo & Flip Freedom fees
+  if (sLower.includes("top up saldo") || sLower.includes("flip freedom")) return null;
+
   const flipId = extractFlipId(subject, body);
-  if (!flipId) return null;
+  if (!flipId || flipId.toUpperCase() === "FFFFFF") return null;
 
   const serviceType = detectServiceType(subject);
   const nominal = extractNominal(body);
   const transactionTime = extractTransactionTime(body);
-  const customerName = extractCustomerName(body, serviceType, subject);
+  let customerName = extractCustomerName(body, serviceType, subject);
   const customerNumber = extractCustomerNumber(body, serviceType);
   const bankOrProvider = extractBankOrProvider(body, serviceType, subject);
+
+  // Guard 3: Sanitize customer name against legal disclaimer text
+  if (customerName) {
+    const cLower = customerName.toLowerCase();
+    if (
+      customerName.length > 60 ||
+      cLower.includes("email ini") ||
+      cLower.includes("rahasia") ||
+      cLower.includes("sistem anda") ||
+      cLower.includes("peraturan")
+    ) {
+      customerName = null;
+    }
+  }
 
   return {
     flipId,
