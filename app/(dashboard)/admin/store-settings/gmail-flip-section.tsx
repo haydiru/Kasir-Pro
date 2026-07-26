@@ -63,7 +63,7 @@ export default function GmailFlipSection({ gmailAuth, storeId }: Props) {
     setIsSyncing(true);
     toast.info("Sedang menghubungi Gmail API dan menarik notifikasi Flip...");
     try {
-      const res = await syncFlipEmailsFromGmail();
+      const res = await syncFlipEmailsFromGmail(true);
       if (res.error) {
         toast.error(res.error);
       } else {

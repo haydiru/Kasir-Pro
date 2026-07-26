@@ -112,15 +112,29 @@ function extractBodyFromPayload(payload: any): string {
   return "";
 }
 
+// In-memory cache untuk membatasi frekuensi eksekusi otomatis (cooldown 3 menit per toko)
+const lastSyncMap = new Map<string, number>();
+
 /**
  * Fungsi inti penarikan email Flip untuk spesifik toko (Dapat dipanggil oleh Cron / Background Sync)
  */
-export async function syncFlipEmailsForStore(storeId: string) {
+export async function syncFlipEmailsForStore(storeId: string, force = false) {
   try {
+    const now = Date.now();
+    const lastSync = lastSyncMap.get(storeId) || 0;
+
+    // Cooldown 3 menit (180.000 ms) jika penarikan bersifat otomatis (force === false)
+    if (!force && now - lastSync < 180000) {
+      return { success: true, processed: 0, newCount: 0, message: "Penarikan dilewati (baru saja disinkronkan kurang dari 3 menit lalu)." };
+    }
+
     const token = await getGmailAccessToken(storeId);
     if (!token) {
       return { error: "Akun Gmail Flip belum terhubung untuk toko ini." };
     }
+
+    // Catat waktu penarikan terbaru
+    lastSyncMap.set(storeId, now);
 
     // 1. Cari pesan dari Gmail API yang relevan dengan transaksi Flip
     const query = encodeURIComponent("from:flip.id OR subject:Flip OR subject:Transfer OR subject:Pembelian");
@@ -238,11 +252,11 @@ export async function syncFlipEmailsForStore(storeId: string) {
 /**
  * Server Action: Tarik email Flip berdasarkan sesi pengguna aktif
  */
-export async function syncFlipEmailsFromGmail() {
+export async function syncFlipEmailsFromGmail(force = false) {
   const session = await auth();
   if (!session?.user?.storeId) {
     return { error: "Unauthorized / Toko tidak ditemukan" };
   }
 
-  return await syncFlipEmailsForStore(session.user.storeId);
+  return await syncFlipEmailsForStore(session.user.storeId, force);
 }
