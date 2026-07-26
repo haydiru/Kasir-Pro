@@ -53,10 +53,11 @@ interface VerificationsClientProps {
   submittedReports: any[];
   verifiedReports: any[];
   unmatchedFlips: any[];
+  flipMap?: Record<string, any>;
   timezone: string;
 }
 
-export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, timezone }: VerificationsClientProps) {
+export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, flipMap = {}, timezone }: VerificationsClientProps) {
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -211,10 +212,22 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                               <p className="text-xs font-medium text-destructive">
                                 {reportUnmatchedFlips.length} transaksi Flip belum tercatat di laporan ini:
                               </p>
-                              <div className="flex flex-wrap gap-1.5 mt-2">
+                              <div className="flex flex-wrap gap-2 mt-2">
                                 {reportUnmatchedFlips.map((fw: any) => (
-                                  <Badge key={fw.id} variant="outline" className="border-destructive/30 text-destructive text-[10px] font-mono gap-1 bg-white/50">
-                                    {fw.flipId} • {fw.serviceType}: {formatCurrency(fw.nominal)}
+                                  <Badge key={fw.id} variant="outline" className="border-destructive/30 text-destructive text-[11px] font-mono gap-1.5 bg-white/80 dark:bg-black/40 p-1.5 px-2.5 rounded-lg flex items-center flex-wrap">
+                                    <span className="font-bold text-destructive">#{fw.flipId?.replace(/^#/, "")}</span>
+                                    <span>•</span>
+                                    <span>{fw.serviceType}: {formatCurrency(fw.nominal)}</span>
+                                    {fw.customerName && (
+                                      <span className="font-sans font-bold text-foreground bg-destructive/10 px-1.5 py-0.5 rounded text-[10px]">
+                                        👤 {fw.customerName}
+                                      </span>
+                                    )}
+                                    {fw.bankOrProvider && (
+                                      <span className="font-sans text-muted-foreground text-[10px]">
+                                        ({fw.bankOrProvider})
+                                      </span>
+                                    )}
                                   </Badge>
                                 ))}
                               </div>
@@ -227,28 +240,52 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/30">
-                                  <TableHead className="text-xs">Jenis</TableHead>
-                                  <TableHead className="text-xs">Detail</TableHead>
+                                  <TableHead className="text-xs">Jenis & ID Flip</TableHead>
+                                  <TableHead className="text-xs">Detail / Customer</TableHead>
                                   <TableHead className="text-xs text-right">Nominal</TableHead>
                                   <TableHead className="text-xs text-right">Laba</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {report.digitalTransactions.map((dt: any) => (
-                                  <TableRow key={dt.id}>
-                                    <TableCell className="text-xs">
-                                      <div className="flex flex-col">
-                                        <Badge variant="outline" className="text-[10px] w-fit">{dt.serviceType}</Badge>
-                                        <span className="text-[9px] text-muted-foreground mt-1 font-bold">
-                                          {dt.isNonCash ? `Non-Tunai (${dt.paymentMethod || "Tanpa Ket."})` : "Tunai"}
-                                        </span>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-xs text-muted-foreground">{dt.detailContact}</TableCell>
-                                    <TableCell className="text-xs text-right font-mono">{formatCurrency(dt.grossAmount)}</TableCell>
-                                    <TableCell className="text-xs text-right font-mono text-emerald-600">+{formatCurrency(dt.profitAmount)}</TableCell>
-                                  </TableRow>
-                                ))}
+                                {report.digitalTransactions.map((dt: any) => {
+                                  const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
+                                  const matchedFlip = cleanFlipId && flipMap ? flipMap[cleanFlipId] : null;
+
+                                  return (
+                                    <TableRow key={dt.id}>
+                                      <TableCell className="text-xs">
+                                        <div className="flex flex-col gap-1">
+                                          <Badge variant="outline" className="text-[10px] w-fit font-bold">{dt.serviceType}</Badge>
+                                          {cleanFlipId && (
+                                            <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono w-fit font-bold px-1.5 py-0.5">
+                                              #{cleanFlipId}
+                                            </Badge>
+                                          )}
+                                          <span className="text-[9px] text-muted-foreground font-bold">
+                                            {dt.isNonCash ? `Non-Tunai (${dt.paymentMethod || "Tanpa Ket."})` : "Tunai"}
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-xs">
+                                        <div className="flex flex-col">
+                                          <span className="font-medium text-foreground">{dt.detailContact || "—"}</span>
+                                          {matchedFlip?.customerName && (
+                                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                                              👤 {matchedFlip.customerName}
+                                            </span>
+                                          )}
+                                          {matchedFlip?.bankOrProvider && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              🏦 {matchedFlip.bankOrProvider} {matchedFlip?.customerNumber ? `(${matchedFlip.customerNumber})` : ""}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-xs text-right font-mono font-bold">{formatCurrency(dt.grossAmount)}</TableCell>
+                                      <TableCell className="text-xs text-right font-mono text-emerald-600 font-bold">+{formatCurrency(dt.profitAmount)}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
                               </TableBody>
                             </Table>
                           </div>

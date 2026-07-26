@@ -37,7 +37,32 @@ export default async function AdminVerificationsPage() {
   const submittedReports = reports.filter(r => r.status === "Submitted");
   const verifiedReports = reports.filter(r => r.status === "Verified").slice(0, 50); // limit
 
-  // Fetch actual unmatched Flip webhooks to show warnings on specific reports
+  // Fetch Flip webhooks to build a lookup map by flipId for admin verification view
+  const flipWebhooks = await prisma.flipWebhook.findMany({
+    where: { storeId },
+    select: {
+      id: true,
+      flipId: true,
+      serviceType: true,
+      nominal: true,
+      customerName: true,
+      customerNumber: true,
+      bankOrProvider: true,
+      transactionTime: true,
+    },
+    orderBy: { transactionTime: 'desc' },
+    take: 300,
+  });
+
+  const flipMap: Record<string, any> = {};
+  flipWebhooks.forEach(fw => {
+    const cleanId = fw.flipId.replace(/^#/, "").trim().toUpperCase();
+    flipMap[cleanId] = {
+      ...fw,
+      transactionTime: fw.transactionTime.toISOString()
+    };
+  });
+
   const unmatched = await prisma.flipWebhook.findMany({
     where: {
       storeId,
@@ -45,7 +70,7 @@ export default async function AdminVerificationsPage() {
       matched: false
     }
   });
-  
+
   const unmatchedFlips = unmatched.map(fw => ({
     ...fw,
     transactionTime: fw.transactionTime.toISOString(),
@@ -57,6 +82,7 @@ export default async function AdminVerificationsPage() {
       submittedReports={submittedReports}
       verifiedReports={verifiedReports}
       unmatchedFlips={unmatchedFlips}
+      flipMap={flipMap}
       timezone={timezone}
     />
   );

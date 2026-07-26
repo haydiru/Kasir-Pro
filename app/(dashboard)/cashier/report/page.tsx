@@ -519,7 +519,7 @@ export default function CashierReportPage() {
             <ul className="mt-1 space-y-0.5">
               {unmatchedFlips.map((f) => (
                 <li key={f.flipId} className="text-xs text-muted-foreground">
-                  {f.flipId} — {formatCurrency(f.nominal)}
+                  #{f.flipId?.replace(/^#/, "")} — {f.serviceType}: {formatCurrency(f.nominal)}{f.customerName ? ` (${f.customerName})` : ""}
                 </li>
               ))}
             </ul>
@@ -669,7 +669,7 @@ export default function CashierReportPage() {
                 <div className="flex flex-wrap gap-2 pt-2">
                   {unmatchedFlips.map(f => (
                     <Badge key={f.id} variant="outline" className="border-amber-500/30 text-amber-600 text-[10px] font-mono gap-1">
-                      {f.serviceType}: {formatCurrency(f.nominal)}
+                      #{f.flipId?.replace(/^#/, "")} • {f.serviceType}: {formatCurrency(f.nominal)}{f.customerName ? ` (${f.customerName})` : ""}
                     </Badge>
                   ))}
                 </div>
