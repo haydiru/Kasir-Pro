@@ -45,13 +45,17 @@ function detectServiceType(subject: string): string {
  * Returns the ID without the leading '#'.
  */
 function extractFlipId(subject: string, body: string): string | null {
-  // Transfer format: #FTxxxxxxxxx
-  const ftMatch = body.match(/#?(FT\d{6,})/i) || subject.match(/#?(FT\d{6,})/i);
+  // 1. Transfer format: #FTxxxxxxxxx
+  const ftMatch = body.match(/#?(FT[A-Za-z0-9]{5,})/i) || subject.match(/#?(FT[A-Za-z0-9]{5,})/i);
   if (ftMatch) return ftMatch[1];
 
-  // Bill payment format: DPTxxxxxxxx (from subject)
-  const dptMatch = subject.match(/#?(DPT\d{6,})/i) || body.match(/(?:ID Transaksi|id transaksi)[^<]*?(DPT\d{6,})/i);
+  // 2. Bill payment format: DPTxxxxxxxx (includes alphanumeric suffixes like PTZ)
+  const dptMatch = subject.match(/#?(DPT[A-Za-z0-9]{5,})/i) || body.match(/(?:ID Transaksi|id transaksi)[^<]*?(DPT[A-Za-z0-9]{5,})/i);
   if (dptMatch) return dptMatch[1];
+
+  // 3. General hashtag ID fallback: #ABC12345
+  const genMatch = subject.match(/#([A-Za-z0-9]{6,})/i) || body.match(/#([A-Za-z0-9]{6,})/i);
+  if (genMatch) return genMatch[1];
 
   return null;
 }

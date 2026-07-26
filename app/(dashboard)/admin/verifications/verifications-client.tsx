@@ -53,11 +53,52 @@ interface VerificationsClientProps {
   submittedReports: any[];
   verifiedReports: any[];
   unmatchedFlips: any[];
-  flipMap?: Record<string, any>;
+  flipWebhooks?: any[];
   timezone: string;
 }
 
-export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, flipMap = {}, timezone }: VerificationsClientProps) {
+function findMatchedFlip(dt: any, flipWebhooks: any[]) {
+  if (!flipWebhooks || flipWebhooks.length === 0) return null;
+
+  const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
+  const cleanContact = dt.detailContact?.replace(/\D/g, ""); // digits only
+
+  // Strategy 1: Exact flipId match
+  if (cleanFlipId) {
+    const exact = flipWebhooks.find((fw) => {
+      const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
+      return fwId === cleanFlipId;
+    });
+    if (exact) return exact;
+
+    // Strategy 2: Alphanumeric prefix or partial match (e.g. DPT260726184605310 vs DPT260726184605310PTZ)
+    const partial = flipWebhooks.find((fw) => {
+      const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
+      if (!fwId) return false;
+      return cleanFlipId.startsWith(fwId) || fwId.startsWith(cleanFlipId) || cleanFlipId.includes(fwId) || fwId.includes(cleanFlipId);
+    });
+    if (partial) return partial;
+  }
+
+  // Strategy 3: Phone number / Account match (if 8+ digits match)
+  if (cleanContact && cleanContact.length >= 8) {
+    const byPhone = flipWebhooks.find((fw) => {
+      const fwPhone = (fw.customerNumber || "").replace(/\D/g, "");
+      return fwPhone && fwPhone.length >= 8 && (fwPhone.endsWith(cleanContact) || cleanContact.endsWith(fwPhone));
+    });
+    if (byPhone) return byPhone;
+  }
+
+  // Strategy 4: Nominal match (matching grossAmount)
+  if (dt.grossAmount > 0) {
+    const byNominal = flipWebhooks.find((fw) => fw.nominal === dt.grossAmount);
+    if (byNominal) return byNominal;
+  }
+
+  return null;
+}
+
+export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, flipWebhooks = [], timezone }: VerificationsClientProps) {
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -257,7 +298,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                               <TableBody>
                                 {report.digitalTransactions.map((dt: any) => {
                                   const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
-                                  const matchedFlip = cleanFlipId && flipMap ? flipMap[cleanFlipId] : null;
+                                  const matchedFlip = findMatchedFlip(dt, flipWebhooks);
 
                                   return (
                                     <TableRow key={dt.id}>
