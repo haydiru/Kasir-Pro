@@ -206,31 +206,39 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                         </div>
 
                         {reportUnmatchedFlips.length > 0 && (
-                          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 mt-3">
-                            <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-xs font-medium text-destructive">
-                                {reportUnmatchedFlips.length} transaksi Flip belum tercatat di laporan ini:
-                              </p>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {reportUnmatchedFlips.map((fw: any) => (
-                                  <Badge key={fw.id} variant="outline" className="border-destructive/30 text-destructive text-[11px] font-mono gap-1.5 bg-white/80 dark:bg-black/40 p-1.5 px-2.5 rounded-lg flex items-center flex-wrap">
-                                    <span className="font-bold text-destructive">#{fw.flipId?.replace(/^#/, "")}</span>
-                                    <span>•</span>
-                                    <span>{fw.serviceType}: {formatCurrency(fw.nominal)}</span>
-                                    {fw.customerName && (
-                                      <span className="font-sans font-bold text-foreground bg-destructive/10 px-1.5 py-0.5 rounded text-[10px]">
-                                        👤 {fw.customerName}
+                          <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/20 p-4 mt-3 space-y-2.5">
+                            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-xs">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>{reportUnmatchedFlips.length} Transaksi Flip Belum Tercatat di Laporan Ini:</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {reportUnmatchedFlips.map((fw: any) => (
+                                <div 
+                                  key={fw.id} 
+                                  className="flex items-center justify-between gap-3 bg-white dark:bg-card border border-rose-200/80 dark:border-rose-900/40 p-2.5 px-3 rounded-lg shadow-sm"
+                                >
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-mono font-extrabold text-xs text-rose-600 dark:text-rose-400">
+                                        #{fw.flipId?.replace(/^#/, "")}
+                                      </span>
+                                      <Badge variant="secondary" className="text-[9px] font-bold px-1.5 py-0 h-4 uppercase bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
+                                        {fw.serviceType}
+                                      </Badge>
+                                    </div>
+                                    {(fw.customerName || fw.bankOrProvider) && (
+                                      <span className="text-xs font-semibold text-foreground truncate mt-1">
+                                        👤 {fw.customerName || "Tanpa Nama"} {fw.bankOrProvider ? `(${fw.bankOrProvider})` : ""}
                                       </span>
                                     )}
-                                    {fw.bankOrProvider && (
-                                      <span className="font-sans text-muted-foreground text-[10px]">
-                                        ({fw.bankOrProvider})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                ))}
-                              </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="font-mono font-black text-sm text-foreground">
+                                      {formatCurrency(fw.nominal)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
