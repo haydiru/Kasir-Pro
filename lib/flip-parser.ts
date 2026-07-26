@@ -143,23 +143,58 @@ function extractTransactionTime(body: string): Date {
 }
 
 /**
- * Extract customer name from email body.
+ * Extract customer name from subject or email body.
  */
-function extractCustomerName(body: string, serviceType: string): string | null {
+function extractCustomerName(body: string, serviceType: string, subject: string): string | null {
+  // 1. Try subject pattern: "Transfer ke RISA FATIMAH berhasil" or "Transfer ke GO-PAY - RISA FATIMAH berhasil"
+  const subMatch = subject.match(/(?:Transfer|Pengiriman|Kirim)\s+(?:Rp\s*[\d.,]+\s+)?ke\s+(.+?)\s+berhasil/i);
+  if (subMatch) {
+    const candidate = subMatch[1].trim();
+    if (candidate && !candidate.toLowerCase().startsWith("http")) {
+      return candidate;
+    }
+  }
+
   const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-  if (serviceType === "Transfer") {
-    const m = text.match(/Nama Tujuan[^A-Z]*([\w\s.]+?)(?=\s{2,}|Bank|Nomor)/i);
-    if (m) return m[1].trim();
-  } else if (serviceType === "Pulsa/Paket Data") {
-    // Extract Produk
-    const m = text.match(/Produk\s+(.+?)(?=\s*Nomor HP|\s*ID Transaksi|\s*Waktu|\s*Nomor Referensi)/i);
-    if (m) return m[1].trim();
-  } else {
-    // Bill payments
-    const m = text.match(/Nama Pelanggan[^A-Z]*([\w\s.]+?)(?=\s{2,}|Alamat|Periode|Jumlah)/i);
+  // 2. Try body patterns for Transfer & E-Wallet
+  const transferPatterns = [
+    /(?:Nama\s+Tujuan|Nama\s+Penerima|Penerima|Atas\s+Nama|Nama\s+Pemilik)\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Bank|Nomor|ID|Jumlah|Waktu|Total|Rp|Catatan|Status|$))/i,
+    /Tujuan\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Bank|Nomor|ID|Jumlah|Waktu|Total|Rp|$))/i,
+  ];
+
+  for (const p of transferPatterns) {
+    const m = text.match(p);
+    if (m && m[1].trim()) {
+      const found = m[1].trim();
+      if (found.length > 1 && !found.toLowerCase().includes("transaksi")) {
+        return found;
+      }
+    }
+  }
+
+  // 3. Try body patterns for Bill Payments (PDAM, PLN, Indihome)
+  const billPatterns = [
+    /(?:Nama\s+Pelanggan|Nama\s+Konsumen|Nama\s+Pemilik)\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Alamat|Periode|Jumlah|Nomor|ID|Total|Waktu|$))/i,
+    /Pelanggan\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Alamat|Periode|Jumlah|Nomor|ID|Total|Waktu|$))/i,
+  ];
+
+  for (const p of billPatterns) {
+    const m = text.match(p);
+    if (m && m[1].trim()) {
+      const found = m[1].trim();
+      if (found.length > 1) {
+        return found;
+      }
+    }
+  }
+
+  // 4. Try Pulsa / Paket Data Produk Name
+  if (serviceType === "Pulsa/Paket Data") {
+    const m = text.match(/Produk\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Nomor|ID|Waktu|Jumlah|Total|$))/i);
     if (m) return m[1].trim();
   }
+
   return null;
 }
 
@@ -217,7 +252,7 @@ export function parseFlipEmail(subject: string, body: string): FlipParsedData | 
   const serviceType = detectServiceType(subject);
   const nominal = extractNominal(body);
   const transactionTime = extractTransactionTime(body);
-  const customerName = extractCustomerName(body, serviceType);
+  const customerName = extractCustomerName(body, serviceType, subject);
   const customerNumber = extractCustomerNumber(body, serviceType);
   const bankOrProvider = extractBankOrProvider(body, serviceType, subject);
 

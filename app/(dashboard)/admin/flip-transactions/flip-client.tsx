@@ -350,15 +350,22 @@ export function FlipTransactionsClient({
                       </TableCell>
                       <TableCell>{getServiceBadge(tx.serviceType)}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col max-w-[200px]">
-                          <span className="text-sm font-medium truncate">
-                            {tx.customerName || "-"}
+                        <div className="flex flex-col max-w-[240px]">
+                          <span className={`text-sm font-bold truncate ${tx.customerName ? "text-foreground" : "text-muted-foreground italic text-xs"}`}>
+                            {tx.customerName ? `👤 ${tx.customerName}` : "— (Tanpa Nama)"}
                           </span>
-                          {tx.customerNumber && (
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {tx.customerNumber}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {tx.bankOrProvider && (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                                🏦 {tx.bankOrProvider}
+                              </span>
+                            )}
+                            {tx.customerNumber && (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {tx.customerNumber}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono font-bold text-sm">
