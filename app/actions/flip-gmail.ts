@@ -88,26 +88,21 @@ function decodeBase64Url(base64UrlStr: string): string {
 function extractBodyFromPayload(payload: any): string {
   if (!payload) return "";
 
-  // Direct body on payload
   if (payload.body && payload.body.data) {
     return decodeBase64Url(payload.body.data);
   }
 
-  // Check parts
   if (payload.parts && Array.isArray(payload.parts)) {
-    // Prefer HTML part
     const htmlPart = payload.parts.find((p: any) => p.mimeType === "text/html");
     if (htmlPart && htmlPart.body && htmlPart.body.data) {
       return decodeBase64Url(htmlPart.body.data);
     }
 
-    // Fallback to plain text part
     const textPart = payload.parts.find((p: any) => p.mimeType === "text/plain");
     if (textPart && textPart.body && textPart.body.data) {
       return decodeBase64Url(textPart.body.data);
     }
 
-    // Recursive search in sub-parts
     for (const part of payload.parts) {
       const subBody = extractBodyFromPayload(part);
       if (subBody) return subBody;
@@ -118,24 +113,16 @@ function extractBodyFromPayload(payload: any): string {
 }
 
 /**
- * Server Action: Tarik email Flip langsung dari Gmail API
+ * Fungsi inti penarikan email Flip untuk spesifik toko (Dapat dipanggil oleh Cron / Background Sync)
  */
-export async function syncFlipEmailsFromGmail() {
+export async function syncFlipEmailsForStore(storeId: string) {
   try {
-    const session = await auth();
-    if (!session?.user?.storeId) {
-      return { error: "Unauthorized / Toko tidak ditemukan" };
-    }
-
-    const storeId = session.user.storeId;
     const token = await getGmailAccessToken(storeId);
-
     if (!token) {
-      return { error: "Akun Gmail Flip belum terhubung. Silakan hubungkan terlebih dahulu di halaman ini." };
+      return { error: "Akun Gmail Flip belum terhubung untuk toko ini." };
     }
 
     // 1. Cari pesan dari Gmail API yang relevan dengan transaksi Flip
-    // Query: from:flip.id ATAU subject:Flip / Transfer / Pembelian
     const query = encodeURIComponent("from:flip.id OR subject:Flip OR subject:Transfer OR subject:Pembelian");
     const listRes = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=30`,
@@ -175,14 +162,12 @@ export async function syncFlipEmailsFromGmail() {
       const payload = msgData.payload;
       if (!payload) continue;
 
-      // Ambik Header Subject
       const headers = payload.headers || [];
       const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject");
       const subject = subjectHeader ? subjectHeader.value : "";
 
       if (!subject) continue;
 
-      // Ambil Body
       const body = extractBodyFromPayload(payload);
       if (!body) continue;
 
@@ -193,8 +178,6 @@ export async function syncFlipEmailsFromGmail() {
       processedCount++;
 
       // 4. Upsert secara AMAN berdasarkan flipId + storeId
-      // Hal ini menjamin bahwa email dengan subjek yang sama pada hari yang sama
-      // tidak akan terlewat karena setiap transaksi memiliki flipId unik tersendiri.
       const existing = await prisma.flipWebhook.findUnique({
         where: {
           flipId_storeId: {
@@ -247,7 +230,19 @@ export async function syncFlipEmailsFromGmail() {
       message: `Berhasil memproses ${processedCount} email Flip (${newCount} transaksi baru ditambahkan).`,
     };
   } catch (error: any) {
-    console.error("Error in syncFlipEmailsFromGmail action:", error);
+    console.error("Error in syncFlipEmailsForStore:", error);
     return { error: "Terjadi kesalahan sistem saat menarik email dari Gmail." };
   }
+}
+
+/**
+ * Server Action: Tarik email Flip berdasarkan sesi pengguna aktif
+ */
+export async function syncFlipEmailsFromGmail() {
+  const session = await auth();
+  if (!session?.user?.storeId) {
+    return { error: "Unauthorized / Toko tidak ditemukan" };
+  }
+
+  return await syncFlipEmailsForStore(session.user.storeId);
 }

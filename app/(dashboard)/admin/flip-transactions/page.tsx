@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getFlipTransactions } from "@/app/actions/flip";
+import { syncFlipEmailsForStore } from "@/app/actions/flip-gmail";
 import { FlipTransactionsClient } from "./flip-client";
 
 export default async function FlipTransactionsPage() {
@@ -8,6 +9,11 @@ export default async function FlipTransactionsPage() {
   if (!session?.user) redirect("/login");
   if (session.user.role !== "admin" && session.user.role !== "super_admin") {
     redirect("/dashboard");
+  }
+
+  // Otomatis tarik email Flip terbaru dari Gmail di latar belakang server sebelum merender data
+  if (session.user.storeId) {
+    await syncFlipEmailsForStore(session.user.storeId).catch(() => {});
   }
 
   const now = new Date();

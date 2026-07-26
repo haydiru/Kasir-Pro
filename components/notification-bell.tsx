@@ -16,6 +16,7 @@ import { getNotifications, markAsRead, markAllAsRead } from "@/app/actions/notif
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { AutoFlipSync } from "@/components/auto-flip-sync";
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -62,7 +63,9 @@ export function NotificationBell() {
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <>
+      <AutoFlipSync />
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-primary/10 transition-colors">
           <Bell className="h-[1.1rem] w-[1.1rem]" />
@@ -141,6 +144,7 @@ export function NotificationBell() {
           </div>
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </>
   );
 }
