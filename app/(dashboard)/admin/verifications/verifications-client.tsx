@@ -61,38 +61,36 @@ function findMatchedFlip(dt: any, flipWebhooks: any[]) {
   if (!flipWebhooks || flipWebhooks.length === 0) return null;
 
   const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
-  const cleanContact = dt.detailContact?.replace(/\D/g, ""); // digits only
 
-  // Strategy 1: Exact flipId match
+  // If cashier entered a Flip ID, match strictly by Flip ID (exact or partial)
   if (cleanFlipId) {
+    // 1. Exact match
     const exact = flipWebhooks.find((fw) => {
       const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
       return fwId === cleanFlipId;
     });
     if (exact) return exact;
 
-    // Strategy 2: Alphanumeric prefix or partial match (e.g. DPT260726184605310 vs DPT260726184605310PTZ)
+    // 2. Alphanumeric prefix / partial match
     const partial = flipWebhooks.find((fw) => {
       const fwId = fw.flipId?.replace(/^#/, "").trim().toUpperCase();
       if (!fwId) return false;
-      return cleanFlipId.startsWith(fwId) || fwId.startsWith(cleanFlipId) || cleanFlipId.includes(fwId) || fwId.includes(cleanFlipId);
+      return cleanFlipId.startsWith(fwId) || fwId.startsWith(cleanFlipId);
     });
     if (partial) return partial;
+
+    // Cashier entered an ID but it does not exist in Flip records (wrong/typo ID)
+    return null;
   }
 
-  // Strategy 3: Phone number / Account match (if 8+ digits match)
+  // If cashier didn't enter any Flip ID, try matching by phone number
+  const cleanContact = dt.detailContact?.replace(/\D/g, "");
   if (cleanContact && cleanContact.length >= 8) {
     const byPhone = flipWebhooks.find((fw) => {
       const fwPhone = (fw.customerNumber || "").replace(/\D/g, "");
       return fwPhone && fwPhone.length >= 8 && (fwPhone.endsWith(cleanContact) || cleanContact.endsWith(fwPhone));
     });
     if (byPhone) return byPhone;
-  }
-
-  // Strategy 4: Nominal match (matching grossAmount)
-  if (dt.grossAmount > 0) {
-    const byNominal = flipWebhooks.find((fw) => fw.nominal === dt.grossAmount);
-    if (byNominal) return byNominal;
   }
 
   return null;
@@ -297,7 +295,7 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                               </TableHeader>
                               <TableBody>
                                 {report.digitalTransactions.map((dt: any) => {
-                                  const cleanFlipId = dt.flipId?.replace(/^#/, "").trim().toUpperCase();
+                                  const rawFlipId = dt.flipId ? dt.flipId.replace(/^#/, "").trim() : null;
                                   const matchedFlip = findMatchedFlip(dt, flipWebhooks);
 
                                   return (
@@ -305,9 +303,9 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                                       <TableCell className="text-xs">
                                         <div className="flex flex-col gap-1">
                                           <Badge variant="outline" className="text-[10px] w-fit font-bold">{dt.serviceType}</Badge>
-                                          {cleanFlipId && (
+                                          {rawFlipId && (
                                             <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono w-fit font-bold px-1.5 py-0.5">
-                                              #{cleanFlipId}
+                                              #{rawFlipId}
                                             </Badge>
                                           )}
                                           <span className="text-[9px] text-muted-foreground font-bold">
