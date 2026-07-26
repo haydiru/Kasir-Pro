@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFlipTransactions, toggleFlipExcluded } from "@/app/actions/flip";
+import { syncFlipEmailsFromGmail } from "@/app/actions/flip-gmail";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,17 @@ export function FlipTransactionsClient({
   const [month, setMonth] = useState(initialMonth);
   const [year, setYear] = useState(initialYear);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Background non-blocking sync: Eksekusi di latar belakang tanpa menghambat render UI
+  useEffect(() => {
+    syncFlipEmailsFromGmail().then((res) => {
+      if (res?.newCount && res.newCount > 0) {
+        getFlipTransactions(month, year).then((r) => {
+          if (r.success && r.data) setTransactions(r.data);
+        });
+      }
+    }).catch(() => {});
+  }, [month, year]);
 
   const months = [
     { value: 1, label: "Januari" },
