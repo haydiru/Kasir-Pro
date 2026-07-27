@@ -18,6 +18,7 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
 
     const { storeId, id: currentUserId, role } = session.user;
     const isAdmin = role === "admin" || role === "super_admin";
+    const isSuperAdmin = role === "super_admin";
 
     // 1. Ambil data User untuk pilihan dropdown dan statistik (khusus admin)
     let usersData: any[] = [];
@@ -60,7 +61,6 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
     });
 
     // 4. Hitung Statistik Per User
-    // Kita lakukan agregasi manual agar lebih fleksibel
     const allStoreFunds = await prisma.employeeShoppingFund.findMany({
       where: { storeId },
       select: { userId: true, amount: true }
@@ -90,7 +90,7 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
       };
     });
 
-    // Serialisasi data tanggal ke string ISO untuk mencegah masalah Next.js
+    // Serialisasi data tanggal ke string ISO
     const serializedFunds = funds.map((f) => ({
       ...f,
       createdAt: f.createdAt.toISOString(),
@@ -110,7 +110,7 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
         funds: serializedFunds,
         expenses: serializedExpenses,
         statistics: userStats,
-        currentUser: { id: currentUserId, role, isAdmin }
+        currentUser: { id: currentUserId, role, isAdmin, isSuperAdmin }
       }
     };
   } catch (error: any) {
@@ -120,7 +120,7 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
 }
 
 /**
- * Memberikan/Mengalokasikan dana operasional belanja ke salah satu pegawai (Hanya Admin)
+ * Memberikan/Mengalokasikan dana operasional belanja ke salah satu pegawai (Hanya Admin & Super Admin)
  */
 export async function allocateShoppingFund(data: {
   userId: string;
@@ -142,7 +142,6 @@ export async function allocateShoppingFund(data: {
     if (!amount || amount <= 0) return { success: false, error: "Nominal pengiriman harus lebih besar dari 0!" };
     if (!["CASH", "TRANSFER"].includes(paymentMethod)) return { success: false, error: "Metode pembayaran tidak valid" };
 
-    // Pastikan user penerima ada di toko yang sama
     const recipient = await prisma.user.findFirst({
       where: { id: userId, storeId }
     });
@@ -150,7 +149,6 @@ export async function allocateShoppingFund(data: {
       return { success: false, error: "Pegawai penerima tidak valid atau tidak terdaftar di toko ini" };
     }
 
-    // Buat record dana belanja baru
     await prisma.employeeShoppingFund.create({
       data: {
         storeId,
@@ -171,12 +169,12 @@ export async function allocateShoppingFund(data: {
 }
 
 /**
- * Mencatat pengeluaran/belanja operasional baru yang dilakukan pegawai (Semua role terotentikasi)
+ * Mencatat pengeluaran/belanja operasional baru yang dilakukan pegawai
  */
 export async function createShoppingExpense(data: {
   companyName: string;
   totalPrice: number;
-  receiptUrl: string; // WAJIB foto nota
+  receiptUrl: string;
   notes?: string | null;
 }): Promise<ActionResponse> {
   try {
@@ -192,7 +190,6 @@ export async function createShoppingExpense(data: {
     if (!totalPrice || totalPrice <= 0) return { success: false, error: "Total pengeluaran tidak valid!" };
     if (!receiptUrl) return { success: false, error: "Bukti foto nota belanja wajib diunggah!" };
 
-    // Simpan data pengeluaran belanja pegawai
     await prisma.employeeShoppingExpense.create({
       data: {
         storeId,
@@ -209,5 +206,79 @@ export async function createShoppingExpense(data: {
   } catch (error: any) {
     console.error("createShoppingExpense error:", error);
     return { success: false, error: error.message || "Gagal menyimpan laporan belanja" };
+  }
+}
+
+/**
+ * Menghapus transaksi pemberian dana (HANYA SUPER ADMIN)
+ */
+export async function deleteShoppingFund(id: string): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    if (session.user.role !== "super_admin") {
+      return { success: false, error: "Hanya Super Admin yang dapat menghapus transaksi pemberian dana!" };
+    }
+
+    const fund = await prisma.employeeShoppingFund.findFirst({
+      where: { id, storeId: session.user.storeId }
+    });
+
+    if (!fund) {
+      return { success: false, error: "Data transaksi pemberian dana tidak ditemukan" };
+    }
+
+    await prisma.employeeShoppingFund.delete({
+      where: { id }
+    });
+
+    revalidatePath("/shopping-funds");
+    return { success: true };
+  } catch (error: any) {
+    console.error("deleteShoppingFund error:", error);
+    return { success: false, error: error.message || "Gagal menghapus pemberian dana" };
+  }
+}
+
+/**
+ * Menghapus laporan belanja (SUPER ADMIN, ADMIN, atau PEGAWAI PEMBUAT LAPORAN)
+ */
+export async function deleteShoppingExpense(id: string): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { storeId, id: currentUserId, role } = session.user;
+
+    const expense = await prisma.employeeShoppingExpense.findFirst({
+      where: { id, storeId }
+    });
+
+    if (!expense) {
+      return { success: false, error: "Data laporan belanja tidak ditemukan" };
+    }
+
+    const isSuperAdmin = role === "super_admin";
+    const isAdmin = role === "admin";
+    const isOwnerOfExpense = expense.userId === currentUserId;
+
+    if (!isSuperAdmin && !isAdmin && !isOwnerOfExpense) {
+      return { success: false, error: "Anda tidak berhak menghapus laporan belanja ini!" };
+    }
+
+    await prisma.employeeShoppingExpense.delete({
+      where: { id }
+    });
+
+    revalidatePath("/shopping-funds");
+    return { success: true };
+  } catch (error: any) {
+    console.error("deleteShoppingExpense error:", error);
+    return { success: false, error: error.message || "Gagal menghapus laporan belanja" };
   }
 }

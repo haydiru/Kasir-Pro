@@ -34,11 +34,12 @@ import {
   Info,
   X,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { uploadReceipt } from "@/app/actions/upload";
-import { allocateShoppingFund, createShoppingExpense, getShoppingFundsData } from "@/app/actions/shopping-funds";
+import { allocateShoppingFund, createShoppingExpense, deleteShoppingFund, deleteShoppingExpense, getShoppingFundsData } from "@/app/actions/shopping-funds";
 
 interface UserStat {
   userId: string;
@@ -51,6 +52,7 @@ interface UserStat {
 
 interface FundAllocation {
   id: string;
+  userId: string;
   amount: number;
   paymentMethod: string;
   evidenceUrl: string | null;
@@ -61,6 +63,7 @@ interface FundAllocation {
 
 interface ShoppingExpense {
   id: string;
+  userId: string;
   companyName: string;
   totalPrice: number;
   receiptUrl: string;
@@ -75,7 +78,7 @@ interface Props {
     funds: FundAllocation[];
     expenses: ShoppingExpense[];
     statistics: UserStat[];
-    currentUser: { id: string; role: string; isAdmin: boolean };
+    currentUser: { id: string; role: string; isAdmin: boolean; isSuperAdmin?: boolean };
   };
 }
 
@@ -197,6 +200,33 @@ export default function FundsClient({ initialData }: Props) {
   const [selectedUserFilter, setSelectedUserFilter] = useState("ALL");
 
   const isAdmin = data.currentUser.isAdmin;
+  const isSuperAdmin = data.currentUser.isSuperAdmin || data.currentUser.role === "super_admin";
+
+  function handleDeleteExpense(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus laporan belanja ini?")) return;
+    startTransition(async () => {
+      const res = await deleteShoppingExpense(id);
+      if (res.success) {
+        toast.success("Laporan belanja berhasil dihapus!");
+        refreshData(true);
+      } else {
+        toast.error(res.error || "Gagal menghapus laporan belanja");
+      }
+    });
+  }
+
+  function handleDeleteFund(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus transaksi pemberian dana ini?")) return;
+    startTransition(async () => {
+      const res = await deleteShoppingFund(id);
+      if (res.success) {
+        toast.success("Transaksi pemberian dana berhasil dihapus!");
+        refreshData(true);
+      } else {
+        toast.error(res.error || "Gagal menghapus pemberian dana");
+      }
+    });
+  }
 
   // Refresh Data helper
   async function refreshData(silent = false) {
@@ -630,7 +660,7 @@ export default function FundsClient({ initialData }: Props) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                     <span className="text-lg font-black text-rose-600">
                       -{formatIdr(exp.totalPrice)}
                     </span>
@@ -643,6 +673,17 @@ export default function FundsClient({ initialData }: Props) {
                       <Eye className="h-3.5 w-3.5" />
                       Nota
                     </Button>
+                    {(isSuperAdmin || isAdmin || exp.userId === data.currentUser.id) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteExpense(exp.id)}
+                        className="h-8.5 w-8.5 p-0 rounded-lg text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
+                        title="Hapus Laporan Belanja"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -698,7 +739,7 @@ export default function FundsClient({ initialData }: Props) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                     <span className="text-lg font-black text-emerald-600">
                       +{formatIdr(fund.amount)}
                     </span>
@@ -714,6 +755,17 @@ export default function FundsClient({ initialData }: Props) {
                       </Button>
                     ) : (
                       <span className="text-[10px] text-muted-foreground font-medium italic">Tidak ada foto</span>
+                    )}
+                    {isSuperAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteFund(fund.id)}
+                        className="h-8.5 w-8.5 p-0 rounded-lg text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
+                        title="Hapus Pemberian Dana (Super Admin Only)"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     )}
                   </div>
                 </CardContent>
