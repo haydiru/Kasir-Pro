@@ -164,11 +164,21 @@ export function DashboardClient({
 
   function handlePreset(days: number) {
     const end = new Date();
+    const fmt = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: timezone });
+    const e = fmt(end);
+
+    if (days === 9999) {
+      // Semua (All Time)
+      const s = "2020-01-01";
+      setStartDate(s);
+      setEndDate(e);
+      fetchStats(s, e);
+      return;
+    }
+
     const start = new Date();
     start.setDate(end.getDate() - (days - 1));
-    const fmt = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: timezone });
     const s = fmt(start);
-    const e = fmt(end);
     setStartDate(s);
     setEndDate(e);
     fetchStats(s, e);
@@ -259,6 +269,8 @@ export function DashboardClient({
                 { label: "7 Hari", days: 7 },
                 { label: "30 Hari", days: 30 },
                 { label: "90 Hari (3 Bulan)", days: 90 },
+                { label: "Tahun Ini", days: 365 },
+                { label: "Semua (All Time)", days: 9999 },
               ].map((p) => (
                 <Button
                   key={p.label}
@@ -548,6 +560,7 @@ export function DashboardClient({
                       <TableHead className="pl-4">Nama Pegawai</TableHead>
                       <TableHead className="text-center">Shift</TableHead>
                       <TableHead className="text-right">Total Omzet</TableHead>
+                      <TableHead className="text-right">Omzet Debit</TableHead>
                       <TableHead className="text-right">Rata-rata/Shift</TableHead>
                       <TableHead className="text-right">Laba Digital</TableHead>
                       <TableHead className="text-center">Produk Digital Favorit</TableHead>
@@ -555,58 +568,67 @@ export function DashboardClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userPerformance.map((u, index) => (
-                      <TableRow key={u.userId} className="hover:bg-muted/10 transition">
-                        <TableCell className="font-bold pl-4">
-                          <div className="flex items-center gap-2">
-                            {index === 0 ? (
-                              <span className="text-amber-500 font-extrabold text-sm">🥇</span>
-                            ) : index === 1 ? (
-                              <span className="text-slate-400 font-extrabold text-sm">🥈</span>
-                            ) : index === 2 ? (
-                              <span className="text-amber-700 font-extrabold text-sm">🥉</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground w-4 text-center font-mono">{index + 1}</span>
-                            )}
-                            <div>
-                              <p className="text-sm font-extrabold tracking-tight">{u.userName}</p>
-                              <Badge variant="secondary" className="text-[9px] py-0 h-4 font-semibold capitalize">
-                                {getRoleLabel(u.userRole)}
-                              </Badge>
+                    {userPerformance.map((u, index) => {
+                      const debitPct = u.totalOmzet > 0 ? Math.round((u.omzetDebit / u.totalOmzet) * 100) : 0;
+                      return (
+                        <TableRow key={u.userId} className="hover:bg-muted/10 transition">
+                          <TableCell className="font-bold pl-4">
+                            <div className="flex items-center gap-2">
+                              {index === 0 ? (
+                                <span className="text-amber-500 font-extrabold text-sm">🥇</span>
+                              ) : index === 1 ? (
+                                <span className="text-slate-400 font-extrabold text-sm">🥈</span>
+                              ) : index === 2 ? (
+                                <span className="text-amber-700 font-extrabold text-sm">🥉</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground w-4 text-center font-mono">{index + 1}</span>
+                              )}
+                              <div>
+                                <p className="text-sm font-extrabold tracking-tight">{u.userName}</p>
+                                <Badge variant="secondary" className="text-[9px] py-0 h-4 font-semibold capitalize">
+                                  {getRoleLabel(u.userRole)}
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center font-semibold text-xs">
-                          {u.shiftCount} <span className="text-[10px] text-muted-foreground font-normal">shift</span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency(u.totalOmzet)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                          {formatCurrency(u.avgOmzetPerShift)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-teal-600 dark:text-teal-400">
-                          +{formatCurrency(u.digitalProfit)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20">
-                            {u.topDigitalService}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right pr-4">
-                          <div className="flex flex-col items-end">
-                            <span className={`text-xs font-black ${u.accuracyRate >= 90 ? "text-emerald-600" : u.accuracyRate >= 80 ? "text-amber-600" : "text-rose-600"}`}>
-                              {u.accuracyRate}%
-                            </span>
-                            {u.totalVariance !== 0 && (
-                              <span className={`text-[10px] font-mono ${u.totalVariance < 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                                ({u.totalVariance > 0 ? "+" : ""}{formatCurrency(u.totalVariance)})
+                          </TableCell>
+                          <TableCell className="text-center font-semibold text-xs">
+                            {u.shiftCount} <span className="text-[10px] text-muted-foreground font-normal">shift</span>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(u.totalOmzet)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-purple-600 dark:text-purple-400">
+                            <div>
+                              <span>{formatCurrency(u.omzetDebit)}</span>
+                              <span className="block text-[10px] font-normal text-muted-foreground">({debitPct}%)</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {formatCurrency(u.avgOmzetPerShift)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-teal-600 dark:text-teal-400">
+                            +{formatCurrency(u.digitalProfit)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20">
+                              {u.topDigitalService}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right pr-4">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-xs font-black ${u.accuracyRate >= 90 ? "text-emerald-600" : u.accuracyRate >= 80 ? "text-amber-600" : "text-rose-600"}`}>
+                                {u.accuracyRate}%
                               </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              {u.totalVariance !== 0 && (
+                                <span className={`text-[10px] font-mono ${u.totalVariance < 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                                  ({u.totalVariance > 0 ? "+" : ""}{formatCurrency(u.totalVariance)})
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

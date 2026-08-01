@@ -237,7 +237,9 @@ export async function getAdminDashboardStats(
     });
     const timezone = store?.timezone || "Asia/Jakarta";
 
-    const rangeStart = getTZDateRange(new Date(startDate + "T00:00:00"), timezone).start;
+    const rangeStart = startDate === "2020-01-01" || startDate === "all" || !startDate
+      ? new Date(0)
+      : getTZDateRange(new Date(startDate + "T00:00:00"), timezone).start;
     const rangeEnd = getTZDateRange(new Date(endDate + "T00:00:00"), timezone).end;
 
     const reports = await prisma.shiftReport.findMany({
