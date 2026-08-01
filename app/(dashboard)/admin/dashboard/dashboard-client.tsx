@@ -11,10 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, TrendingDown,
-  Wallet, Zap, Loader2, Trophy, Sparkles, Lightbulb, Target, ShieldAlert, BarChart3
+  Wallet, Zap, Loader2, Trophy, Sparkles, Lightbulb, Target, ShieldAlert, BarChart3,
+  Calendar, ShoppingBag, CreditCard, Flame
 } from "lucide-react";
 import { formatCurrency, formatTime, getRoleLabel, calcExpectedCash } from "@/lib/utils";
-import { getAdminDashboardStats, type DashboardStatsResult, type UserPerformanceEntry, type SmartInsight } from "@/app/actions/dashboard";
+import {
+  getAdminDashboardStats,
+  type DashboardStatsResult,
+  type UserPerformanceEntry,
+  type SmartInsight,
+  type ConsumerBehaviorInsight,
+  type WeekdayVsWeekendStats
+} from "@/app/actions/dashboard";
 import { getPayrollRecap, type PayrollRecapItem } from "@/app/actions/payroll";
 import { toast } from "sonner";
 import {
@@ -138,6 +146,9 @@ export function DashboardClient({
   const [recapOffset, setRecapOffset] = useState<number>(0);
   const [isRecapPending, startRecapTransition] = useTransition();
 
+  // Chart view mode: 'daily' | 'weekly' | 'monthly'
+  const [chartMode, setChartMode] = useState<"daily" | "weekly" | "monthly">("daily");
+
   function handleRecapOffsetChange(val: string) {
     const offset = Number(val);
     setRecapOffset(offset);
@@ -174,12 +185,51 @@ export function DashboardClient({
     });
   }
 
-  const { summary, daily, userPerformance = [], insights = [] } = stats;
+  const {
+    summary,
+    daily = [],
+    weekly = [],
+    monthly = [],
+    weekdayVsWeekend = {
+      weekday: { shiftCount: 0, totalOmzet: 0, avgOmzetPerShift: 0, omzetCash: 0, omzetDebit: 0, cashPercent: 0, debitPercent: 0, digitalProfit: 0 },
+      weekend: { shiftCount: 0, totalOmzet: 0, avgOmzetPerShift: 0, omzetCash: 0, omzetDebit: 0, cashPercent: 0, debitPercent: 0, digitalProfit: 0 },
+      weekendSurgePercent: 0,
+      busiestDayName: "-",
+      busiestDayOmzet: 0,
+    },
+    userPerformance = [],
+    insights = [],
+    consumerInsights = []
+  } = stats;
 
-  const chartData = daily.map((d) => ({
-    ...d,
-    label: new Date(d.date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
-  }));
+  // Active chart data based on view mode
+  const activeChartData =
+    chartMode === "weekly"
+      ? weekly.map((w) => ({
+          label: w.weekLabel,
+          omzetCash: w.omzetCash,
+          omzetDebit: w.omzetDebit,
+          expenditure: w.expenditure,
+          digitalRevenue: w.digitalRevenue,
+          digitalProfit: w.digitalProfit,
+        }))
+      : chartMode === "monthly"
+      ? monthly.map((m) => ({
+          label: m.monthLabel,
+          omzetCash: m.omzetCash,
+          omzetDebit: m.omzetDebit,
+          expenditure: m.expenditure,
+          digitalRevenue: m.digitalRevenue,
+          digitalProfit: m.digitalProfit,
+        }))
+      : daily.map((d) => ({
+          label: new Date(d.date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
+          omzetCash: d.omzetCash,
+          omzetDebit: d.omzetDebit,
+          expenditure: d.expenditure,
+          digitalRevenue: d.digitalRevenue,
+          digitalProfit: d.digitalProfit,
+        }));
 
   const userChartData = userPerformance.map((u) => ({
     name: u.userName.split(" ")[0],
@@ -258,6 +308,109 @@ export function DashboardClient({
         <SummaryCard title="Pendapatan Digital" value={formatCurrency(summary.digitalRevenue)} icon={Zap} colorClass="bg-amber-500/10 text-amber-600" />
         <SummaryCard title="Laba Digital" value={formatCurrency(summary.digitalProfit)} icon={Zap} colorClass="bg-teal-500/10 text-teal-600" />
       </div>
+
+      {/* ── WEEKDAY VS WEEKEND & CONSUMER BEHAVIOR ANALYTICS ── */}
+      <Card className="border border-indigo-500/20 shadow-sm rounded-2xl bg-gradient-to-br from-indigo-500/5 via-background to-purple-500/5">
+        <CardHeader className="pb-3 border-b border-border/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                <ShoppingBag className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-black tracking-tight">Analisa Pola Konsumsi Masyarakat (Weekday vs Weekend)</CardTitle>
+                <CardDescription className="text-xs">
+                  Perbandingan tren belanja hari kerja (Senin-Jumat) vs akhir pekan (Sabtu-Minggu) dan metode pembayaran favorit.
+                </CardDescription>
+              </div>
+            </div>
+            {weekdayVsWeekend.weekendSurgePercent !== 0 && (
+              <Badge variant="outline" className={`border-indigo-500/30 text-xs font-bold ${weekdayVsWeekend.weekendSurgePercent > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                {weekdayVsWeekend.weekendSurgePercent > 0 ? "🔥 Weekend Surge +" : "📉 Weekend "}
+                {weekdayVsWeekend.weekendSurgePercent}%
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5 space-y-6">
+          {/* Weekday vs Weekend Comparison Grid */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Weekday Card */}
+            <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-blue-500" />
+                  <span className="font-bold text-sm">Hari Kerja (Weekday)</span>
+                </div>
+                <Badge variant="secondary" className="text-[10px]">Senin - Jumat ({weekdayVsWeekend.weekday.shiftCount} Shift)</Badge>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-foreground">{formatCurrency(weekdayVsWeekend.weekday.totalOmzet)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata: <span className="font-bold">{formatCurrency(weekdayVsWeekend.weekday.avgOmzetPerShift)}</span>/shift</p>
+              </div>
+              <div className="space-y-1.5 pt-2 border-t text-xs">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Metode Pembayaran</span>
+                  <span className="font-bold text-foreground">Cash {weekdayVsWeekend.weekday.cashPercent}% vs Debit {weekdayVsWeekend.weekday.debitPercent}%</span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
+                  <div className="bg-blue-500 h-full" style={{ width: `${weekdayVsWeekend.weekday.cashPercent}%` }} />
+                  <div className="bg-purple-500 h-full" style={{ width: `${weekdayVsWeekend.weekday.debitPercent}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                  <span>Laba Digital Disumbang</span>
+                  <span className="font-bold text-teal-600">+{formatCurrency(weekdayVsWeekend.weekday.digitalProfit)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Weekend Card */}
+            <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-amber-500" />
+                  <span className="font-bold text-sm">Akhir Pekan (Weekend)</span>
+                </div>
+                <Badge variant="secondary" className="text-[10px]">Sabtu - Minggu ({weekdayVsWeekend.weekend.shiftCount} Shift)</Badge>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-foreground">{formatCurrency(weekdayVsWeekend.weekend.totalOmzet)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata: <span className="font-bold">{formatCurrency(weekdayVsWeekend.weekend.avgOmzetPerShift)}</span>/shift</p>
+              </div>
+              <div className="space-y-1.5 pt-2 border-t text-xs">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Metode Pembayaran</span>
+                  <span className="font-bold text-foreground">Cash {weekdayVsWeekend.weekend.cashPercent}% vs Debit {weekdayVsWeekend.weekend.debitPercent}%</span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
+                  <div className="bg-blue-500 h-full" style={{ width: `${weekdayVsWeekend.weekend.cashPercent}%` }} />
+                  <div className="bg-purple-500 h-full" style={{ width: `${weekdayVsWeekend.weekend.debitPercent}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                  <span>Laba Digital Disumbang</span>
+                  <span className="font-bold text-teal-600">+{formatCurrency(weekdayVsWeekend.weekend.digitalProfit)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Consumer Behavior Narrative Cards */}
+          {consumerInsights.length > 0 && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {consumerInsights.map((ci) => (
+                <div key={ci.id} className="p-3.5 rounded-xl border bg-background/80 space-y-1">
+                  <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                    {ci.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {ci.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── SMART BUSINESS INSIGHTS & SALES OPPORTUNITIES ── */}
       {insights.length > 0 && (
@@ -462,85 +615,123 @@ export function DashboardClient({
         </CardContent>
       </Card>
 
-      {/* ── Charts ── */}
-      {chartData.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-            Tidak ada data untuk periode yang dipilih.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Bar Chart: Cash vs Debit */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Omzet Cash vs Debit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CurrencyTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="omzetCash" name="Cash" fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
-                  <Bar dataKey="omzetDebit" name="Debit" fill="#8b5cf6" radius={[4, 4, 0, 0]} stackId="a" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Line Chart: Pengeluaran */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Pengeluaran Harian</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CurrencyTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="expenditure" name="Pengeluaran" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Area Chart: Digital Revenue & Profit */}
-          <Card className="border-0 shadow-sm lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Pendapatan & Laba Digital</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CurrencyTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Area type="monotone" dataKey="digitalRevenue" name="Pendapatan Digital" stroke="#f59e0b" fill="url(#colorRevenue)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="digitalProfit" name="Laba Digital" stroke="#14b8a6" fill="url(#colorProfit)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+      {/* ── CHARTS WITH MULTI-PERSPECTIVE TOGGLE (DAILY / WEEKLY / MONTHLY) ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-base font-bold tracking-tight">Grafik Growth & Trend Penjualan</h3>
+          <div className="flex gap-1.5 bg-muted p-1 rounded-xl">
+            <Button
+              size="sm"
+              variant={chartMode === "daily" ? "default" : "ghost"}
+              onClick={() => setChartMode("daily")}
+              className="text-xs h-7 rounded-lg"
+            >
+              Harian (Daily)
+            </Button>
+            <Button
+              size="sm"
+              variant={chartMode === "weekly" ? "default" : "ghost"}
+              onClick={() => setChartMode("weekly")}
+              className="text-xs h-7 rounded-lg"
+            >
+              Per Minggu (Weekly)
+            </Button>
+            <Button
+              size="sm"
+              variant={chartMode === "monthly" ? "default" : "ghost"}
+              onClick={() => setChartMode("monthly")}
+              className="text-xs h-7 rounded-lg"
+            >
+              Per Bulan (Monthly)
+            </Button>
+          </div>
         </div>
-      )}
+
+        {activeChartData.length === 0 ? (
+          <Card className="border-0 shadow-sm">
+            <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+              Tidak ada data untuk periode yang dipilih.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Bar Chart: Cash vs Debit */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">
+                  Omzet Cash vs Debit ({chartMode === "weekly" ? "Per Minggu" : chartMode === "monthly" ? "Per Bulan" : "Harian"})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={activeChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CurrencyTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="omzetCash" name="Cash" fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
+                    <Bar dataKey="omzetDebit" name="Debit" fill="#8b5cf6" radius={[4, 4, 0, 0]} stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Line Chart: Pengeluaran */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">
+                  Pengeluaran Toko ({chartMode === "weekly" ? "Per Minggu" : chartMode === "monthly" ? "Per Bulan" : "Harian"})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={activeChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CurrencyTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="expenditure" name="Pengeluaran" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Area Chart: Digital Revenue & Profit */}
+            <Card className="border-0 shadow-sm lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">
+                  Pendapatan & Laba Digital ({chartMode === "weekly" ? "Per Minggu" : chartMode === "monthly" ? "Per Bulan" : "Harian"})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={activeChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CurrencyTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Area type="monotone" dataKey="digitalRevenue" name="Pendapatan Digital" stroke="#f59e0b" fill="url(#colorRevenue)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="digitalProfit" name="Laba Digital" stroke="#14b8a6" fill="url(#colorProfit)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
 
       {/* ── Live Monitor + Payroll side by side ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">

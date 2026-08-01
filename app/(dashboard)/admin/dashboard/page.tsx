@@ -65,7 +65,22 @@ export default async function AdminDashboardPage() {
   const statsRes = await getAdminDashboardStats(thirtyDaysAgoStr, todayStr);
   const initialStats = statsRes.success && statsRes.data
     ? statsRes.data
-    : { summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 }, daily: [], userPerformance: [], insights: [] };
+    : {
+        summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 },
+        daily: [],
+        weekly: [],
+        monthly: [],
+        weekdayVsWeekend: {
+          weekday: { shiftCount: 0, totalOmzet: 0, avgOmzetPerShift: 0, omzetCash: 0, omzetDebit: 0, cashPercent: 0, debitPercent: 0, digitalProfit: 0 },
+          weekend: { shiftCount: 0, totalOmzet: 0, avgOmzetPerShift: 0, omzetCash: 0, omzetDebit: 0, cashPercent: 0, debitPercent: 0, digitalProfit: 0 },
+          weekendSurgePercent: 0,
+          busiestDayName: "-",
+          busiestDayOmzet: 0
+        },
+        userPerformance: [],
+        insights: [],
+        consumerInsights: []
+      };
 
   // Count unmatched flips
   const flipWebhooks = await prisma.flipWebhook.findMany({
