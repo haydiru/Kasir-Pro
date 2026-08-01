@@ -4,14 +4,19 @@ import { useState, useEffect, useMemo, useTransition } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +31,16 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
-  Clock,
   User,
   Loader2,
   Search,
   Undo,
   ArrowRight,
   Package,
+  LayoutGrid,
+  List,
 } from "lucide-react";
-import { formatCurrency, formatFullLocalDate } from "@/lib/utils";
+import { formatFullLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   createReturnedItem,
@@ -63,6 +69,7 @@ export default function ReturPage() {
   const [items, setItems] = useState<ReturnedItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"SEMUA" | "PENDING" | "RETURNED" | "RESOLVED">("PENDING");
+  const [viewMode, setViewMode] = useState<"table" | "card">("table");
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -347,7 +354,7 @@ export default function ReturPage() {
   }, [filteredItems]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-24 animate-in fade-in duration-300">
+    <div className="mx-auto max-w-5xl space-y-6 pb-24 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -370,7 +377,7 @@ export default function ReturPage() {
       </div>
 
       {/* Filter and Search controls */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -381,44 +388,71 @@ export default function ReturPage() {
           />
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl w-fit self-end sm:self-auto">
-          <Button
-            variant={statusFilter === "PENDING" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("PENDING")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Pending
-          </Button>
-          <Button
-            variant={statusFilter === "RETURNED" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("RETURNED")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Dikirim
-          </Button>
-          <Button
-            variant={statusFilter === "RESOLVED" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("RESOLVED")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Selesai
-          </Button>
-          <Button
-            variant={statusFilter === "SEMUA" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setStatusFilter("SEMUA")}
-            className="h-8 text-xs font-bold rounded-lg"
-          >
-            Semua
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status Filter buttons */}
+          <div className="flex gap-1 p-1 bg-muted/60 rounded-xl">
+            <Button
+              variant={statusFilter === "PENDING" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("PENDING")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Pending
+            </Button>
+            <Button
+              variant={statusFilter === "RETURNED" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("RETURNED")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Dikirim
+            </Button>
+            <Button
+              variant={statusFilter === "RESOLVED" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("RESOLVED")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Selesai
+            </Button>
+            <Button
+              variant={statusFilter === "SEMUA" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("SEMUA")}
+              className="h-8 text-xs font-bold rounded-lg"
+            >
+              Semua
+            </Button>
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex gap-1 p-1 bg-muted/60 rounded-xl">
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="h-8 text-xs font-bold rounded-lg gap-1.5"
+              title="Tampilan List / Tabel Ringkas"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant={viewMode === "card" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="h-8 text-xs font-bold rounded-lg gap-1.5"
+              title="Tampilan Kartu"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Kartu</span>
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Items list grouped by supplier */}
-      <div className="space-y-6">
+      {/* Items list */}
+      <div>
         {isLoading && items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
@@ -436,14 +470,172 @@ export default function ReturPage() {
                 : "Semua retur telah selesai diproses! Gunakan tombol di atas untuk mencatat barang retur baru."}
             </p>
           </div>
+        ) : viewMode === "table" ? (
+          /* ── COMPACT LIST / TABLE VIEW ── */
+          <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 text-xs font-bold uppercase tracking-wider">
+                  <TableHead className="w-10 pl-4">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-muted-foreground/30 text-primary focus:ring-primary accent-primary cursor-pointer"
+                      checked={filteredItems.length > 0 && filteredItems.every((i) => selectedIds.includes(i.id))}
+                      onChange={() => {
+                        if (filteredItems.every((i) => selectedIds.includes(i.id))) {
+                          setSelectedIds([]);
+                        } else {
+                          setSelectedIds(filteredItems.map((i) => i.id));
+                        }
+                      }}
+                    />
+                  </TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Nama Barang</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead>Alasan Retur</TableHead>
+                  <TableHead>Tanggal & Catatan</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-right pr-4">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => {
+                  const isResolved = item.status === "RESOLVED";
+                  const isReturned = item.status === "RETURNED";
+                  const isItemLoading = actionLoadingId === item.id;
+                  const isSelected = selectedIds.includes(item.id);
+
+                  return (
+                    <TableRow
+                      key={item.id}
+                      className={`hover:bg-muted/30 transition-colors ${
+                        isSelected ? "bg-primary/[0.04]" : ""
+                      }`}
+                    >
+                      <TableCell className="pl-4">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-muted-foreground/30 text-primary focus:ring-primary accent-primary cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectItem(item.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-bold text-xs text-foreground whitespace-nowrap">
+                        {item.supplierName}
+                      </TableCell>
+                      <TableCell className="font-extrabold text-xs text-foreground">
+                        {item.productName}
+                      </TableCell>
+                      <TableCell className="text-center whitespace-nowrap">
+                        <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/5 border-primary/20 text-primary px-2 py-0.5">
+                          {item.quantity} pcs
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate" title={item.reason || "-"}>
+                        {item.reason || "-"}
+                      </TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        <div>
+                          <p className="font-semibold">{formatFullLocalDate(item.createdAt, "Asia/Jakarta")}</p>
+                          {item.createdBy && <p className="text-[10px] opacity-75">Oleh: {item.createdBy.name}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center whitespace-nowrap">
+                        {isResolved ? (
+                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[9px] py-0.5 h-5 font-bold uppercase text-white">
+                            Selesai / Clear
+                          </Badge>
+                        ) : isReturned ? (
+                          <Badge className="bg-amber-600 hover:bg-amber-700 text-[9px] py-0.5 h-5 font-bold uppercase text-white">
+                            Telah Dikirim
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-rose-600 hover:bg-rose-700 text-[9px] py-0.5 h-5 font-bold uppercase text-white">
+                            Pending / Di Toko
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right pr-4 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {isResolved ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={isItemLoading}
+                              onClick={() => handleRevertStatus(item.id, item.status)}
+                              className="h-7 text-xs font-semibold px-2 text-muted-foreground hover:bg-accent"
+                              title="Kembalikan ke Dikirim"
+                            >
+                              <Undo className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : isReturned ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isItemLoading}
+                                onClick={() => handleRevertStatus(item.id, item.status)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:bg-accent"
+                                title="Kembalikan ke Pending"
+                              >
+                                <Undo className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                disabled={isItemLoading}
+                                onClick={() => handleUpdateStatus(item.id, item.status)}
+                                className="h-7 text-[11px] font-bold px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1"
+                              >
+                                {isItemLoading ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3 w-3" />
+                                )}
+                                Selesai
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled={isItemLoading}
+                              onClick={() => handleUpdateStatus(item.id, item.status)}
+                              className="h-7 text-[11px] font-bold px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-1"
+                            >
+                              {isItemLoading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <ArrowRight className="h-3 w-3" />
+                              )}
+                              Kirim
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isItemLoading}
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                            title="Hapus"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
+          /* ── CARD VIEW (GROUPED BY SUPPLIER) ── */
           <div className="space-y-8">
             {Object.entries(groupedItems).map(([supplierName, groupItems]) => {
               const supplierItemIds = groupItems.map((i) => i.id);
               const allSelected = supplierItemIds.every((id) => selectedIds.includes(id));
               const someSelected = supplierItemIds.some((id) => selectedIds.includes(id)) && !allSelected;
 
-              // Filter actions based on what's available
               const hasPending = groupItems.some((i) => i.status === "PENDING");
               const hasReturned = groupItems.some((i) => i.status === "RETURNED");
 
@@ -509,7 +701,6 @@ export default function ReturPage() {
                     {groupItems.map((item) => {
                       const isResolved = item.status === "RESOLVED";
                       const isReturned = item.status === "RETURNED";
-                      const isPending = item.status === "PENDING";
                       const isItemLoading = actionLoadingId === item.id;
                       const isSelected = selectedIds.includes(item.id);
 
