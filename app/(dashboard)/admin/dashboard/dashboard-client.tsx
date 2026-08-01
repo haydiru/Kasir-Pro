@@ -5,13 +5,16 @@ import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, TrendingDown, Wallet, Zap, Loader2 } from "lucide-react";
+import {
+  Users, DollarSign, ClipboardCheck, AlertTriangle, TrendingUp, TrendingDown,
+  Wallet, Zap, Loader2, Trophy, Sparkles, Lightbulb, Target, ShieldAlert, BarChart3
+} from "lucide-react";
 import { formatCurrency, formatTime, getRoleLabel, calcExpectedCash } from "@/lib/utils";
-import { getAdminDashboardStats, type DashboardStatsResult } from "@/app/actions/dashboard";
+import { getAdminDashboardStats, type DashboardStatsResult, type UserPerformanceEntry, type SmartInsight } from "@/app/actions/dashboard";
 import { getPayrollRecap, type PayrollRecapItem } from "@/app/actions/payroll";
 import { toast } from "sonner";
 import {
@@ -171,11 +174,18 @@ export function DashboardClient({
     });
   }
 
-  const { summary, daily } = stats;
+  const { summary, daily, userPerformance = [], insights = [] } = stats;
 
   const chartData = daily.map((d) => ({
     ...d,
     label: new Date(d.date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
+  }));
+
+  const userChartData = userPerformance.map((u) => ({
+    name: u.userName.split(" ")[0],
+    totalOmzet: u.totalOmzet,
+    digitalProfit: u.digitalProfit,
+    avgOmzet: u.avgOmzetPerShift,
   }));
 
   return (
@@ -247,6 +257,209 @@ export function DashboardClient({
         <SummaryCard title="Pendapatan Digital" value={formatCurrency(summary.digitalRevenue)} icon={Zap} colorClass="bg-amber-500/10 text-amber-600" />
         <SummaryCard title="Laba Digital" value={formatCurrency(summary.digitalProfit)} icon={Zap} colorClass="bg-teal-500/10 text-teal-600" />
       </div>
+
+      {/* ── SMART BUSINESS INSIGHTS & SALES OPPORTUNITIES ── */}
+      {insights.length > 0 && (
+        <Card className="border border-amber-500/20 shadow-sm bg-gradient-to-br from-amber-500/5 via-background to-emerald-500/5 rounded-2xl overflow-hidden">
+          <CardHeader className="pb-3 border-b border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-black tracking-tight">Rekomendasi Strategis Peningkatan Penjualan</CardTitle>
+                  <CardDescription className="text-xs">
+                    Analisa otomatis berbasis data transaksi & performa pegawai pada periode terpilih.
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-bold">
+                Smart Analytics
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 grid gap-3 md:grid-cols-2">
+            {insights.map((ins) => {
+              const bgClass =
+                ins.type === "success"
+                  ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/20"
+                  : ins.type === "opportunity"
+                  ? "bg-teal-500/10 text-teal-800 dark:text-teal-300 border-teal-500/20"
+                  : ins.type === "warning"
+                  ? "bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-500/20"
+                  : "bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-500/20";
+
+              const IconComponent =
+                ins.type === "success"
+                  ? Trophy
+                  : ins.type === "opportunity"
+                  ? Target
+                  : ins.type === "warning"
+                  ? ShieldAlert
+                  : Lightbulb;
+
+              return (
+                <div key={ins.id} className={`p-4 rounded-xl border ${bgClass} space-y-1.5 transition hover:shadow-xs`}>
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <IconComponent className="h-4 w-4 shrink-0" />
+                    <span>{ins.title}</span>
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90 font-medium">
+                    {ins.description}
+                  </p>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── USER PERFORMANCE TREND & ANALYTICS ── */}
+      <Card className="border border-border/80 shadow-sm rounded-2xl">
+        <CardHeader className="pb-3 border-b border-border/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black tracking-tight">Analisa Trend Per User & Produktivitas Kasir</CardTitle>
+                <CardDescription className="text-xs">
+                  Evaluasi omzet, kontribusi laba digital, dan akurasi kas dari setiap pembuat laporan.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary" className="self-start sm:self-auto font-bold text-xs px-3 py-1">
+              {userPerformance.length} Pegawai Terlibat
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5 space-y-6">
+          {userPerformance.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-xs font-medium">
+              Belum ada data transaksi/laporan pegawai pada periode ini.
+            </div>
+          ) : (
+            <>
+              {/* User Performance Chart */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="border shadow-none bg-muted/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Total Omzet vs Laba Digital Per Kasir
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={userChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip content={<CurrencyTooltip />} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="totalOmzet" name="Omzet POS" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="digitalProfit" name="Laba Digital" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card className="border shadow-none bg-muted/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Rata-Rata Omzet Per Shift (Produktivitas)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={userChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip content={<CurrencyTooltip />} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="avgOmzet" name="Rata-rata/Shift" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* User Performance Leaderboard Table */}
+              <div className="overflow-x-auto rounded-xl border border-border/80">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 text-xs font-bold uppercase tracking-wider">
+                      <TableHead className="pl-4">Nama Pegawai</TableHead>
+                      <TableHead className="text-center">Shift</TableHead>
+                      <TableHead className="text-right">Total Omzet</TableHead>
+                      <TableHead className="text-right">Rata-rata/Shift</TableHead>
+                      <TableHead className="text-right">Laba Digital</TableHead>
+                      <TableHead className="text-center">Produk Digital Favorit</TableHead>
+                      <TableHead className="text-right pr-4">Akurasi Kas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userPerformance.map((u, index) => (
+                      <TableRow key={u.userId} className="hover:bg-muted/10 transition">
+                        <TableCell className="font-bold pl-4">
+                          <div className="flex items-center gap-2">
+                            {index === 0 ? (
+                              <span className="text-amber-500 font-extrabold text-sm">🥇</span>
+                            ) : index === 1 ? (
+                              <span className="text-slate-400 font-extrabold text-sm">🥈</span>
+                            ) : index === 2 ? (
+                              <span className="text-amber-700 font-extrabold text-sm">🥉</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground w-4 text-center font-mono">{index + 1}</span>
+                            )}
+                            <div>
+                              <p className="text-sm font-extrabold tracking-tight">{u.userName}</p>
+                              <Badge variant="secondary" className="text-[9px] py-0 h-4 font-semibold capitalize">
+                                {getRoleLabel(u.userRole)}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-semibold text-xs">
+                          {u.shiftCount} <span className="text-[10px] text-muted-foreground font-normal">shift</span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(u.totalOmzet)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                          {formatCurrency(u.avgOmzetPerShift)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-teal-600 dark:text-teal-400">
+                          +{formatCurrency(u.digitalProfit)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20">
+                            {u.topDigitalService}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <div className="flex flex-col items-end">
+                            <span className={`text-xs font-black ${u.accuracyRate >= 90 ? "text-emerald-600" : u.accuracyRate >= 80 ? "text-amber-600" : "text-rose-600"}`}>
+                              {u.accuracyRate}%
+                            </span>
+                            {u.totalVariance !== 0 && (
+                              <span className={`text-[10px] font-mono ${u.totalVariance < 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                                ({u.totalVariance > 0 ? "+" : ""}{formatCurrency(u.totalVariance)})
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Charts ── */}
       {chartData.length === 0 ? (

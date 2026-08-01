@@ -60,7 +60,7 @@ export default async function AdminDashboardPage() {
   const statsRes = await getAdminDashboardStats(todayStr, todayStr);
   const initialStats = statsRes.success && statsRes.data
     ? statsRes.data
-    : { summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 }, daily: [] };
+    : { summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 }, daily: [], userPerformance: [], insights: [] };
 
   // Count unmatched flips
   const flipWebhooks = await prisma.flipWebhook.findMany({
