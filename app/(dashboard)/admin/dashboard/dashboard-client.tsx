@@ -253,7 +253,7 @@ export function DashboardClient({
 
       {/* ── Summary Cards Row 1 ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.totalOmzet)} icon={DollarSign} colorClass="bg-chart-1/10 text-chart-1" />
+        <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.todayOmzet)} icon={DollarSign} colorClass="bg-chart-1/10 text-chart-1" subtext="Khusus transaksi POS hari ini" />
         <SummaryCard title="Pegawai Aktif" value={String(activeAttendances.length)} icon={Users} colorClass="bg-chart-2/10 text-chart-2" subtext="Sedang bertugas saat ini" />
         <SummaryCard title="Menunggu Verifikasi" value={String(submittedCount)} icon={ClipboardCheck} colorClass="bg-amber-500/10 text-amber-500" />
         <SummaryCard title="Flip Belum Cocok" value={String(unmatchedFlipCount)} icon={AlertTriangle} colorClass="bg-destructive/10 text-destructive" />
@@ -313,7 +313,7 @@ export function DashboardClient({
 
       {/* ── Financial Summary Cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <SummaryCard title="Total Omzet" value={formatCurrency(summary.totalOmzet)} icon={TrendingUp} colorClass="bg-emerald-500/10 text-emerald-600" />
+        <SummaryCard title="Total Omzet (Periode)" value={formatCurrency(summary.totalOmzet)} icon={TrendingUp} colorClass="bg-emerald-500/10 text-emerald-600" subtext="Berdasarkan filter tanggal" />
         <SummaryCard title="Omzet Cash" value={formatCurrency(summary.omzetCash)} icon={Wallet} colorClass="bg-blue-500/10 text-blue-600" />
         <SummaryCard title="Omzet Debit" value={formatCurrency(summary.omzetDebit)} icon={DollarSign} colorClass="bg-violet-500/10 text-violet-600" />
         <SummaryCard title="Total Pengeluaran" value={formatCurrency(summary.totalExpenditure)} icon={TrendingDown} colorClass="bg-rose-500/10 text-rose-600" />

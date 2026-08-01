@@ -66,7 +66,7 @@ export default async function AdminDashboardPage() {
   const initialStats = statsRes.success && statsRes.data
     ? statsRes.data
     : {
-        summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 },
+        summary: { todayOmzet: 0, totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 },
         daily: [],
         weekly: [],
         monthly: [],

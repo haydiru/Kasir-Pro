@@ -8,6 +8,7 @@ import { getTZDateRange, formatLocalDate } from "@/lib/utils";
 // ───── Types ─────
 
 export interface DashboardSummary {
+  todayOmzet: number;
   totalOmzet: number;
   omzetCash: number;
   omzetDebit: number;
@@ -256,8 +257,21 @@ export async function getAdminDashboardStats(
       orderBy: { date: "asc" },
     });
 
+    // Today's omzet specifically for "Omzet Hari Ini" card
+    const todayTZRange = getTZDateRange(new Date(), timezone);
+    const todayReports = await prisma.shiftReport.findMany({
+      where: {
+        storeId,
+        status: { in: ["Submitted", "Verified"] },
+        date: { gte: todayTZRange.start, lte: todayTZRange.end },
+      },
+      select: { posCash: true, posDebit: true },
+    });
+    const todayOmzet = todayReports.reduce((sum, r) => sum + r.posCash + r.posDebit, 0);
+
     // ── Global Summary ──
     const summary: DashboardSummary = {
+      todayOmzet,
       totalOmzet: 0,
       omzetCash: 0,
       omzetDebit: 0,
