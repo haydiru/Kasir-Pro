@@ -203,11 +203,12 @@ export function DashboardClient({
       <Card className="border-0 shadow-sm">
         <CardContent className="pt-5">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {[
                 { label: "Hari Ini", days: 1 },
                 { label: "7 Hari", days: 7 },
                 { label: "30 Hari", days: 30 },
+                { label: "90 Hari (3 Bulan)", days: 90 },
               ].map((p) => (
                 <Button
                   key={p.label}

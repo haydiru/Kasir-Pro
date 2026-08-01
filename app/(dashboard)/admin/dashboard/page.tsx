@@ -56,8 +56,13 @@ export default async function AdminDashboardPage() {
   // Payroll recap
   const payrollRecap = await getPayrollRecap();
 
-  // Initial chart data: today
-  const statsRes = await getAdminDashboardStats(todayStr, todayStr);
+  // Date range: Default to last 30 days for rich trend analysis
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  const thirtyDaysAgoStr = formatLocalDate(thirtyDaysAgo, timezone);
+
+  // Initial chart & user performance data: last 30 days
+  const statsRes = await getAdminDashboardStats(thirtyDaysAgoStr, todayStr);
   const initialStats = statsRes.success && statsRes.data
     ? statsRes.data
     : { summary: { totalOmzet: 0, omzetCash: 0, omzetDebit: 0, totalExpenditure: 0, digitalRevenue: 0, digitalProfit: 0 }, daily: [], userPerformance: [], insights: [] };
@@ -98,7 +103,7 @@ export default async function AdminDashboardPage() {
       unmatchedFlipCount={unmatchedFlipCount}
       payrollRecap={payrollRecap}
       initialStats={initialStats}
-      initialStartDate={todayStr}
+      initialStartDate={thirtyDaysAgoStr}
       initialEndDate={todayStr}
       timezone={timezone}
     />
