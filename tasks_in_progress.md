@@ -1,6 +1,6 @@
 # 🟡 Agent 2: Tasks In Progress (Task Sedang Dikerjakan)
 
-Dokumen ini mencatat task yang **SEDANG AKTIF DIKERJAKAN** oleh AI assistant. Setelah seluruh instruksi dan verifikasi selesai, task dari file ini akan dipindahkan secara otomatis ke `tasks_done.md`.
+Dokumen ini mencatat task yang **SEDANG AKTIF DIKERJAKAN** oleh AI assistant. Setelah seluruh instruksi dan verifikasi selesai, task dari file ini meupun task done dipindahkan secara berurutan.
 
 ---
 
