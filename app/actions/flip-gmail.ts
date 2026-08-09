@@ -136,10 +136,10 @@ export async function syncFlipEmailsForStore(storeId: string, force = false) {
     // Catat waktu penarikan terbaru
     lastSyncMap.set(storeId, now);
 
-    // 1. Cari pesan dari Gmail API yang persis dengan filter AppsScript (hanya email Flip resmi bernilai berhasil)
-    const query = encodeURIComponent('from:no-reply@flip.id subject:"berhasil" -subject:"Flip Freedom" -subject:"Top Up Saldo"');
+    // 1. Cari pesan dari Gmail API dengan filter komprehensif seluruh transaksi Flip
+    const query = encodeURIComponent('(from:flip.id OR "flip.id") (subject:"berhasil" OR subject:"sukses" OR subject:"pembelian" OR subject:"transfer" OR subject:"transaksi") -subject:"Flip Freedom" -subject:"Top Up Saldo"');
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=50`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=200`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }

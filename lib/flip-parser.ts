@@ -1,20 +1,20 @@
 /**
- * Flip Email Parser
+ * Flip Email Parser (Enhanced for All Flip Transaction Formats)
  * Extracts transaction data from Flip email HTML notifications.
  *
- * Supports two formats:
- *   Format A – Bill Payment (PDAM, Listrik, Indihome, etc.)
- *     Subject pattern: "Pembelian [Jenis] #DPT... berhasil"
- *     ID format: DPTxxxxxxxx
+ * Supports formats:
+ *   Format A – Bill Payment (PDAM, Listrik, Indihome, E-Wallet, Pulsa)
+ *     Subject patterns: "Pembelian [Jenis] #... berhasil", "Transaksi [Jenis] berhasil"
+ *     ID formats: DPTxxxxxxxx, TXxxxxxxxx, TRXxxxxxxxx, etc.
  *
  *   Format B – Transfer (Bank / E-Wallet)
- *     Subject pattern: "Transfer ke [NAMA] berhasil"
- *     ID format: #FTxxxxxxxxx
+ *     Subject patterns: "Transfer ke [NAMA] berhasil", "Pengiriman uang ke... berhasil"
+ *     ID formats: #FTxxxxxxxxx
  */
 
 export interface FlipParsedData {
   flipId: string;          // e.g. "FT811717539" or "DPT92116802" (without #)
-  serviceType: string;     // e.g. "Transfer", "PDAM", "Listrik", "Indihome"
+  serviceType: string;     // e.g. "Transfer", "PDAM", "Listrik", "Indihome", "Top Up E-Walet", "Pulsa/Paket Data"
   nominal: number;         // e.g. 175000
   customerName: string | null;
   customerNumber: string | null;
@@ -24,16 +24,21 @@ export interface FlipParsedData {
 }
 
 /**
- * Detect transaction type from email subject.
+ * Detect transaction type from email subject & body.
  */
-function detectServiceType(subject: string): string {
+function detectServiceType(subject: string, body: string): string {
   const s = subject.toLowerCase();
-  if (s.includes("transfer")) return "Transfer";
-  if (s.includes("pdam")) return "PDAM";
-  if (s.includes("listrik")) return "Listrik";
-  if (s.includes("internet") || s.includes("indihome")) return "Indihome";
-  if (s.includes("pulsa") || s.includes("paket data")) return "Pulsa/Paket Data";
-  if (s.includes("top up") || s.includes("e-wallet") || s.includes("e-walet")) return "Top Up E-Walet";
+  const b = body.toLowerCase();
+
+  if (s.includes("transfer") || b.includes("transfer bank")) return "Transfer";
+  if (s.includes("pdam") || b.includes("pdam")) return "PDAM";
+  if (s.includes("listrik") || s.includes("pln") || b.includes("token listrik")) return "Listrik";
+  if (s.includes("internet") || s.includes("indihome") || b.includes("telkom")) return "Indihome";
+  if (s.includes("pulsa") || s.includes("paket data") || b.includes("paket data")) return "Pulsa/Paket Data";
+  if (s.includes("top up") || s.includes("e-wallet") || s.includes("e-walet") || b.includes("e-wallet") || b.includes("gopay") || b.includes("ovo") || b.includes("dana") || b.includes("shopeepay")) {
+    return "Top Up E-Walet";
+  }
+
   // Fallback: extract the type from "Pembelian [TYPE] #..."
   const m = subject.match(/Pembelian\s+(.+?)\s+#/i);
   if (m) return m[1].trim();
@@ -46,16 +51,24 @@ function detectServiceType(subject: string): string {
  */
 function extractFlipId(subject: string, body: string): string | null {
   // 1. Transfer format: #FTxxxxxxxxx
-  const ftMatch = body.match(/#?(FT[A-Za-z0-9]{5,})/i) || subject.match(/#?(FT[A-Za-z0-9]{5,})/i);
-  if (ftMatch) return ftMatch[1];
+  const ftMatch = body.match(/#?(FT[A-Za-z0-9]{4,})/i) || subject.match(/#?(FT[A-Za-z0-9]{4,})/i);
+  if (ftMatch) return ftMatch[1].toUpperCase();
 
-  // 2. Bill payment format: DPTxxxxxxxx (includes alphanumeric suffixes like PTZ)
-  const dptMatch = subject.match(/#?(DPT[A-Za-z0-9]{5,})/i) || body.match(/(?:ID Transaksi|id transaksi)[^<]*?(DPT[A-Za-z0-9]{5,})/i);
-  if (dptMatch) return dptMatch[1];
+  // 2. Bill payment format: DPTxxxxxxxx
+  const dptMatch = subject.match(/#?(DPT[A-Za-z0-9]{4,})/i) || body.match(/(?:ID Transaksi|id transaksi|ID Pengiriman)[^<]*?(DPT[A-Za-z0-9]{4,})/i);
+  if (dptMatch) return dptMatch[1].toUpperCase();
 
-  // 3. General hashtag ID fallback: #ABC12345
-  const genMatch = subject.match(/#([A-Za-z0-9]{6,})/i) || body.match(/#([A-Za-z0-9]{6,})/i);
-  if (genMatch) return genMatch[1];
+  // 3. TRX / TX prefix format: TRXxxxxxxxx or TXxxxxxxxx
+  const trxMatch = subject.match(/#?((?:TRX|TX)[A-Za-z0-9]{4,})/i) || body.match(/#?((?:TRX|TX)[A-Za-z0-9]{4,})/i);
+  if (trxMatch) return trxMatch[1].toUpperCase();
+
+  // 4. Explicit label format: "ID Transaksi : #ABC12345" or "ID Transaksi: 12345678"
+  const labelMatch = body.match(/(?:ID Transaksi|ID Pengiriman|Kode Transaksi)\s*[:\s]*#?([A-Za-z0-9]{5,})/i);
+  if (labelMatch) return labelMatch[1].toUpperCase();
+
+  // 5. General hashtag ID fallback in subject or body: #ABC12345
+  const genMatch = subject.match(/#([A-Za-z0-9]{5,})/i) || body.match(/#([A-Za-z0-9]{5,})/i);
+  if (genMatch) return genMatch[1].toUpperCase();
 
   return null;
 }
@@ -71,16 +84,16 @@ function parseRupiah(str: string): number {
 
 /**
  * Extract nominal amount from the email body.
- * Looks for "Jumlah Tagihan" or "Nominal" labels followed by Rp value.
  */
 function extractNominal(body: string): number {
-  // Strip HTML to get plain pairs of label → value
+  // Strip HTML to get plain text
   const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-  // Pattern: "Jumlah Tagihan ... Rpxx.xxx" or "Nominal ... Rpxx.xxx"
+  // Pattern: "Jumlah Tagihan ... Rpxx.xxx" or "Nominal ... Rpxx.xxx" or "Total ... Rpxx.xxx"
   const patterns = [
-    /(?:Jumlah Tagihan|Total Tagihan)[^R]*?(Rp[\d.,]+)/i,
+    /(?:Jumlah Tagihan|Total Tagihan|Total Pengiriman|Nominal Transfer)[^R]*?(Rp[\d.,]+)/i,
     /Nominal[^R]*?(Rp[\d.,]+)/i,
+    /Total[^R]*?(Rp[\d.,]+)/i,
   ];
 
   for (const p of patterns) {
@@ -93,7 +106,7 @@ function extractNominal(body: string): number {
   if (cellMatches) return parseRupiah(cellMatches[1]);
 
   // Last resort: find largest Rp value in body
-  const allRp = [...text.matchAll(/Rp([\d.,]+)/g)].map((m) => parseRupiah("Rp" + m[1]));
+  const allRp = [...text.matchAll(/Rp\s*([\d.,]+)/g)].map((m) => parseRupiah("Rp" + m[1]));
   if (allRp.length > 0) return Math.max(...allRp);
 
   return 0;
@@ -101,21 +114,16 @@ function extractNominal(body: string): number {
 
 /**
  * Parse Indonesian date string to Date object.
- * e.g. "14 April 2026, 14:00 WIB" → Date
  */
 function parseIndonesianDate(dateStr: string): Date {
   const months: Record<string, number> = {
-    // Indonesian
     januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
     juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11,
-    // English full
     january: 0, february: 1, march: 2, may: 4, june: 5,
     july: 6, august: 7, october: 9, december: 11,
-    // English/Indonesian short
     jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, agt: 7, aug: 7, sep: 8, okt: 9, oct: 9, nov: 10, des: 11, dec: 11
   };
 
-  // Match: "14 April 2026, 14:00 WIB" or "14 April 2026 14:00 WIB"
   const m = dateStr.match(/(\d{1,2})\s+(\w+)\s+(\d{4})[,\s]+(\d{1,2})[:.:](\d{2})/i);
   if (!m) return new Date();
 
@@ -135,12 +143,10 @@ function parseIndonesianDate(dateStr: string): Date {
  */
 function extractTransactionTime(body: string): Date {
   const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  // Look for "Waktu Proses" or "Waktu Terkirim" label
-  const m = text.match(/(?:Waktu Proses|Waktu Terkirim)[^0-9]*(\d{1,2}\s+\w+\s+\d{4}[,\s]+\d{1,2}[:.]\d{2}\s*WIB)/i);
+  const m = text.match(/(?:Waktu Proses|Waktu Terkirim|Waktu Transaksi|Tanggal)[^0-9]*(\d{1,2}\s+\w+\s+\d{4}[,\s]+\d{1,2}[:.]\d{2}\s*WIB)/i);
   if (m) return parseIndonesianDate(m[1]);
 
-  // Fallback: find any date pattern
-  const fallback = text.match(/(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4}[,\s]+\d{1,2}[:.]\d{2}\s*WIB)/i);
+  const fallback = text.match(/(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember|Jan|Feb|Mar|Apr|Jun|Jul|Agt|Aug|Sep|Okt|Oct|Nov|Des|Dec)\s+\d{4}[,\s]+\d{1,2}[:.]\d{2}\s*WIB)/i);
   if (fallback) return parseIndonesianDate(fallback[1]);
 
   return new Date();
@@ -150,7 +156,6 @@ function extractTransactionTime(body: string): Date {
  * Extract customer name from subject or email body.
  */
 function extractCustomerName(body: string, serviceType: string, subject: string): string | null {
-  // 1. Try subject pattern: "Transfer ke RISA FATIMAH berhasil" or "Transfer ke GO-PAY - RISA FATIMAH berhasil"
   const subMatch = subject.match(/(?:Transfer|Pengiriman|Kirim)\s+(?:Rp\s*[\d.,]+\s+)?ke\s+(.+?)\s+berhasil/i);
   if (subMatch) {
     const candidate = subMatch[1].trim();
@@ -161,7 +166,6 @@ function extractCustomerName(body: string, serviceType: string, subject: string)
 
   const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-  // 2. Try body patterns for Transfer & E-Wallet
   const transferPatterns = [
     /(?:Nama\s+Tujuan|Nama\s+Penerima|Penerima|Atas\s+Nama|Nama\s+Pemilik)\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Bank|Nomor|ID|Jumlah|Waktu|Total|Rp|Catatan|Status|$))/i,
     /Tujuan\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Bank|Nomor|ID|Jumlah|Waktu|Total|Rp|$))/i,
@@ -177,7 +181,6 @@ function extractCustomerName(body: string, serviceType: string, subject: string)
     }
   }
 
-  // 3. Try body patterns for Bill Payments (PDAM, PLN, Indihome)
   const billPatterns = [
     /(?:Nama\s+Pelanggan|Nama\s+Konsumen|Nama\s+Pemilik)\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Alamat|Periode|Jumlah|Nomor|ID|Total|Waktu|$))/i,
     /Pelanggan\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Alamat|Periode|Jumlah|Nomor|ID|Total|Waktu|$))/i,
@@ -193,7 +196,6 @@ function extractCustomerName(body: string, serviceType: string, subject: string)
     }
   }
 
-  // 4. Try Pulsa / Paket Data Produk Name
   if (serviceType === "Pulsa/Paket Data") {
     const m = text.match(/Produk\s*[:\s]*([A-Za-z0-9\s'.\-\/]+?)(?=\s*(?:Nomor|ID|Waktu|Jumlah|Total|$))/i);
     if (m) return m[1].trim();
@@ -252,16 +254,16 @@ function extractBankOrProvider(body: string, serviceType: string, subject: strin
 export function parseFlipEmail(subject: string, body: string): FlipParsedData | null {
   const sLower = subject.toLowerCase();
 
-  // Guard 1: Must be a successful transaction email
-  if (!sLower.includes("berhasil")) return null;
+  // Guard 1: Must be a successful transaction email or transfer/purchase
+  if (!sLower.includes("berhasil") && !sLower.includes("sukses") && !sLower.includes("selesai")) return null;
 
   // Guard 2: Exclude store balance Top Up Saldo & Flip Freedom fees
   if (sLower.includes("top up saldo") || sLower.includes("flip freedom")) return null;
 
   const flipId = extractFlipId(subject, body);
-  if (!flipId || flipId.toUpperCase() === "FFFFFF") return null;
+  if (!flipId || flipId === "FFFFFF") return null;
 
-  const serviceType = detectServiceType(subject);
+  const serviceType = detectServiceType(subject, body);
   const nominal = extractNominal(body);
   const transactionTime = extractTransactionTime(body);
   let customerName = extractCustomerName(body, serviceType, subject);

@@ -327,18 +327,18 @@ export function FlipTransactionsClient({
                       key={tx.id}
                       className={`border-border/20 hover:bg-primary/5 transition-all h-14 ${tx.excluded ? "opacity-50" : ""}`}
                     >
-                      <TableCell className="pl-6">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold">
+                      <TableCell className="pl-6" suppressHydrationWarning>
+                        <div className="flex flex-col" suppressHydrationWarning>
+                          <span className="text-sm font-bold" suppressHydrationWarning>
                             {new Date(tx.transactionTime).toLocaleDateString(
                               "id-ID",
-                              { day: "numeric", month: "short" }
+                              { day: "numeric", month: "short", timeZone: "Asia/Jakarta" }
                             )}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-medium">
+                          <span className="text-[10px] text-muted-foreground font-medium" suppressHydrationWarning>
                             {new Date(tx.transactionTime).toLocaleTimeString(
                               "id-ID",
-                              { hour: "2-digit", minute: "2-digit" }
+                              { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }
                             )}
                           </span>
                         </div>
