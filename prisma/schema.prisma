@@ -142,6 +142,9 @@ model DigitalTransaction {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([reportId])
+  @@index([flipId])
 }
 
 model Expenditure {
@@ -198,6 +201,7 @@ model FlipWebhook {
   @@unique([flipId, storeId])
   @@index([storeId])
   @@index([transactionTime])
+  @@index([storeId, transactionTime])
 }
 
 model ShiftSetting {

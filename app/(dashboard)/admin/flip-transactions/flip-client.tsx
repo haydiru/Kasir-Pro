@@ -61,7 +61,7 @@ export function FlipTransactionsClient({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Background non-blocking sync: Eksekusi di latar belakang tanpa menghambat render UI
+  // Background non-blocking sync: Eksekusi di latar belakang HANYA saat pertama kali halaman dimuat
   useEffect(() => {
     syncFlipEmailsFromGmail().then((res) => {
       if (res?.newCount && res.newCount > 0) {
@@ -70,7 +70,7 @@ export function FlipTransactionsClient({
         });
       }
     }).catch(() => {});
-  }, [month, year]);
+  }, []);
 
   const months = [
     { value: 1, label: "Januari" },
@@ -89,14 +89,14 @@ export function FlipTransactionsClient({
 
   const years = [initialYear - 1, initialYear, initialYear + 1];
 
-  async function handleSearch() {
+  async function fetchForMonthYear(m: number, y: number) {
     setIsLoading(true);
     setSelectedIds([]);
     try {
-      const res = await getFlipTransactions(month, year);
+      const res = await getFlipTransactions(m, y);
       if (res.success && res.data) {
-        setTransactions(res.data);
-        toast.success(`Data ${months[month - 1].label} ${year} dimuat`);
+        setTransactions(r => res.data);
+        toast.success(`Data ${months[m - 1].label} ${y} dimuat`);
       } else {
         toast.error(res.error || "Gagal memuat data");
       }
@@ -105,6 +105,10 @@ export function FlipTransactionsClient({
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleSearch() {
+    await fetchForMonthYear(month, year);
   }
 
   async function handleToggleExclude(id: string) {
@@ -313,7 +317,11 @@ export function FlipTransactionsClient({
               </label>
               <Select
                 value={String(month)}
-                onValueChange={(v) => setMonth(Number(v))}
+                onValueChange={(v) => {
+                  const m = Number(v);
+                  setMonth(m);
+                  fetchForMonthYear(m, year);
+                }}
               >
                 <SelectTrigger className="w-40 h-11 rounded-xl">
                   <SelectValue />
@@ -333,7 +341,11 @@ export function FlipTransactionsClient({
               </label>
               <Select
                 value={String(year)}
-                onValueChange={(v) => setYear(Number(v))}
+                onValueChange={(v) => {
+                  const y = Number(v);
+                  setYear(y);
+                  fetchForMonthYear(month, y);
+                }}
               >
                 <SelectTrigger className="w-28 h-11 rounded-xl">
                   <SelectValue />

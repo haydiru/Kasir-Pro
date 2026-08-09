@@ -52,6 +52,14 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
 
+### 🚀 [DONE-SYNC-01] Cooldown Auto-Sync 1 Jam & Tombol Manual Sync Gmail Flip (`/admin/flip-transactions`)
+- **Status**: ✅ **COMPLETED & VERIFIED** (09 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Menambahkan batasan cooldown 1 jam (60 menit) untuk auto-sync Gmail pada server (`app/actions/flip-gmail.ts`) dan client (`localStorage`).
+  2. Menambahkan tombol **"Sinkronkan Gmail"** manual dengan indikator animasi spinner (`RotateCw`) dan toast notification di halaman `/admin/flip-transactions`.
+  3. Menampilkan status indikator jam waktu sync terakhir (*Terakhir sync: HH:mm*) pada bar filter.
+  4. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
+
 ### [DONE-FE-05] Halaman Laporan Pengeluaran & Pemberian Dana (`/shopping-funds`)
 - **Fitur Terimplementasi**:
   - Form pemberian kas kecil oleh Owner/Admin ke pegawai.

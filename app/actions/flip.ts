@@ -40,21 +40,25 @@ export async function getFlipTransactions(
       orderBy: { transactionTime: "desc" },
     });
 
-    // Dynamically compute matched status based on whether it exists in any report
+    // Dynamically compute matched status for the current page's transactions only
     const dbFlipIds = transactions.map(t => t.flipId).filter(Boolean);
-    const usedDigitalTxs = await prisma.digitalTransaction.findMany({
-      where: {
-        report: { storeId },
-      },
-      select: { flipId: true }
-    });
-    
-    // Normalize flipIds (remove leading #)
-    const usedSet = new Set(
-      usedDigitalTxs
-        .map(dt => dt.flipId?.replace(/^#/, "") || "")
-        .filter(Boolean)
-    );
+    let usedSet = new Set<string>();
+
+    if (dbFlipIds.length > 0) {
+      const searchFlipIds = dbFlipIds.flatMap(id => [id, `#${id}`]);
+      const usedDigitalTxs = await prisma.digitalTransaction.findMany({
+        where: {
+          flipId: { in: searchFlipIds },
+          report: { storeId },
+        },
+        select: { flipId: true },
+      });
+      usedSet = new Set(
+        usedDigitalTxs
+          .map(dt => dt.flipId?.replace(/^#/, "") || "")
+          .filter(Boolean)
+      );
+    }
 
     const resolvedTransactions = transactions.map(t => ({
       ...t,
@@ -245,7 +249,6 @@ export async function deleteFlipTransaction(id: string): Promise<ActionResponse>
 
     await prisma.flipWebhook.delete({ where: { id } });
 
-    revalidatePath("/admin/flip-transactions");
     return { success: true, data: { id } };
   } catch (error) {
     console.error("deleteFlipTransaction error:", error);
@@ -277,7 +280,6 @@ export async function bulkDeleteFlipTransactions(ids: string[]): Promise<ActionR
       },
     });
 
-    revalidatePath("/admin/flip-transactions");
     return { success: true, data: { count: result.count } };
   } catch (error) {
     console.error("bulkDeleteFlipTransactions error:", error);
