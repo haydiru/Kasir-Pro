@@ -4,11 +4,23 @@ import { signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function authenticate(
   prevState: string | undefined,
   formData: FormData,
 ) {
+  const email = (formData.get("email") as string || "").trim().toLowerCase();
+
+  // Proteksi Bruteforce & DDoS (ISO 27001 & OWASP): Maksimal 5 percobaan per menit per email
+  if (email) {
+    const rateCheck = checkRateLimit(`login_${email}`, { limit: 5, windowMs: 60 * 1000 });
+    if (!rateCheck.success) {
+      const waitSec = Math.ceil(rateCheck.resetInMs / 1000);
+      return `Batas percobaan login terlampaui. Silakan tunggu ${waitSec} detik demi keamanan sistem.`;
+    }
+  }
+
   let isSuccess = false;
   let errorMessage = "";
 
@@ -58,6 +70,12 @@ export async function changePin(prevState: string | undefined, formData: FormDat
   const { auth } = await import("@/auth");
   const session = await auth();
   if (!session?.user?.email) return "Unauthorized.";
+
+  const rateCheck = checkRateLimit(`changepin_${session.user.id}`, { limit: 5, windowMs: 60 * 1000 });
+  if (!rateCheck.success) {
+    const waitSec = Math.ceil(rateCheck.resetInMs / 1000);
+    return `Batas percobaaan ganti PIN terlampaui. Silakan tunggu ${waitSec} detik.`;
+  }
 
   const oldPin = formData.get("oldPin") as string;
   const newPin = formData.get("newPin") as string;
