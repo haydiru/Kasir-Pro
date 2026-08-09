@@ -224,3 +224,63 @@ export async function getFlipApiKey(): Promise<ActionResponse> {
     return { success: false, error: "Gagal mengambil API key" };
   }
 }
+
+/**
+ * Delete a single Flip transaction (Super Admin only).
+ */
+export async function deleteFlipTransaction(id: string): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (
+      !session?.user?.storeId ||
+      session.user.role !== "super_admin"
+    ) {
+      return { success: false, error: "Hanya Super Admin yang berhak menghapus transaksi Flip." };
+    }
+
+    const record = await prisma.flipWebhook.findUnique({ where: { id } });
+    if (!record || record.storeId !== session.user.storeId) {
+      return { success: false, error: "Transaksi tidak ditemukan." };
+    }
+
+    await prisma.flipWebhook.delete({ where: { id } });
+
+    revalidatePath("/admin/flip-transactions");
+    return { success: true, data: { id } };
+  } catch (error) {
+    console.error("deleteFlipTransaction error:", error);
+    return { success: false, error: "Gagal menghapus transaksi Flip." };
+  }
+}
+
+/**
+ * Bulk delete Flip transactions (Super Admin only).
+ */
+export async function bulkDeleteFlipTransactions(ids: string[]): Promise<ActionResponse> {
+  try {
+    const session = await auth();
+    if (
+      !session?.user?.storeId ||
+      session.user.role !== "super_admin"
+    ) {
+      return { success: false, error: "Hanya Super Admin yang berhak menghapus transaksi Flip." };
+    }
+
+    if (!ids || ids.length === 0) {
+      return { success: false, error: "Tidak ada transaksi yang dipilih." };
+    }
+
+    const result = await prisma.flipWebhook.deleteMany({
+      where: {
+        id: { in: ids },
+        storeId: session.user.storeId,
+      },
+    });
+
+    revalidatePath("/admin/flip-transactions");
+    return { success: true, data: { count: result.count } };
+  } catch (error) {
+    console.error("bulkDeleteFlipTransactions error:", error);
+    return { success: false, error: "Gagal menghapus transaksi Flip massal." };
+  }
+}

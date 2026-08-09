@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getFlipTransactions, toggleFlipExcluded } from "@/app/actions/flip";
+import {
+  getFlipTransactions,
+  toggleFlipExcluded,
+  deleteFlipTransaction,
+  bulkDeleteFlipTransactions,
+} from "@/app/actions/flip";
 import { syncFlipEmailsFromGmail } from "@/app/actions/flip-gmail";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -26,10 +32,11 @@ import {
   Search,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   Mail,
   EyeOff,
   Eye,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -38,17 +45,21 @@ interface Props {
   initialTransactions: any[];
   initialMonth: number;
   initialYear: number;
+  isSuperAdmin?: boolean;
 }
 
 export function FlipTransactionsClient({
   initialTransactions,
   initialMonth,
   initialYear,
+  isSuperAdmin = false,
 }: Props) {
   const [transactions, setTransactions] = useState<any[]>(initialTransactions);
   const [month, setMonth] = useState(initialMonth);
   const [year, setYear] = useState(initialYear);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Background non-blocking sync: Eksekusi di latar belakang tanpa menghambat render UI
   useEffect(() => {
@@ -80,6 +91,7 @@ export function FlipTransactionsClient({
 
   async function handleSearch() {
     setIsLoading(true);
+    setSelectedIds([]);
     try {
       const res = await getFlipTransactions(month, year);
       if (res.success && res.data) {
@@ -114,6 +126,70 @@ export function FlipTransactionsClient({
       }
     } catch {
       toast.error("Terjadi kesalahan");
+    }
+  }
+
+  async function handleDeleteSingle(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus transaksi Flip ini secara permanen?")) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await deleteFlipTransaction(id);
+      if (res.success) {
+        setTransactions((prev) => prev.filter((t) => t.id !== id));
+        setSelectedIds((prev) => prev.filter((item) => item !== id));
+        toast.success("Transaksi Flip berhasil dihapus");
+      } else {
+        toast.error(res.error || "Gagal menghapus transaksi");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan sistem saat menghapus");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin menghapus ${selectedIds.length} transaksi Flip yang dipilih secara permanen?`
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await bulkDeleteFlipTransactions(selectedIds);
+      if (res.success) {
+        setTransactions((prev) => prev.filter((t) => !selectedIds.includes(t.id)));
+        toast.success(`${selectedIds.length} transaksi Flip berhasil dihapus`);
+        setSelectedIds([]);
+      } else {
+        toast.error(res.error || "Gagal menghapus transaksi massal");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat menghapus massal");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedIds(transactions.map((t) => t.id));
+    } else {
+      setSelectedIds([]);
+    }
+  }
+
+  function handleSelectRow(id: string, checked: boolean) {
+    if (checked) {
+      setSelectedIds((prev) => [...prev, id]);
+    } else {
+      setSelectedIds((prev) => prev.filter((item) => item !== id));
     }
   }
 
@@ -164,16 +240,18 @@ export function FlipTransactionsClient({
     excluded: transactions.filter((t) => t.excluded).length,
   };
 
+  const isAllSelected =
+    transactions.length > 0 && selectedIds.length === transactions.length;
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-10">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
           Transaksi Flip
         </h1>
         <p className="text-muted-foreground">
-          Daftar transaksi digital dari email Flip untuk sinkronisasi dengan
-          laporan kasir.
+          Daftar transaksi digital dari email Flip untuk sinkronisasi dengan laporan kasir.
         </p>
       </div>
 
@@ -288,7 +366,16 @@ export function FlipTransactionsClient({
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent border-border/50 h-14">
-                  <TableHead className="font-black text-xs uppercase tracking-widest pl-6">
+                  {isSuperAdmin && (
+                    <TableHead className="w-12 pl-4 text-center">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(c) => handleSelectAll(!!c)}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead className={`font-black text-xs uppercase tracking-widest ${isSuperAdmin ? "pl-2" : "pl-6"}`}>
                     Tanggal
                   </TableHead>
                   <TableHead className="font-black text-xs uppercase tracking-widest">
@@ -306,7 +393,7 @@ export function FlipTransactionsClient({
                   <TableHead className="font-black text-xs uppercase tracking-widest text-center">
                     Status
                   </TableHead>
-                  <TableHead className="font-black text-xs uppercase tracking-widest text-center">
+                  <TableHead className="font-black text-xs uppercase tracking-widest text-center pr-6">
                     Aksi
                   </TableHead>
                 </TableRow>
@@ -315,100 +402,160 @@ export function FlipTransactionsClient({
                 {transactions.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={isSuperAdmin ? 8 : 7}
                       className="text-center py-20 text-muted-foreground italic"
                     >
                       Belum ada data transaksi Flip untuk periode ini.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  transactions.map((tx) => (
-                    <TableRow
-                      key={tx.id}
-                      className={`border-border/20 hover:bg-primary/5 transition-all h-14 ${tx.excluded ? "opacity-50" : ""}`}
-                    >
-                      <TableCell className="pl-6" suppressHydrationWarning>
-                        <div className="flex flex-col" suppressHydrationWarning>
-                          <span className="text-sm font-bold" suppressHydrationWarning>
-                            {new Date(tx.transactionTime).toLocaleDateString(
-                              "id-ID",
-                              { day: "numeric", month: "short", timeZone: "Asia/Jakarta" }
-                            )}
+                  transactions.map((tx) => {
+                    const isSelected = selectedIds.includes(tx.id);
+                    return (
+                      <TableRow
+                        key={tx.id}
+                        className={`border-border/20 hover:bg-primary/5 transition-all h-14 ${
+                          tx.excluded ? "opacity-50" : ""
+                        } ${isSelected ? "bg-primary/10 hover:bg-primary/15" : ""}`}
+                      >
+                        {isSuperAdmin && (
+                          <TableCell className="pl-4 text-center">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(c) => handleSelectRow(tx.id, !!c)}
+                              aria-label={`Select ${tx.flipId}`}
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell className={isSuperAdmin ? "pl-2" : "pl-6"} suppressHydrationWarning>
+                          <div className="flex flex-col" suppressHydrationWarning>
+                            <span className="text-sm font-bold" suppressHydrationWarning>
+                              {new Date(tx.transactionTime).toLocaleDateString(
+                                "id-ID",
+                                { day: "numeric", month: "short", timeZone: "Asia/Jakarta" }
+                              )}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-medium" suppressHydrationWarning>
+                              {new Date(tx.transactionTime).toLocaleTimeString(
+                                "id-ID",
+                                { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm font-bold text-primary">
+                            #{tx.flipId}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-medium" suppressHydrationWarning>
-                            {new Date(tx.transactionTime).toLocaleTimeString(
-                              "id-ID",
-                              { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }
-                            )}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm font-bold text-primary">
-                          #{tx.flipId}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getServiceBadge(tx.serviceType)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col max-w-[240px]">
-                          <span className={`text-sm font-bold truncate ${tx.customerName ? "text-foreground" : "text-muted-foreground italic text-xs"}`}>
-                            {tx.customerName ? `👤 ${tx.customerName}` : "— (Tanpa Nama)"}
-                          </span>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            {tx.bankOrProvider && (
-                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                                🏦 {tx.bankOrProvider}
-                              </span>
-                            )}
-                            {tx.customerNumber && (
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {tx.customerNumber}
-                              </span>
+                        </TableCell>
+                        <TableCell>{getServiceBadge(tx.serviceType)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col max-w-[240px]">
+                            <span className={`text-sm font-bold truncate ${tx.customerName ? "text-foreground" : "text-muted-foreground italic text-xs"}`}>
+                              {tx.customerName ? `👤 ${tx.customerName}` : "— (Tanpa Nama)"}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              {tx.bankOrProvider && (
+                                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                                  🏦 {tx.bankOrProvider}
+                                </span>
+                              )}
+                              {tx.customerNumber && (
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {tx.customerNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-sm">
+                          {formatCurrency(tx.nominal)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getStatusBadge(tx)}
+                        </TableCell>
+                        <TableCell className="text-center pr-6">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-8 rounded-xl text-xs gap-1.5 ${
+                                tx.excluded
+                                  ? "text-primary hover:text-primary"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                              onClick={() => handleToggleExclude(tx.id)}
+                              title={
+                                tx.excluded
+                                  ? "Kembalikan ke daftar aktif"
+                                  : "Tandai bukan transaksi kasir"
+                              }
+                            >
+                              {tx.excluded ? (
+                                <>
+                                  <Eye className="h-3.5 w-3.5" /> Aktifkan
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="h-3.5 w-3.5" /> Kecualikan
+                                </>
+                              )}
+                            </Button>
+
+                            {isSuperAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isDeleting}
+                                className="h-8 rounded-xl text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteSingle(tx.id)}
+                                title="Hapus transaksi ini (Khusus Super Admin)"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Hapus
+                              </Button>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-bold text-sm">
-                        {formatCurrency(tx.nominal)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(tx)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`h-8 rounded-xl text-xs gap-1.5 ${
-                            tx.excluded
-                              ? "text-primary hover:text-primary"
-                              : "text-muted-foreground hover:text-destructive"
-                          }`}
-                          onClick={() => handleToggleExclude(tx.id)}
-                          title={
-                            tx.excluded
-                              ? "Kembalikan ke daftar aktif"
-                              : "Tandai bukan transaksi kasir"
-                          }
-                        >
-                          {tx.excluded ? (
-                            <>
-                              <Eye className="h-3.5 w-3.5" /> Aktifkan
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff className="h-3.5 w-3.5" /> Kecualikan
-                            </>
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Floating Action Bar for Bulk Delete (Super Admin only) */}
+      {isSuperAdmin && selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-foreground text-background dark:bg-card dark:text-foreground px-6 py-3.5 rounded-2xl shadow-2xl border border-border animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <span>{selectedIds.length} transaksi dipilih</span>
+          </div>
+          <div className="h-4 w-px bg-border/40" />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={handleBulkDelete}
+              className="rounded-xl px-4 font-bold gap-1.5 shadow-lg shadow-destructive/20"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? "Menghapus..." : `Hapus (${selectedIds.length})`}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl px-3 text-xs opacity-80 hover:opacity-100"
+            >
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

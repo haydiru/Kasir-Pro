@@ -17,11 +17,14 @@ export default async function FlipTransactionsPage() {
   const res = await getFlipTransactions(month, year);
   const transactions = res.success && res.data ? res.data : [];
 
+  const isSuperAdmin = session.user.role === "super_admin";
+
   return (
     <FlipTransactionsClient
       initialTransactions={transactions}
       initialMonth={month}
       initialYear={year}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }
