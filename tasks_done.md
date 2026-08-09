@@ -4,6 +4,19 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ---
 
+## 🔐 Phase 1: Authentication, Session & Security
+
+### [DONE-AUTH-01] Perbaikan Logout Session, Invalidasi Cookie & Router Cache Clearance
+- **Masalah Yang Diatasi**:
+  - Pengguna menekan Logout dan berhasil ke halaman `/login`, tetapi ketika halaman `/login` di-refresh atau dinavigasi ulang, browser otomatis terlempar kembali ke Dashboard session toko sebelumnya.
+- **Fitur & Solusi Terimplementasi**:
+  - Penambahan `revalidatePath('/', 'layout')` pada server action `logOut()`.
+  - Penambahan client-side logout handler dengan hard window location reset (`window.location.href = '/login'`) untuk mematikan dan menghapus Next.js Client Router Cache serta seluruh JWT session cookie.
+  - Verifikasi login akun beda toko dijamin 100% bersih tanpa ada kebocoran session lama.
+- **File Referensi**: [app/actions/auth.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/auth.ts), [components/sidebar.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/components/sidebar.tsx)
+
+---
+
 ## 📌 Phase 1: Frontend (Tampilan & Interaksi Halaman)
 
 ### [DONE-FE-01] Halaman Dashboard Kasir & Absensi Live (`/dashboard`, `/attendance`)

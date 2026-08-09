@@ -50,6 +50,7 @@ export async function authenticate(
 }
 
 export async function logOut() {
+  revalidatePath("/", "layout");
   await signOut({ redirectTo: "/login" });
 }
 

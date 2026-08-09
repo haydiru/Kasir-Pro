@@ -211,7 +211,18 @@ export function Sidebar({ className, onNavigate, user, actingAsCashier }: Sideba
               <KeyRound className="h-4 w-4" />
             </Link>
             
-            <form action={logOut}>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await logOut();
+                } catch (err) {
+                  // Fallback
+                } finally {
+                  window.location.href = "/login";
+                }
+              }}
+            >
               <button
                 type="submit"
                 title="Keluar"
