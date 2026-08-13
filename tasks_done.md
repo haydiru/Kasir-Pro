@@ -52,6 +52,13 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
 
+### 🚀 [DONE-PERF-02] Optimasi Kecepatan Hapus Instan Transaksi Flip (Optimistic UI Update & 1-Query Delete)
+- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Menambahkan **Optimistic UI Removal** pada tombol "Hapus" tunggal maupun "Hapus Massal": baris tabel langsung hilang secara **instan (0ms)** saat diklik tanpa menunggu latency jaringan serverless Vercel.
+  2. Memangkas query database server action `deleteFlipTransaction` dari 2x query (`findUnique` + `delete`) menjadi 1x direct query `deleteMany` berbasis `id` & `storeId`.
+  3. Pengujian kompilasi `npm run build` dan push ke GitHub tuntas 100%.
+
 ### 🚀 [DONE-BUG-04] Penambahan Parser Email Flip Tipe "Pembelian ... berhasil" (Pulsa / PLN / Tagihan)
 - **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
 - **Hasil Pekerjaan**:
