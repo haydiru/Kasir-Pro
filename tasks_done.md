@@ -52,14 +52,19 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
 
-### 🚀 [DONE-BUG-04] DPT / Pulsa / Table-Based Flip Email HTML Parsing & Case-Insensitive Matching
+### 🚀 [DONE-BUG-04] Penambahan Parser Email Flip Tipe "Pembelian ... berhasil" (Pulsa / PLN / Tagihan)
 - **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
 - **Hasil Pekerjaan**:
-  1. Memperbarui `extractKeyValueFromHtml` di `lib/flip-parser.ts` agar dapat mengekstrak tag HTML `<td>` (seperti email Pulsa, PLN, PDAM, Indihome) selain tag `<div>`.
-  2. Menambahkan parser khusus untuk produk Pulsa & Paket Data (`Produk`, `Nomor HP`, `Total Pembayaran`).
-  3. Memperluas query Gmail API di `app/actions/flip-gmail.ts` menjadi `(from:flip.id OR "flip.id" OR "no-reply@flip.id")` agar semua format transaksi Flip ditarik dari Gmail tanpa ada yang terlewat.
-  4. Mengimplementasikan case-insensitive matching di `app/actions/flip.ts` (`getFlipTransactions` & `getUnmatchedFlipForReport`) sehingga pencocokan ID Flip yang diketik kasir (misal `#dpt260813121029178ylx` atau `#DPT260813121029178YLX`) selalu 100% akurat.
-  5. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
+  1. Menambahkan dukungan parser untuk tipe email Flip berformat **Pembelian** (`Pembelian Pulsa #... berhasil`) tanpa mengubah/mengganggu parser format terdahulu (`Transfer`, `ST...`, `FT...`).
+  2. Ekstraksi otomatis dari tabel HTML email:
+     - `ID Transaksi`: (contoh `DPT260813121029178ylX`) -> `flipId`
+     - `Produk`: (contoh `Pulsa Indosat 25.000`) -> `bankOrProvider`
+     - `Nomor HP`: (contoh `+6285855148952`) -> `customerNumber`
+     - `Waktu Proses`: (contoh `13 Agustus 2026, 12:10 WIB`) -> `transactionTime`
+     - `Total Pembayaran`: (contoh `Rp25.800`) -> `nominal`
+     - `serviceType`: `Pulsa/Paket Data`
+  3. Menambahkan proteksi penyaringan subjek agar `pengisian ulang saldo` / `top up saldo` / `Flip Freedom` / `QRIS` tidak masuk ke tabel transaksi kasir.
+  4. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
 
 ### 🚀 [DONE-SYNC-01] Cooldown Auto-Sync 1 Jam & Tombol Manual Sync Gmail Flip (`/admin/flip-transactions`)
 - **Status**: ✅ **COMPLETED & VERIFIED** (09 Agustus 2026)
