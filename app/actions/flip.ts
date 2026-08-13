@@ -242,12 +242,16 @@ export async function deleteFlipTransaction(id: string): Promise<ActionResponse>
       return { success: false, error: "Hanya Super Admin yang berhak menghapus transaksi Flip." };
     }
 
-    const record = await prisma.flipWebhook.findUnique({ where: { id } });
-    if (!record || record.storeId !== session.user.storeId) {
+    const res = await prisma.flipWebhook.deleteMany({
+      where: {
+        id,
+        storeId: session.user.storeId,
+      },
+    });
+
+    if (res.count === 0) {
       return { success: false, error: "Transaksi tidak ditemukan." };
     }
-
-    await prisma.flipWebhook.delete({ where: { id } });
 
     return { success: true, data: { id } };
   } catch (error) {

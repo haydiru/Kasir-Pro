@@ -137,20 +137,26 @@ export function FlipTransactionsClient({
     if (!confirm("Apakah Anda yakin ingin menghapus transaksi Flip ini secara permanen?")) {
       return;
     }
-    setIsDeleting(true);
+    const target = transactions.find((t) => t.id === id);
+    if (!target) return;
+
+    // Optimistic removal: hapus instan dari layar tanpa menunggu jaringan
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    setSelectedIds((prev) => prev.filter((item) => item !== id));
+
     try {
       const res = await deleteFlipTransaction(id);
       if (res.success) {
-        setTransactions((prev) => prev.filter((t) => t.id !== id));
-        setSelectedIds((prev) => prev.filter((item) => item !== id));
         toast.success("Transaksi Flip berhasil dihapus");
       } else {
+        // Rollback jika server gagal
+        setTransactions((prev) => [target, ...prev]);
         toast.error(res.error || "Gagal menghapus transaksi");
       }
     } catch {
+      // Rollback jika terjadi exception
+      setTransactions((prev) => [target, ...prev]);
       toast.error("Terjadi kesalahan sistem saat menghapus");
-    } finally {
-      setIsDeleting(false);
     }
   }
 
@@ -164,20 +170,26 @@ export function FlipTransactionsClient({
       return;
     }
 
-    setIsDeleting(true);
+    const idsToDelete = [...selectedIds];
+    const targets = transactions.filter((t) => idsToDelete.includes(t.id));
+
+    // Optimistic removal: hapus instan dari layar tanpa menunggu jaringan
+    setTransactions((prev) => prev.filter((t) => !idsToDelete.includes(t.id)));
+    setSelectedIds([]);
+
     try {
-      const res = await bulkDeleteFlipTransactions(selectedIds);
+      const res = await bulkDeleteFlipTransactions(idsToDelete);
       if (res.success) {
-        setTransactions((prev) => prev.filter((t) => !selectedIds.includes(t.id)));
-        toast.success(`${selectedIds.length} transaksi Flip berhasil dihapus`);
-        setSelectedIds([]);
+        toast.success(`${idsToDelete.length} transaksi Flip berhasil dihapus`);
       } else {
+        // Rollback jika server gagal
+        setTransactions((prev) => [...targets, ...prev]);
         toast.error(res.error || "Gagal menghapus transaksi massal");
       }
     } catch {
+      // Rollback jika terjadi exception
+      setTransactions((prev) => [...targets, ...prev]);
       toast.error("Terjadi kesalahan saat menghapus massal");
-    } finally {
-      setIsDeleting(false);
     }
   }
 
