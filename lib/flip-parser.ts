@@ -28,14 +28,25 @@ function cleanQuotedPrintable(str: string): string {
 /**
  * Helper to extract value from Flip HTML structure:
  * <div class="text--gray">Key</div><div class="text--bold">Value</div>
+ * Or <td>Key</td><td class="detail__value">Value</td>
  */
 function extractKeyValueFromHtml(cleanBody: string, keyName: string): string | null {
-  const regex = new RegExp(`text--gray"[^>]*>\\s*${keyName}\\s*<\\/div>\\s*<div[^>]*>\\s*([^<]+)\\s*<\\/div>`, "i");
-  const m = cleanBody.match(regex);
-  if (m && m[1]) {
-    const val = m[1].trim();
-    if (val && val !== "—") return val;
+  if (!cleanBody || !keyName) return null;
+
+  // 1. Try Div structure (existing format)
+  const divRegex = new RegExp(`text--gray"[^>]*>\\s*${keyName}\\s*<\\/div>\\s*<div[^>]*>\\s*([^<]+)<\\/div>`, "i");
+  const mDiv = cleanBody.match(divRegex);
+  if (mDiv && mDiv[1] && mDiv[1].trim() !== "—") {
+    return mDiv[1].trim();
   }
+
+  // 2. Try Table cell structure (new "Pembelian" / Pulsa / PLN email format)
+  const tdRegex = new RegExp(`<td[^>]*>\\s*${keyName}\\s*<\\/td>\\s*<td[^>]*>\\s*([^<]+?)\\s*<\\/td>`, "i");
+  const mTd = cleanBody.match(tdRegex);
+  if (mTd && mTd[1] && mTd[1].trim() !== "—") {
+    return mTd[1].trim();
+  }
+
   return null;
 }
 
@@ -76,7 +87,7 @@ function extractFlipId(subject: string, rawBody: string): string | null {
   if (htmlVal) {
     const cleanId = htmlVal.replace(/^#/, "").trim();
     if (cleanId && cleanId.toUpperCase() !== "FFFFFF") {
-      return cleanId.toUpperCase();
+      return cleanId;
     }
   }
 
@@ -90,7 +101,7 @@ function extractFlipId(subject: string, rawBody: string): string | null {
 
   // 4. Bill payment format: DPTxxxxxxxx
   const dptMatch = subject.match(/#?(DPT[A-Za-z0-9]{4,})/i) || body.match(/(?:ID Transaksi|id transaksi|ID Pengiriman)[^<]*?(DPT[A-Za-z0-9]{4,})/i);
-  if (dptMatch) return dptMatch[1].toUpperCase();
+  if (dptMatch) return dptMatch[1];
 
   // 5. TRX / TX prefix format: TRXxxxxxxxx or TXxxxxxxxx
   const trxMatch = subject.match(/#?((?:TRX|TX)[A-Za-z0-9]{4,})/i) || body.match(/#?((?:TRX|TX)[A-Za-z0-9]{4,})/i);
@@ -122,8 +133,10 @@ function parseRupiah(str: string): number {
 function extractNominal(rawBody: string): number {
   const body = cleanQuotedPrintable(rawBody);
 
-  // 1. Try HTML Key-Value structure: "Nominal"
-  const htmlNominal = extractKeyValueFromHtml(body, "Nominal");
+  // 1. Try HTML Key-Value structure: "Nominal", "Total Pembayaran", "Total Pengiriman"
+  const htmlNominal = extractKeyValueFromHtml(body, "Nominal") ||
+                      extractKeyValueFromHtml(body, "Total Pembayaran") ||
+                      extractKeyValueFromHtml(body, "Total Pengiriman");
   if (htmlNominal) {
     const val = parseRupiah(htmlNominal);
     if (val > 0) return val;
@@ -132,7 +145,7 @@ function extractNominal(rawBody: string): number {
   const text = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
   const patterns = [
-    /(?:Jumlah Tagihan|Total Tagihan|Total Pengiriman|Nominal Transfer|Nominal)[^R]*?(Rp[\d.,]+)/i,
+    /(?:Jumlah Tagihan|Total Tagihan|Total Pengiriman|Nominal Transfer|Total Pembayaran|Nominal)[^R]*?(Rp[\d.,]+)/i,
     /Total[^R]*?(Rp[\d.,]+)/i,
   ];
 
@@ -247,8 +260,10 @@ function extractCustomerName(rawBody: string, serviceType: string, subject: stri
 function extractCustomerNumber(rawBody: string, serviceType: string): string | null {
   const body = cleanQuotedPrintable(rawBody);
 
-  // 1. Try HTML Key-Value structure: "Nomor Rekening Tujuan" or "Nomor Pelanggan"
-  const htmlNumber = extractKeyValueFromHtml(body, "Nomor Rekening Tujuan") || extractKeyValueFromHtml(body, "Nomor Pelanggan");
+  // 1. Try HTML Key-Value structure: "Nomor Rekening Tujuan", "Nomor Pelanggan", "Nomor HP"
+  const htmlNumber = extractKeyValueFromHtml(body, "Nomor Rekening Tujuan") ||
+                     extractKeyValueFromHtml(body, "Nomor Pelanggan") ||
+                     extractKeyValueFromHtml(body, "Nomor HP");
   if (htmlNumber) {
     return htmlNumber;
   }
@@ -266,8 +281,8 @@ function extractCustomerNumber(rawBody: string, serviceType: string): string | n
 function extractBankOrProvider(rawBody: string, serviceType: string, subject: string): string | null {
   const body = cleanQuotedPrintable(rawBody);
 
-  // 1. Try HTML Key-Value structure: "Bank Tujuan"
-  const htmlBank = extractKeyValueFromHtml(body, "Bank Tujuan");
+  // 1. Try HTML Key-Value structure: "Bank Tujuan" or "Produk"
+  const htmlBank = extractKeyValueFromHtml(body, "Bank Tujuan") || extractKeyValueFromHtml(body, "Produk");
   if (htmlBank) {
     return htmlBank;
   }
@@ -298,8 +313,15 @@ export function parseFlipEmail(subject: string, rawBody: string): FlipParsedData
   // Guard 1: Must be a successful transaction email or transfer/purchase
   if (!sLower.includes("berhasil") && !sLower.includes("sukses") && !sLower.includes("selesai")) return null;
 
-  // Guard 2: Exclude store balance Top Up Saldo & Flip Freedom fees
-  if (sLower.includes("top up saldo") || sLower.includes("flip freedom")) return null;
+  // Guard 2: Exclude store balance Top Up Saldo & Flip Freedom fees & QRIS
+  if (
+    sLower.includes("top up saldo") ||
+    sLower.includes("pengisian ulang saldo") ||
+    sLower.includes("flip freedom") ||
+    sLower.includes("qris")
+  ) {
+    return null;
+  }
 
   const flipId = extractFlipId(subject, body);
   if (!flipId || flipId === "FFFFFF") return null;
