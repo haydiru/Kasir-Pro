@@ -52,6 +52,15 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
 
+### 🚀 [DONE-BUG-04] DPT / Pulsa / Table-Based Flip Email HTML Parsing & Case-Insensitive Matching
+- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Memperbarui `extractKeyValueFromHtml` di `lib/flip-parser.ts` agar dapat mengekstrak tag HTML `<td>` (seperti email Pulsa, PLN, PDAM, Indihome) selain tag `<div>`.
+  2. Menambahkan parser khusus untuk produk Pulsa & Paket Data (`Produk`, `Nomor HP`, `Total Pembayaran`).
+  3. Memperluas query Gmail API di `app/actions/flip-gmail.ts` menjadi `(from:flip.id OR "flip.id" OR "no-reply@flip.id")` agar semua format transaksi Flip ditarik dari Gmail tanpa ada yang terlewat.
+  4. Mengimplementasikan case-insensitive matching di `app/actions/flip.ts` (`getFlipTransactions` & `getUnmatchedFlipForReport`) sehingga pencocokan ID Flip yang diketik kasir (misal `#dpt260813121029178ylx` atau `#DPT260813121029178YLX`) selalu 100% akurat.
+  5. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
+
 ### 🚀 [DONE-SYNC-01] Cooldown Auto-Sync 1 Jam & Tombol Manual Sync Gmail Flip (`/admin/flip-transactions`)
 - **Status**: ✅ **COMPLETED & VERIFIED** (09 Agustus 2026)
 - **Hasil Pekerjaan**:
