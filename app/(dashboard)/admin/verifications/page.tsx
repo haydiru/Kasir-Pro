@@ -13,9 +13,15 @@ export default async function AdminVerificationsPage() {
   const storeId = session.user.storeId;
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: { timezone: true }
+    select: {
+      timezone: true,
+      shiftSettings: {
+        select: { name: true, startTime: true, endTime: true }
+      }
+    }
   });
   const timezone = store?.timezone || "Asia/Jakarta";
+  const shiftSettings = store?.shiftSettings || [];
 
   // Retrieve reports matching specific statuses
   const reports = await prisma.shiftReport.findMany({
@@ -74,12 +80,31 @@ export default async function AdminVerificationsPage() {
     createdAt: fw.createdAt.toISOString()
   }));
 
+  // Fetch all recorded flipIds in this store to map to their respective reportIds
+  const allUsedDigitalTxs = await prisma.digitalTransaction.findMany({
+    where: {
+      report: { storeId },
+      flipId: { not: null },
+    },
+    select: { flipId: true, reportId: true },
+  });
+
+  const usedFlipMap: Record<string, string> = {};
+  for (const dt of allUsedDigitalTxs) {
+    const cleanId = (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
+    if (cleanId) {
+      usedFlipMap[cleanId] = dt.reportId;
+    }
+  }
+
   return (
     <VerificationsClient 
       submittedReports={submittedReports}
       verifiedReports={verifiedReports}
       unmatchedFlips={unmatchedFlips}
       flipWebhooks={serializedFlips}
+      usedFlipMap={usedFlipMap}
+      shiftSettings={shiftSettings}
       timezone={timezone}
     />
   );

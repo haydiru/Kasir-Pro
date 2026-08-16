@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { serialize, ActionResponse } from "@/lib/serialize";
 import { revalidatePath } from "next/cache";
-import { getTZMonthRange, getTZDateRange } from "@/lib/utils";
+import { getTZMonthRange, getTZDateRange, getTZShiftRange } from "@/lib/utils";
 import crypto from "crypto";
 
 /**
@@ -55,15 +55,18 @@ export async function getFlipTransactions(
       });
       usedSet = new Set(
         usedDigitalTxs
-          .map(dt => dt.flipId?.replace(/^#/, "") || "")
+          .map(dt => (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
           .filter(Boolean)
       );
     }
 
-    const resolvedTransactions = transactions.map(t => ({
-      ...t,
-      matched: usedSet.has(t.flipId)
-    }));
+    const resolvedTransactions = transactions.map(t => {
+      const cleanId = (t.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
+      return {
+        ...t,
+        matched: usedSet.has(cleanId)
+      };
+    });
 
     return { success: true, data: serialize(resolvedTransactions) };
   } catch (error) {
@@ -107,9 +110,10 @@ export async function toggleFlipExcluded(id: string): Promise<ActionResponse> {
 /**
  * Get unmatched Flip transactions for a specific report.
  * Returns Flip emails that:
- *   1. Are within the same day as the report
+ *   1. Fall within the exact shift hours (Shift Pagi / Siang / Malam / Custom)
  *   2. Are not excluded by admin
- *   3. Their flipId does NOT match any digitalTransaction.flipId in this report
+ *   3. Are NOT already reported in any OTHER shift report (no duplicate reporting)
+ *   4. Their flipId does NOT match any digitalTransaction.flipId in this current report
  */
 export async function getUnmatchedFlipForReport(
   reportId: string
@@ -124,7 +128,12 @@ export async function getUnmatchedFlipForReport(
       where: { id: reportId },
       include: {
         digitalTransactions: { select: { flipId: true } },
-        store: { select: { timezone: true } },
+        store: { 
+          select: { 
+            timezone: true,
+            shiftSettings: { select: { name: true, startTime: true, endTime: true } }
+          } 
+        },
       },
     });
 
@@ -133,31 +142,66 @@ export async function getUnmatchedFlipForReport(
     }
 
     const timezone = report.store?.timezone || "Asia/Jakarta";
-    const { start, end } = getTZDateRange(report.date, timezone);
-    const shiftEnd = report.submittedAt ? new Date(report.submittedAt) : end;
+    
+    // 1. Calculate the exact shift time range
+    const shiftRange = getTZShiftRange(
+      report.date,
+      report.shiftType,
+      timezone,
+      report.store?.shiftSettings
+    );
 
+    const shiftStart = shiftRange.start;
+    // Allow up to report submission time or shift end time
+    const shiftEnd = report.submittedAt
+      ? new Date(Math.max(new Date(report.submittedAt).getTime(), shiftRange.end.getTime()))
+      : shiftRange.end;
+
+    // 2. Fetch all Flip transactions within the shift time window
     const flipTxs = await prisma.flipWebhook.findMany({
       where: {
         storeId: report.storeId,
         excluded: false,
-        transactionTime: { gte: start, lte: shiftEnd },
+        transactionTime: { gte: shiftStart, lte: shiftEnd },
       },
       orderBy: { transactionTime: "desc" },
     });
 
-    // Get flipIds from report's digital transactions (strip leading # and uppercase)
-    const reportFlipIds = new Set(
+    // 3. Find all flipIds ALREADY recorded in OTHER shift reports of this store
+    const otherDigitalTxs = await prisma.digitalTransaction.findMany({
+      where: {
+        report: { storeId: report.storeId },
+        reportId: { not: report.id },
+        flipId: { not: null },
+      },
+      select: { flipId: true },
+    });
+
+    const usedInOtherReports = new Set(
+      otherDigitalTxs
+        .map((dt) => (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+        .filter(Boolean)
+    );
+
+    // 4. Current report's recorded flipIds
+    const currentReportFlipIds = new Set(
       report.digitalTransactions
         .map((dt) => (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
         .filter(Boolean)
     );
 
-    // Unmatched = in email but NOT in report
-    const unmatched = flipTxs.filter((ft) => !reportFlipIds.has((ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase()));
+    // 5. Unmatched = strictly in shift range, NOT in other reports, and NOT in current report
+    const unmatched = flipTxs.filter((ft) => {
+      const cleanId = (ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
+      // If already recorded in another shift, do NOT flag as missing here
+      if (usedInOtherReports.has(cleanId)) return false;
+      // If not yet entered in current report, flag as missing
+      return !currentReportFlipIds.has(cleanId);
+    });
 
-    // Update matched status for those that ARE matched
+    // 6. Update matched flag in DB for transactions used in the current report
     const matchedIds = flipTxs
-      .filter((ft) => reportFlipIds.has((ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase()))
+      .filter((ft) => currentReportFlipIds.has((ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase()))
       .map((ft) => ft.id);
 
     if (matchedIds.length > 0) {

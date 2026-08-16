@@ -85,6 +85,78 @@ export function getTZDateRange(date: Date, timeZone: string) {
 }
 
 /**
+ * Returns the exact UTC start and end Date for a given shift on a specific calendar date in a timezone.
+ * Supports custom ShiftSettings as well as standard default shift presets (Pagi, Siang, Malam).
+ */
+export function getTZShiftRange(
+  date: Date | string,
+  shiftType: string,
+  timeZone: string = "Asia/Jakarta",
+  shiftSettings?: { name: string; startTime: string; endTime: string }[]
+) {
+  const isoDate = formatLocalDate(date, timeZone);
+  const normalizedShift = (shiftType || "").trim().toLowerCase();
+
+  let startTime = "00:00";
+  let endTime = "23:59:59.999";
+  let crossesMidnight = false;
+
+  // 1. Try matching store's custom shift settings
+  const customSetting = shiftSettings?.find(
+    (s) => s.name.trim().toLowerCase() === normalizedShift ||
+           normalizedShift.includes(s.name.trim().toLowerCase())
+  );
+
+  if (customSetting?.startTime && customSetting?.endTime) {
+    startTime = customSetting.startTime.trim();
+    endTime = customSetting.endTime.trim();
+    const [sH, sM] = startTime.split(":").map(Number);
+    const [eH, eM] = endTime.split(":").map(Number);
+    if (eH < sH || (eH === sH && eM <= sM)) {
+      crossesMidnight = true;
+    }
+  } else if (normalizedShift.includes("pagi") || normalizedShift === "1") {
+    startTime = "07:00";
+    endTime = "15:00";
+  } else if (normalizedShift.includes("siang") || normalizedShift.includes("sore") || normalizedShift === "2") {
+    startTime = "15:00";
+    endTime = "23:00";
+  } else if (normalizedShift.includes("malam") || normalizedShift === "3") {
+    startTime = "23:00";
+    endTime = "07:00";
+    crossesMidnight = true;
+  }
+
+  if (startTime.length === 5) startTime = `${startTime}:00`;
+  if (endTime.length === 5) endTime = `${endTime}:00`;
+
+  const getUTC = (s: string) => {
+    const d = new Date(s);
+    const inv = new Date(d.toLocaleString("en-US", { timeZone }));
+    const diff = d.getTime() - inv.getTime();
+    return new Date(d.getTime() + diff);
+  };
+
+  const startLocal = `${isoDate}T${startTime}`;
+  let endLocal = `${isoDate}T${endTime}`;
+
+  if (crossesMidnight) {
+    const nextDate = new Date(`${isoDate}T12:00:00Z`);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    const nextIsoDate = nextDate.toISOString().split("T")[0];
+    endLocal = `${nextIsoDate}T${endTime}`;
+  }
+
+  return {
+    start: getUTC(startLocal),
+    end: getUTC(endLocal),
+    isoDate,
+    startTime,
+    endTime,
+  };
+}
+
+/**
  * Returns the start and end of a given month in a specific timezone,
  * as UTC Date objects.
  */

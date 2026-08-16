@@ -42,7 +42,8 @@ import {
   calcExpectedCash,
   getExpenditureTotal,
   formatLocalDate,
-  getTZDateRange
+  getTZDateRange,
+  getTZShiftRange
 } from "@/lib/utils";
 import { toast } from "sonner";
 import { verifyShiftReport, unverifyShiftReport } from "@/app/actions/admin";
@@ -54,6 +55,8 @@ interface VerificationsClientProps {
   verifiedReports: any[];
   unmatchedFlips: any[];
   flipWebhooks?: any[];
+  usedFlipMap?: Record<string, string>;
+  shiftSettings?: any[];
   timezone: string;
 }
 
@@ -81,7 +84,15 @@ function findMatchedFlip(dt: any, flipWebhooks: any[]) {
   return null;
 }
 
-export function VerificationsClient({ submittedReports, verifiedReports, unmatchedFlips, flipWebhooks = [], timezone }: VerificationsClientProps) {
+export function VerificationsClient({
+  submittedReports,
+  verifiedReports,
+  unmatchedFlips,
+  flipWebhooks = [],
+  usedFlipMap = {},
+  shiftSettings = [],
+  timezone,
+}: VerificationsClientProps) {
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -171,9 +182,11 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               const diff = report.manualCashCount - expected;
               
               const tz = timezone || "Asia/Jakarta";
-              const { start, end } = getTZDateRange(new Date(report.date), tz);
-              const dayStartMs = start.getTime();
-              const dayEndMs = report.submittedAt ? new Date(report.submittedAt).getTime() : end.getTime();
+              const shiftRange = getTZShiftRange(report.date, report.shiftType, tz, shiftSettings);
+              const shiftStartMs = shiftRange.start.getTime();
+              const shiftEndMs = report.submittedAt
+                ? Math.max(new Date(report.submittedAt).getTime(), shiftRange.end.getTime())
+                : shiftRange.end.getTime();
 
               const reportFlipIds = new Set(
                 report.digitalTransactions
@@ -182,10 +195,20 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               );
 
               const reportUnmatchedFlips = unmatchedFlips.filter((fw) => {
+                const cleanFwId = (fw.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
+
+                // 1. Anti-Duplicate: If already recorded in another shift report, do NOT show warning
+                const reportedInReportId = usedFlipMap[cleanFwId];
+                if (reportedInReportId && reportedInReportId !== report.id) {
+                  return false;
+                }
+
+                // 2. Strict Shift Range: Only transactions that occurred within this shift's hours
                 const txTime = new Date(fw.transactionTime).getTime();
-                const isWithinShift = txTime >= dayStartMs && txTime <= dayEndMs;
-                const fwId = (fw.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
-                const isNotInReport = !reportFlipIds.has(fwId);
+                const isWithinShift = txTime >= shiftStartMs && txTime <= shiftEndMs;
+
+                // 3. Current Report: Must not already be recorded in this current shift report
+                const isNotInReport = !reportFlipIds.has(cleanFwId);
                 
                 return isWithinShift && isNotInReport;
               });
