@@ -492,253 +492,282 @@ export default function CashierReportPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Status Bar */}
-      <div className="flex items-center justify-between rounded-lg border border-dashed p-3">
+      <div className="flex items-center justify-between rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs">
         <div className="flex items-center gap-3">
-          <Badge className={status === "Draft" ? "bg-muted text-muted-foreground" : "bg-amber-500/15 text-amber-600"}>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+            status === "Draft"
+              ? "bg-muted text-muted-foreground border border-border"
+              : status === "Submitted"
+              ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+              : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+          }`}>
             {status}
-          </Badge>
+          </span>
           {autoSaving && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground animate-save-pulse">
-              <Save className="h-3 w-3" /> Menyimpan draft...
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground animate-save-pulse font-medium">
+              <Save className="h-3.5 w-3.5 text-primary" /> Menyimpan perubahan...
             </span>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">
-          {todayDateStr} • {shiftType}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground border border-border/60">
+            📅 {todayDateStr}
+          </span>
+          {shiftType && (
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              Shift {shiftType}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* SECTION 1: Info Shift & Modal */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" />
-            Info Shift & Modal
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tipe Shift</Label>
-              <Select
-                value={shiftType}
-                onValueChange={(val) => setShiftType(val)}
-                disabled={inputDisabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih shift" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableShifts.map((s) => (
-                    <SelectItem key={s.id} value={s.name}>
-                      Shift {s.name} ({s.startTime} - {s.endTime})
-                    </SelectItem>
-                  ))}
-                  {availableShifts.length === 0 && (
-                    <>
-                      <SelectItem value="Pagi">Shift Pagi (07:00 - 15:00)</SelectItem>
-                      <SelectItem value="Siang">Shift Siang (15:00 - 23:00)</SelectItem>
-                      <SelectItem value="Malam">Shift Malam (23:00 - 07:00)</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Modal Awal (Kas Fisik)</Label>
-              <Input
-                type="number"
-                value={startingCash || ""}
-                onChange={(e) => setStartingCash(Number(e.target.value) || 0)}
-                placeholder="500000"
-                disabled={inputDisabled}
-              />
-            </div>
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs transition-all hover:border-primary/30">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-border/50 mb-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs">
+            <Clock className="h-4.5 w-4.5" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-foreground">1. Informasi Shift & Modal Awal</h2>
+            <p className="text-xs text-muted-foreground">Pilih jadwal shift kasir dan masukkan uang modal fisik laci.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-foreground">Tipe Shift</Label>
+            <Select
+              value={shiftType}
+              onValueChange={(val) => setShiftType(val)}
+              disabled={inputDisabled}
+            >
+              <SelectTrigger className="h-10 rounded-xl border-border/80 text-xs font-medium">
+                <SelectValue placeholder="Pilih shift" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {availableShifts.map((s) => (
+                  <SelectItem key={s.id} value={s.name} className="text-xs rounded-lg">
+                    Shift {s.name} ({s.startTime} - {s.endTime})
+                  </SelectItem>
+                ))}
+                {availableShifts.length === 0 && (
+                  <>
+                    <SelectItem value="Pagi" className="text-xs rounded-lg">Shift Pagi (07:00 - 15:00)</SelectItem>
+                    <SelectItem value="Siang" className="text-xs rounded-lg">Shift Siang (15:00 - 23:00)</SelectItem>
+                    <SelectItem value="Malam" className="text-xs rounded-lg">Shift Malam (23:00 - 07:00)</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-foreground">Modal Awal Laci (Rp)</Label>
+            <Input
+              type="number"
+              value={startingCash || ""}
+              onChange={(e) => setStartingCash(Number(e.target.value) || 0)}
+              placeholder="500000"
+              disabled={inputDisabled}
+              className="h-10 rounded-xl border-border/80 text-xs font-mono font-bold"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* SECTION 2: Omzet POS */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-primary" />
-            Omzet POS (Mesin Kasir)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Omzet POS Tunai</Label>
-              <Input
-                type="number"
-                value={posCash || ""}
-                onChange={(e) => setPosCash(Number(e.target.value) || 0)}
-                placeholder="0"
-                disabled={inputDisabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Omzet POS Non-Tunai / Debit</Label>
-              <Input
-                type="number"
-                value={posDebit || ""}
-                onChange={(e) => setPosDebit(Number(e.target.value) || 0)}
-                placeholder="0"
-                disabled={inputDisabled}
-              />
-            </div>
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs transition-all hover:border-primary/30">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-border/50 mb-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 shadow-2xs">
+            <Calculator className="h-4.5 w-4.5" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-foreground">2. Omzet Mesin Kasir (POS)</h2>
+            <p className="text-xs text-muted-foreground">Catat total penjualan tunai dan kartu debit/QRIS dari sistem POS.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-foreground">Omzet POS Tunai (Rp)</Label>
+            <Input
+              type="number"
+              value={posCash || ""}
+              onChange={(e) => setPosCash(Number(e.target.value) || 0)}
+              placeholder="0"
+              disabled={inputDisabled}
+              className="h-10 rounded-xl border-border/80 text-xs font-mono font-bold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-foreground">Omzet POS Non-Tunai / Debit (Rp)</Label>
+            <Input
+              type="number"
+              value={posDebit || ""}
+              onChange={(e) => setPosDebit(Number(e.target.value) || 0)}
+              placeholder="0"
+              disabled={inputDisabled}
+              className="h-10 rounded-xl border-border/80 text-xs font-mono font-bold text-indigo-600"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* SECTION 3: Transaksi Digital */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-primary" />
-              Transaksi Digital (Flip / Transfer / PLN / Pulsa)
-            </CardTitle>
-            {!inputDisabled && (
-              <Button variant="outline" size="sm" onClick={addDigitalRow}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Baris
-              </Button>
-            )}
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs transition-all hover:border-primary/30">
+        <div className="flex items-center justify-between pb-4 border-b border-border/50 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 shadow-2xs">
+              <Smartphone className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-foreground">3. Transaksi Digital</h2>
+              <p className="text-xs text-muted-foreground">Transfer Bank, E-Wallet, Pulsa, PLN, dan PDAM via Flip.</p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* Flip Warning Banner (Dynamically checks entered Flip IDs) */}
-          {(() => {
-            const enteredFlipIds = new Set(
-              digitalTx
-                .map((tx) => (tx.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
-                .filter(Boolean)
-            );
-            const activeUnmatched = unmatchedFlips.filter(
-              (f) => !enteredFlipIds.has((f.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
-            );
+          {!inputDisabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addDigitalRow}
+              className="rounded-xl border-border/80 text-xs font-bold h-8.5 px-3 hover:bg-primary/10 hover:text-primary hover:border-primary/30"
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Tambah Transaksi
+            </Button>
+          )}
+        </div>
 
-            if (activeUnmatched.length === 0) return null;
+        {/* Flip Warning Banner (Dynamically checks entered Flip IDs) */}
+        {(() => {
+          const enteredFlipIds = new Set(
+            digitalTx
+              .map((tx) => (tx.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+              .filter(Boolean)
+          );
+          const activeUnmatched = unmatchedFlips.filter(
+            (f) => !enteredFlipIds.has((f.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+          );
 
-            return (
-              <div className="mb-4 p-3.5 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-xl text-amber-700 dark:text-amber-300 flex items-start gap-3 shadow-xs">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                <div className="flex-1 space-y-1.5">
-                  <p className="text-sm font-bold">Ada Transaksi Flip yang Belum Diinput</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Ditemukan <b>{activeUnmatched.length} transaksi Flip</b> hari ini yang belum dimasukkan ke dalam tabel di bawah. Klik tombol <b>"+ Gunakan"</b> pada transaksi di bawah untuk mengisinya secara otomatis:
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1.5">
-                    {activeUnmatched.map((f) => (
-                      <div
-                        key={f.id || f.flipId}
-                        className="inline-flex items-center gap-2 bg-background border border-amber-500/30 rounded-lg px-2.5 py-1 text-xs shadow-2xs"
-                      >
-                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                          #{f.flipId?.replace(/^#/, "")}
-                        </span>
-                        <span className="text-muted-foreground">•</span>
-                        <span className="font-medium text-foreground">
-                          {f.serviceType}: {formatCurrency(f.nominal)}
-                        </span>
-                        {f.customerName && (
-                          <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">
-                            ({f.customerName})
-                          </span>
-                        )}
-                        {!inputDisabled && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            className="h-5 px-1.5 text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300"
-                            onClick={() => {
-                              const cleanId = (f.flipId?.replace(/^#/, "") || "").trim();
-                              // Check if there is an empty digital row first
-                              const emptyIdx = digitalTx.findIndex(
-                                (tx) => !tx.flipId && tx.grossAmount === 0
-                              );
-                              if (emptyIdx >= 0) {
-                                updateDigitalTx(digitalTx[emptyIdx].id, "flipId", cleanId);
-                                updateDigitalTx(digitalTx[emptyIdx].id, "grossAmount", f.nominal);
-                                updateDigitalTx(digitalTx[emptyIdx].id, "serviceType", f.serviceType || "Transfer");
-                                if (f.customerNumber || f.customerName) {
-                                  updateDigitalTx(digitalTx[emptyIdx].id, "detailContact", f.customerNumber || f.customerName);
-                                }
-                              } else {
-                                setDigitalTx((prev) => [
-                                  ...prev,
-                                  {
-                                    id: uid(),
-                                    serviceType: f.serviceType || "Transfer",
-                                    grossAmount: f.nominal,
-                                    profitAmount: 0,
-                                    detailContact: f.customerNumber || f.customerName || "",
-                                    flipId: cleanId,
-                                    isNonCash: false,
-                                    paymentMethod: "",
-                                  },
-                                ]);
-                              }
-                              toast.success(`Transaksi Flip #${cleanId} dimasukkan ke tabel`);
-                            }}
-                          >
-                            + Gunakan
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          if (activeUnmatched.length === 0) return null;
 
-          {digitalTx.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Belum ada transaksi digital
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {digitalTx.map((tx, idx) => {
-                const isNewRow = !tx.createdBy; // Just created in this session, not yet saved
-                const isCreator = tx.createdBy === session?.user?.id;
-                const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
-                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
-                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
-
-                return (
-                  <div key={tx.id} className="rounded-lg border p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        #{idx + 1}
+          return (
+            <div className="mb-5 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-700 dark:text-amber-300 flex items-start gap-3 shadow-xs">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-bold">Ada Transaksi Flip yang Belum Diinput</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Ditemukan <b>{activeUnmatched.length} transaksi Flip</b> hari ini yang belum dimasukkan ke dalam tabel di bawah. Klik tombol <b>"+ Gunakan"</b> pada kartu di bawah untuk mengisinya secara instan:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {activeUnmatched.map((f) => (
+                    <div
+                      key={f.id || f.flipId}
+                      className="inline-flex items-center gap-2 bg-background border border-amber-500/30 rounded-xl px-3 py-1.5 text-xs shadow-2xs"
+                    >
+                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                        #{f.flipId?.replace(/^#/, "")}
                       </span>
-                      {canDelete && (
+                      <span className="text-muted-foreground">•</span>
+                      <span className="font-medium text-foreground">
+                        {f.serviceType}: {formatCurrency(f.nominal)}
+                      </span>
+                      {f.customerName && (
+                        <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">
+                          ({f.customerName})
+                        </span>
+                      )}
+                      {!inputDisabled && (
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeDigitalRow(tx.id)}
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-6 px-2 text-[10px] font-bold rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300"
+                          onClick={() => {
+                            const cleanId = (f.flipId?.replace(/^#/, "") || "").trim();
+                            const emptyIdx = digitalTx.findIndex(
+                              (tx) => !tx.flipId && tx.grossAmount === 0
+                            );
+                            if (emptyIdx >= 0) {
+                              updateDigitalTx(digitalTx[emptyIdx].id, "flipId", cleanId);
+                              updateDigitalTx(digitalTx[emptyIdx].id, "grossAmount", f.nominal);
+                              updateDigitalTx(digitalTx[emptyIdx].id, "serviceType", f.serviceType || "Transfer");
+                              if (f.customerNumber || f.customerName) {
+                                updateDigitalTx(digitalTx[emptyIdx].id, "detailContact", f.customerNumber || f.customerName);
+                              }
+                            } else {
+                              setDigitalTx((prev) => [
+                                ...prev,
+                                {
+                                  id: uid(),
+                                  serviceType: f.serviceType || "Transfer",
+                                  grossAmount: f.nominal,
+                                  profitAmount: 0,
+                                  detailContact: f.customerNumber || f.customerName || "",
+                                  flipId: cleanId,
+                                  isNonCash: false,
+                                  paymentMethod: "",
+                                },
+                              ]);
+                            }
+                            toast.success(`Transaksi Flip #${cleanId} dimasukkan ke tabel`);
+                          }}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          + Gunakan
                         </Button>
                       )}
                     </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {digitalTx.length === 0 ? (
+          <div className="text-center py-10 rounded-xl border border-dashed border-border/80 bg-muted/20">
+            <p className="text-xs text-muted-foreground font-medium">
+              Belum ada transaksi digital pada shift ini.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {digitalTx.map((tx, idx) => {
+              const isNewRow = !tx.createdBy;
+              const isCreator = tx.createdBy === session?.user?.id;
+              const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
+              const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
+              const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
+              const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
+
+              return (
+                <div key={tx.id} className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-2xs transition-all hover:border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
+                      #{idx + 1}
+                    </span>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                        onClick={() => removeDigitalRow(tx.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-[11px]">Jenis</Label>
+                      <Label className="text-[11px] font-bold text-foreground">Jenis</Label>
                       <Select
                         value={tx.serviceType}
                         onValueChange={(v) => updateDigitalTx(tx.id, "serviceType", v)}
                         disabled={!canEdit}
                       >
-                        <SelectTrigger className="h-9 text-xs">
+                        <SelectTrigger className="h-9 text-xs rounded-xl border-border/80">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl">
                           <SelectItem value="Transfer">Transfer</SelectItem>
                           <SelectItem value="Top Up E-Walet">Top Up E-Walet</SelectItem>
                           <SelectItem value="Pulsa/Paket Data">Pulsa/Paket Data</SelectItem>
@@ -750,89 +779,72 @@ export default function CashierReportPage() {
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px]">Modal+Laba (Rp)</Label>
+                      <Label className="text-[11px] font-bold text-foreground">Nominal (Gross)</Label>
                       <Input
                         type="number"
                         value={tx.grossAmount || ""}
                         onChange={(e) => updateDigitalTx(tx.id, "grossAmount", Number(e.target.value))}
                         disabled={!canEdit}
-                        className="h-9 text-xs font-mono"
+                        className="h-9 text-xs font-mono font-bold rounded-xl border-border/80"
                         placeholder="0"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px]">Laba (Rp)</Label>
+                      <Label className="text-[11px] font-bold text-foreground">Laba / Fee Admin</Label>
                       <Input
                         type="number"
                         value={tx.profitAmount || ""}
                         onChange={(e) => updateDigitalTx(tx.id, "profitAmount", Number(e.target.value))}
                         disabled={!canEdit}
-                        className="h-9 text-xs font-mono"
+                        className="h-9 text-xs font-mono font-bold text-emerald-600 rounded-xl border-border/80"
                         placeholder="0"
                       />
                     </div>
-                    <div className="col-span-2 space-y-1">
-                      <Label className="text-[11px]">Detail / Kontak</Label>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-bold text-foreground">Detail / Kontak</Label>
                       <Input
                         value={tx.detailContact}
                         onChange={(e) => updateDigitalTx(tx.id, "detailContact", e.target.value)}
                         disabled={!canEdit}
-                        className="h-9 text-xs"
-                        placeholder="No Hp / No Rekening / ID Pelanggan"
+                        className="h-9 text-xs rounded-xl border-border/80"
+                        placeholder="No HP / Rekening"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px]">ID Flip</Label>
+                      <Label className="text-[11px] font-bold text-foreground">ID Flip</Label>
                       <Input
                         value={tx.flipId}
                         onChange={(e) => updateDigitalTx(tx.id, "flipId", e.target.value)}
                         disabled={!canEdit}
-                        className="h-9 text-xs font-mono"
-                        placeholder="#FT783824726"
+                        className="h-9 text-xs font-mono rounded-xl border-border/80"
+                        placeholder="#FTxxxxxxxxx"
                       />
                     </div>
-                  </div>
-                  {/* Non-Cash toggle */}
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={tx.isNonCash}
-                        onChange={(e) => updateDigitalTx(tx.id, "isNonCash", e.target.checked)}
-                        disabled={!canEdit}
-                        className="rounded border-input"
-                      />
-                      Non-Tunai
-                    </label>
-                    {tx.isNonCash && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-bold text-foreground">Metode Bayar</Label>
                       <Select
-                        value={tx.paymentMethod}
-                        onValueChange={(v) => updateDigitalTx(tx.id, "paymentMethod", v)}
+                        value={tx.isNonCash ? (tx.paymentMethod || "Debit") : "Tunai"}
+                        onValueChange={(v) => {
+                          if (v === "Tunai") {
+                            updateDigitalTx(tx.id, "isNonCash", false);
+                            updateDigitalTx(tx.id, "paymentMethod", "");
+                          } else {
+                            updateDigitalTx(tx.id, "isNonCash", true);
+                            updateDigitalTx(tx.id, "paymentMethod", v);
+                          }
+                        }}
                         disabled={!canEdit}
                       >
-                        <SelectTrigger className="h-8 w-32 text-xs">
-                          <SelectValue placeholder="Metode..." />
+                        <SelectTrigger className="h-9 text-xs rounded-xl border-border/80">
+                          <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="QRIS">QRIS</SelectItem>
-                          <SelectItem value="Debit BCA">Debit BCA</SelectItem>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="Tunai">💵 Tunai (Kasir)</SelectItem>
+                          <SelectItem value="Debit">💳 Non-Tunai / Debit</SelectItem>
+                          <SelectItem value="QRIS">📱 QRIS Toko</SelectItem>
+                          <SelectItem value="Transfer Bank">🏦 Transfer Bank</SelectItem>
                         </SelectContent>
                       </Select>
-                    )}
-                    {/* Creator & Updater Tags */}
-                    <div className="ml-auto flex flex-wrap gap-2">
-                        {tx.createdByName && (
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-secondary/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground border">
-                            <UserSquare2 className="h-3 w-3" />
-                            Dibuat: {tx.createdByName}
-                        </div>
-                        )}
-                        {tx.updatedByName && (
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-medium text-blue-600 border border-blue-200">
-                            <FileEdit className="h-3 w-3" />
-                            Diedit: {tx.updatedByName}
-                        </div>
-                        )}
                     </div>
                   </div>
                 </div>
@@ -840,333 +852,265 @@ export default function CashierReportPage() {
             })}
           </div>
         )}
-        </CardContent>
-      </Card>
+      </div>
 
-      {/* SECTION 4: Pengeluaran */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShoppingBag className="h-4 w-4 text-primary" />
-              Pengeluaran
-            </CardTitle>
-            {!inputDisabled && (
-              <Button variant="outline" size="sm" onClick={addExpenditure}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Tambah
-              </Button>
-            )}
+      {/* SECTION 4: Pengeluaran Toko & Supplier */}
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs transition-all hover:border-primary/30">
+        <div className="flex items-center justify-between pb-4 border-b border-border/50 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 shadow-2xs">
+              <ShoppingBag className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-foreground">4. Pengeluaran Toko & Supplier</h2>
+              <p className="text-xs text-muted-foreground">Pembayaran nota supplier dari Uang Tagihan, Uang Kasir, atau Transfer.</p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {expenditures.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Belum ada pengeluaran
+          {!inputDisabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addExpenditure}
+              className="rounded-xl border-border/80 text-xs font-bold h-8.5 px-3 hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/30"
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Tambah Pengeluaran
+            </Button>
+          )}
+        </div>
+
+        {expenditures.length === 0 ? (
+          <div className="text-center py-10 rounded-xl border border-dashed border-border/80 bg-muted/20">
+            <p className="text-xs text-muted-foreground font-medium">
+              Belum ada pengeluaran yang dicatat pada shift ini.
             </p>
-          ) : (
-            <div className="space-y-4">
-              {expenditures.map((ex, idx) => {
-                const exTotal = ex.amountFromBill + ex.amountFromCashier + ex.amountFromTransfer;
-                const isNewRow = !ex.createdBy; // Just created in this session, not yet saved
-                const isCreator = ex.createdBy === session?.user?.id;
-                const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
-                const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
-                const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
-                const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {expenditures.map((ex, idx) => {
+              const exTotal = ex.amountFromBill + ex.amountFromCashier + ex.amountFromTransfer;
+              const isNewRow = !ex.createdBy;
+              const isCreator = ex.createdBy === session?.user?.id;
+              const isCashierRole = session?.user?.role === "cashier" || actingAsCashier;
+              const isAdmin = session?.user?.role === "admin" || session?.user?.role === "super_admin";
+              const canEdit = !inputDisabled && (isNewRow || isCreator || isCashierRole || isAdmin);
+              const canDelete = !inputDisabled && (isNewRow || isCreator || actingAsCashier || isAdmin);
 
-                return (
-                  <div key={ex.id} className="rounded-lg border p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        #{idx + 1}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {exTotal > 0 && (
-                          <span className="text-xs font-mono text-muted-foreground">
-                            Total: {formatCurrency(exTotal)}
-                          </span>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => removeExpenditure(ex.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
+              return (
+                <div key={ex.id} className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-2xs transition-all hover:border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
+                      #{idx + 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {exTotal > 0 && (
+                        <span className="text-xs font-mono font-bold text-foreground">
+                          Total: {formatCurrency(exTotal)}
+                        </span>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                          onClick={() => removeExpenditure(ex.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Row 1: Supplier + Upload */}
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="sm:col-span-3 space-y-1">
-                        <Label className="text-[11px]">Supplier</Label>
+                  {/* Row 1: Supplier */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-3 space-y-1">
+                      <Label className="text-[11px] font-bold text-foreground">Supplier</Label>
+                      <Input
+                        value={ex.supplierName}
+                        onChange={(e) => updateExpenditure(ex.id, "supplierName", e.target.value)}
+                        disabled={!canEdit}
+                        className="h-9 text-xs rounded-xl border-border/80"
+                        placeholder="Nama supplier"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-bold text-foreground">Foto Nota</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-9 text-xs rounded-xl border-border/80"
+                        disabled={!canEdit}
+                      >
+                        <UploadCloud className="mr-1 h-3.5 w-3.5" />
+                        Upload
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Row 2: 3 Payment Sources */}
+                  <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-3.5 space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Sumber Pembayaran (isi sesuai yang digunakan)
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold flex items-center gap-1">
+                          <Wallet className="h-3 w-3 text-amber-500" />
+                          Uang Tagihan (Rp)
+                        </Label>
                         <Input
-                          value={ex.supplierName}
-                          onChange={(e) => updateExpenditure(ex.id, "supplierName", e.target.value)}
+                          type="number"
+                          value={ex.amountFromBill || ""}
+                          onChange={(e) => updateExpenditure(ex.id, "amountFromBill", Number(e.target.value))}
                           disabled={!canEdit}
-                          className="h-9 text-xs"
-                          placeholder="Nama supplier"
+                          className="h-9 text-xs font-mono font-bold rounded-xl border-border/80"
+                          placeholder="0"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px]">Foto Nota</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs"
+                        <Label className="text-[11px] font-semibold flex items-center gap-1">
+                          <CreditCard className="h-3 w-3 text-blue-500" />
+                          Uang Kasir (Rp)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={ex.amountFromCashier || ""}
+                          onChange={(e) => updateExpenditure(ex.id, "amountFromCashier", Number(e.target.value))}
                           disabled={!canEdit}
-                        >
-                          <UploadCloud className="mr-1 h-3 w-3" />
-                          Upload
-                        </Button>
+                          className="h-9 text-xs font-mono font-bold text-destructive rounded-xl border-border/80"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold flex items-center gap-1">
+                          <Send className="h-3 w-3 text-emerald-500" />
+                          Transfer Toko (Rp)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={ex.amountFromTransfer || ""}
+                          onChange={(e) => updateExpenditure(ex.id, "amountFromTransfer", Number(e.target.value))}
+                          disabled={!canEdit}
+                          className="h-9 text-xs font-mono font-bold text-emerald-600 rounded-xl border-border/80"
+                          placeholder="0"
+                        />
                       </div>
                     </div>
-
-                    {/* Row 2: 3 Payment Sources */}
-                    <div className="rounded-md border border-dashed p-3 space-y-2">
-                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Sumber Pembayaran (isi yang dipakai)
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[11px] flex items-center gap-1">
-                            <Wallet className="h-3 w-3 text-amber-500" />
-                            Uang Tagihan (Rp)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={ex.amountFromBill || ""}
-                            onChange={(e) => updateExpenditure(ex.id, "amountFromBill", Number(e.target.value))}
-                            disabled={!canEdit}
-                            className="h-9 text-xs font-mono"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] flex items-center gap-1">
-                            <CreditCard className="h-3 w-3 text-blue-500" />
-                            Uang Kasir (Rp)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={ex.amountFromCashier || ""}
-                            onChange={(e) => updateExpenditure(ex.id, "amountFromCashier", Number(e.target.value))}
-                            disabled={!canEdit}
-                            className="h-9 text-xs font-mono"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] flex items-center gap-1">
-                            <Send className="h-3 w-3 text-emerald-500" />
-                            Transfer (Rp)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={ex.amountFromTransfer || ""}
-                            onChange={(e) => updateExpenditure(ex.id, "amountFromTransfer", Number(e.target.value))}
-                            disabled={!canEdit}
-                            className="h-9 text-xs font-mono"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2 pt-2">
-                        {ex.createdByName && (
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-secondary/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground border">
-                            <UserSquare2 className="h-3 w-3" />
-                            Dibuat: {ex.createdByName}
-                        </div>
-                        )}
-                        {ex.updatedByName && (
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-medium text-blue-600 border border-blue-200">
-                            <FileEdit className="h-3 w-3" />
-                            Diedit: {ex.updatedByName}
-                        </div>
-                        )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Expenditure Summary */}
-              {expenditures.length > 0 && totalExpenditure > 0 && (
-                <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 text-xs">
-                  <p className="font-medium text-muted-foreground uppercase tracking-wider mb-2">Ringkasan Pengeluaran</p>
-                  <div className="flex justify-between">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Wallet className="h-3 w-3 text-amber-500" /> Dari Uang Tagihan
-                    </span>
-                    <span className="font-mono">{formatCurrency(expFromBill)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <CreditCard className="h-3 w-3 text-blue-500" /> Dari Uang Kasir
-                    </span>
-                    <span className="font-mono text-destructive">{formatCurrency(expFromCashier)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Send className="h-3 w-3 text-emerald-500" /> Via Transfer
-                    </span>
-                    <span className="font-mono">{formatCurrency(expFromTransfer)}</span>
-                  </div>
-                  <Separator className="my-1" />
-                  <div className="flex justify-between font-medium">
-                    <span>Total Pengeluaran</span>
-                    <span className="font-mono">{formatCurrency(totalExpenditure)}</span>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 5: Rekap & Live Selisih Kas */}
+      <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-border/50 mb-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs">
+            <Calculator className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-foreground">5. Rekapitulasi & Hitung Fisik Kas</h2>
+            <p className="text-xs text-muted-foreground">Bandingkan jumlah fisik uang di laci dengan hasil kalkulasi sistem.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Calculation breakdown Upwork Ledger */}
+          <div className="rounded-xl border border-border/80 bg-muted/30 p-4 space-y-2 text-sm">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Modal Awal Kas</span>
+              <span className="font-mono font-bold">{formatCurrency(startingCash)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">+ POS Tunai</span>
+              <span className="font-mono font-bold">{formatCurrency(posCash)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">+ Layanan Digital (Tunai)</span>
+              <span className="font-mono font-bold">{formatCurrency(digitalCashIn)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">− Pengeluaran (Uang Kasir)</span>
+              <span className="font-mono font-bold text-destructive">−{formatCurrency(expFromCashier)}</span>
+            </div>
+            <Separator className="my-1 border-border/60" />
+            <div className="flex justify-between font-bold text-sm text-foreground">
+              <span>Total Cash Seharusnya</span>
+              <span className="font-mono text-lg text-primary">{formatCurrency(expectedCash)}</span>
+            </div>
+          </div>
+
+          {/* Manual count input */}
+          <div className="space-y-1.5">
+            <Label htmlFor="manual-count" className="text-xs font-bold text-foreground">
+              Total Cash Hitung Manual Fisik Laci (Rp)
+            </Label>
+            <Input
+              id="manual-count"
+              type="number"
+              value={manualCashCount || ""}
+              onChange={(e) => setManualCashCount(Number(e.target.value))}
+              disabled={inputDisabled}
+              className="h-12 text-lg font-mono font-black rounded-xl border-border/80"
+              placeholder="Masukkan total uang fisik kasir..."
+            />
+          </div>
+
+          {/* Variance indicator */}
+          {manualCashCount > 0 && (
+            <div
+              className={`flex items-center gap-3 rounded-2xl p-4 border transition-all ${
+                variance === 0
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                  : variance > 0
+                  ? "bg-blue-500/10 border-blue-500/30 text-blue-800 dark:text-blue-300"
+                  : "bg-destructive/10 border-destructive/30 text-destructive"
+              }`}
+            >
+              {variance === 0 ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className={`h-5 w-5 shrink-0 ${variance > 0 ? "text-blue-600" : "text-destructive"}`} />
               )}
+              <div>
+                <p className="text-sm font-bold">
+                  {variance === 0
+                    ? "Pas! Tidak ada selisih uang kasir 🎉"
+                    : `Selisih: ${variance > 0 ? "+" : ""}${formatCurrency(variance)}`}
+                </p>
+                <p className="text-xs opacity-85 mt-0.5">
+                  {variance > 0
+                    ? "Fisik uang kasir lebih dari kalkulasi sistem."
+                    : variance < 0
+                    ? "Fisik uang kasir kurang dari kalkulasi sistem."
+                    : "Hitung fisik laci 100% cocok dengan laporan sistem."}
+                </p>
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* SECTION 5: Rekap & Selisih */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-primary" />
-            Rekap & Selisih
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Calculation breakdown */}
-            <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Modal Awal</span>
-                <span className="font-mono">{formatCurrency(startingCash)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">+ POS Tunai</span>
-                <span className="font-mono">{formatCurrency(posCash)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">+ Layanan Digital (Tunai)</span>
-                <span className="font-mono">{formatCurrency(digitalCashIn)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">− Pengeluaran (Uang Kasir)</span>
-                <span className="font-mono text-destructive">−{formatCurrency(expFromCashier)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold">
-                <span>Total Cash Seharusnya</span>
-                <span className="font-mono text-lg">{formatCurrency(expectedCash)}</span>
-              </div>
-            </div>
-
-            {/* Sisa Uang Tagihan */}
-            {(billMoneyReceived > 0 || expFromBill > 0) && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-500/5 p-4 space-y-2 text-sm">
-                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                  📋 Rekap Uang Tagihan
-                </p>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Uang Tagihan Masuk</span>
-                  <span className="font-mono">{formatCurrency(billMoneyReceived)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">− Dipakai untuk Pengeluaran</span>
-                  <span className="font-mono text-destructive">−{formatCurrency(expFromBill)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-semibold">
-                  <span>Sisa Uang Tagihan</span>
-                  <span className={`font-mono text-lg ${sisaUangTagihan < 0 ? "text-destructive" : "text-amber-700 dark:text-amber-400"}`}>
-                    {formatCurrency(sisaUangTagihan)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Expenditure summary in recap (if transfer exists) */}
-            {expFromTransfer > 0 && (
-              <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
-                <span className="font-medium">ℹ️ Pengeluaran via Transfer:</span>{" "}
-                {formatCurrency(expFromTransfer)}{" "}
-                <span className="italic">(tidak mempengaruhi rekap cash)</span>
-              </div>
-            )}
-
-            {/* Manual count input */}
-            <div className="space-y-2">
-              <Label htmlFor="manual-count" className="font-medium">
-                Total Cash Hitung Manual (Rp)
-              </Label>
-              <Input
-                id="manual-count"
-                type="number"
-                value={manualCashCount || ""}
-                onChange={(e) => setManualCashCount(Number(e.target.value))}
-                disabled={inputDisabled}
-                className="h-12 text-lg font-mono font-semibold"
-                placeholder="Masukkan jumlah uang setelah dihitung..."
-              />
-            </div>
-
-            {/* Variance indicator */}
-            {manualCashCount > 0 && (
-              <div
-                className={`flex items-center gap-3 rounded-lg p-4 ${
-                  variance === 0
-                    ? "bg-emerald-500/10 border border-emerald-500/30"
-                    : variance > 0
-                    ? "bg-blue-500/10 border border-blue-500/30"
-                    : "bg-destructive/10 border border-destructive/30"
-                }`}
-              >
-                {variance === 0 ? (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                ) : (
-                  <AlertTriangle className={`h-5 w-5 ${variance > 0 ? "text-blue-500" : "text-destructive"}`} />
-                )}
-                <div>
-                  <p className="text-sm font-medium">
-                    {variance === 0
-                      ? "Pas! Tidak ada selisih 🎉"
-                      : `Selisih: ${variance > 0 ? "+" : ""}${formatCurrency(variance)}`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {variance > 0
-                      ? "Uang lebih dari yang seharusnya"
-                      : variance < 0
-                      ? "Uang kurang dari yang seharusnya"
-                      : "Hitung manual sesuai dengan perhitungan sistem"}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Action Buttons */}
       {status !== "Submitted" && (
-        <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
+        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
           <Button
             size="lg"
             variant="outline"
-            className="px-6"
+            className="rounded-xl px-6 font-bold h-11 border-border/80 bg-card hover:bg-muted"
             onClick={() => handleSave()}
           >
             <Save className="mr-2 h-4 w-4" />
-            Simpan
+            Simpan Draft
           </Button>
           <Button
             size="lg"
-            className="px-8"
-            onClick={handleSubmit}
-            disabled={manualCashCount === 0}
+            className="rounded-xl px-8 font-bold h-11 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+            onClick={() => handleSubmit()}
           >
             <Send className="mr-2 h-4 w-4" />
-            Submit Laporan
+            Kirim Laporan Shift
           </Button>
         </div>
       )}

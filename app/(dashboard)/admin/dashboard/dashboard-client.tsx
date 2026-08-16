@@ -107,20 +107,18 @@ function SummaryCard({
   subtext?: string;
 }) {
   return (
-    <Card className="border-0 shadow-sm">
-      <CardContent className="pt-5">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{title}</p>
-            <p className="mt-1 text-xl font-bold tracking-tight truncate">{value}</p>
-            {subtext && <p className="mt-0.5 text-xs text-muted-foreground">{subtext}</p>}
-          </div>
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
-            <Icon className="h-5 w-5" />
-          </div>
+    <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">{title}</p>
+          <p className="mt-1 text-2xl font-black tracking-tight text-foreground truncate">{value}</p>
+          {subtext && <p className="mt-0.5 text-xs text-muted-foreground truncate">{subtext}</p>}
         </div>
-      </CardContent>
-    </Card>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-2xs ${colorClass}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -140,6 +138,7 @@ export function DashboardClient({
   const [stats, setStats] = useState<DashboardStatsResult>(initialStats);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
+  const [activePreset, setActivePreset] = useState<number>(30);
   const [isPending, startTransition] = useTransition();
 
   const [recap, setRecap] = useState<PayrollRecapItem[]>(payrollRecap);
@@ -163,6 +162,7 @@ export function DashboardClient({
   }
 
   function handlePreset(days: number) {
+    setActivePreset(days);
     const end = new Date();
     const fmt = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: timezone });
     const e = fmt(end);
@@ -233,7 +233,7 @@ export function DashboardClient({
           digitalProfit: m.digitalProfit,
         }))
       : daily.map((d) => ({
-          label: new Date(d.date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
+          label: d.date,
           omzetCash: d.omzetCash,
           omzetDebit: d.omzetDebit,
           expenditure: d.expenditure,
@@ -253,72 +253,91 @@ export function DashboardClient({
 
       {/* ── Summary Cards Row 1 ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.todayOmzet)} icon={DollarSign} colorClass="bg-chart-1/10 text-chart-1" subtext="Khusus transaksi POS hari ini" />
-        <SummaryCard title="Pegawai Aktif" value={String(activeAttendances.length)} icon={Users} colorClass="bg-chart-2/10 text-chart-2" subtext="Sedang bertugas saat ini" />
-        <SummaryCard title="Menunggu Verifikasi" value={String(submittedCount)} icon={ClipboardCheck} colorClass="bg-amber-500/10 text-amber-500" />
-        <SummaryCard title="Flip Belum Cocok" value={String(unmatchedFlipCount)} icon={AlertTriangle} colorClass="bg-destructive/10 text-destructive" />
+        <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.todayOmzet)} icon={DollarSign} colorClass="bg-primary/10 text-primary" subtext="Khusus transaksi POS hari ini" />
+        <SummaryCard title="Pegawai Aktif" value={String(activeAttendances.length)} icon={Users} colorClass="bg-blue-500/10 text-blue-600" subtext="Sedang bertugas saat ini" />
+        <SummaryCard title="Menunggu Verifikasi" value={String(submittedCount)} icon={ClipboardCheck} colorClass="bg-amber-500/10 text-amber-600" subtext="Shift menunggu approval" />
+        <SummaryCard title="Flip Belum Cocok" value={String(unmatchedFlipCount)} icon={AlertTriangle} colorClass="bg-rose-500/10 text-rose-600" subtext="Perlu sinkronisasi transaksi" />
       </div>
 
-      {/* ── Filter Bar ── */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="pt-5">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { label: "Hari Ini", days: 1 },
-                { label: "7 Hari", days: 7 },
-                { label: "30 Hari", days: 30 },
-                { label: "90 Hari (3 Bulan)", days: 90 },
-                { label: "Tahun Ini", days: 365 },
-                { label: "Semua (All Time)", days: 9999 },
-              ].map((p) => (
-                <Button
+      {/* ── Filter Bar Upwork Segmented Controls ── */}
+      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Segmented Pill Preset Switchers */}
+          <div className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl bg-muted/60 p-1.5 border border-border/60">
+            {[
+              { label: "Hari Ini", days: 1 },
+              { label: "7 Hari", days: 7 },
+              { label: "30 Hari", days: 30 },
+              { label: "90 Hari", days: 90 },
+              { label: "Tahun Ini", days: 365 },
+              { label: "Semua", days: 9999 },
+            ].map((p) => {
+              const isSelected = activePreset === p.days;
+              return (
+                <button
                   key={p.label}
-                  variant="outline"
-                  size="sm"
+                  type="button"
                   disabled={isPending}
                   onClick={() => handlePreset(p.days)}
-                  className="rounded-full text-xs h-8"
+                  className={`inline-flex items-center rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all duration-200 ${
+                    isSelected
+                      ? "bg-card text-primary shadow-xs border border-border/80"
+                      : "text-muted-foreground hover:text-foreground hover:bg-card/50"
+                  }`}
                 >
                   {p.label}
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom Date Range Picker */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-muted/30 px-3 py-1.5">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase">Dari:</span>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setActivePreset(0);
+                }}
+                className="bg-transparent text-xs font-mono font-medium focus:outline-none"
               />
-              <span className="text-xs text-muted-foreground">s/d</span>
+            </div>
+            <span className="text-xs text-muted-foreground">s/d</span>
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-muted/30 px-3 py-1.5">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase">Sampai:</span>
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setActivePreset(0);
+                }}
+                className="bg-transparent text-xs font-mono font-medium focus:outline-none"
               />
-              <Button
-                size="sm"
-                disabled={isPending}
-                onClick={() => fetchStats(startDate, endDate)}
-                className="h-8 rounded-full text-xs"
-              >
-                {isPending ? "Memuat..." : "Tampilkan"}
-              </Button>
             </div>
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={() => fetchStats(startDate, endDate)}
+              className="rounded-xl px-4 text-xs font-bold h-9 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+            >
+              {isPending ? "Memuat..." : "Terapkan"}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── Financial Summary Cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <SummaryCard title="Total Omzet (Periode)" value={formatCurrency(summary.totalOmzet)} icon={TrendingUp} colorClass="bg-emerald-500/10 text-emerald-600" subtext="Berdasarkan filter tanggal" />
-        <SummaryCard title="Omzet Cash" value={formatCurrency(summary.omzetCash)} icon={Wallet} colorClass="bg-blue-500/10 text-blue-600" />
-        <SummaryCard title="Omzet Debit" value={formatCurrency(summary.omzetDebit)} icon={DollarSign} colorClass="bg-violet-500/10 text-violet-600" />
-        <SummaryCard title="Total Pengeluaran" value={formatCurrency(summary.totalExpenditure)} icon={TrendingDown} colorClass="bg-rose-500/10 text-rose-600" />
-        <SummaryCard title="Pendapatan Digital" value={formatCurrency(summary.digitalRevenue)} icon={Zap} colorClass="bg-amber-500/10 text-amber-600" />
-        <SummaryCard title="Laba Digital" value={formatCurrency(summary.digitalProfit)} icon={Zap} colorClass="bg-teal-500/10 text-teal-600" />
+        <SummaryCard title="Total Omzet (Periode)" value={formatCurrency(summary.totalOmzet)} icon={TrendingUp} colorClass="bg-primary/10 text-primary" subtext="Akumulasi omzet kasir" />
+        <SummaryCard title="Omzet Cash" value={formatCurrency(summary.omzetCash)} icon={Wallet} colorClass="bg-blue-500/10 text-blue-600" subtext="Penerimaan tunai fisik" />
+        <SummaryCard title="Omzet Debit" value={formatCurrency(summary.omzetDebit)} icon={DollarSign} colorClass="bg-indigo-500/10 text-indigo-600" subtext="EDC & QRIS digital" />
+        <SummaryCard title="Total Pengeluaran" value={formatCurrency(summary.totalExpenditure)} icon={TrendingDown} colorClass="bg-rose-500/10 text-rose-600" subtext="Beban toko & supplier" />
+        <SummaryCard title="Pendapatan Digital" value={formatCurrency(summary.digitalRevenue)} icon={Zap} colorClass="bg-amber-500/10 text-amber-600" subtext="Total gross transaksi digital" />
+        <SummaryCard title="Laba Digital" value={formatCurrency(summary.digitalProfit)} icon={Zap} colorClass="bg-emerald-500/10 text-emerald-600" subtext="Keuntungan bersih fee admin" />
       </div>
 
       {/* ── WEEKDAY VS WEEKEND & CONSUMER BEHAVIOR ANALYTICS ── */}

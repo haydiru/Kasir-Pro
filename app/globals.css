@@ -45,74 +45,74 @@
 }
 
 :root {
-  --background: oklch(0.97 0.003 240);
-  --foreground: oklch(0.15 0.01 250);
+  --background: oklch(0.982 0.002 120);
+  --foreground: oklch(0.14 0.015 140);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 250);
+  --card-foreground: oklch(0.14 0.015 140);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 250);
-  --primary: oklch(0.47 0.23 264);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.94 0.01 240);
-  --secondary-foreground: oklch(0.25 0.02 250);
-  --muted: oklch(0.95 0.005 240);
-  --muted-foreground: oklch(0.5 0.02 250);
-  --accent: oklch(0.93 0.02 264);
-  --accent-foreground: oklch(0.35 0.12 264);
+  --popover-foreground: oklch(0.14 0.015 140);
+  --primary: oklch(0.55 0.19 142);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0.008 140);
+  --secondary-foreground: oklch(0.20 0.02 140);
+  --muted: oklch(0.96 0.004 140);
+  --muted-foreground: oklch(0.48 0.02 140);
+  --accent: oklch(0.94 0.03 142);
+  --accent-foreground: oklch(0.32 0.14 142);
   --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 240);
-  --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.47 0.23 264 / 40%);
-  --chart-1: oklch(0.55 0.22 264);
-  --chart-2: oklch(0.55 0.18 145);
-  --chart-3: oklch(0.60 0.20 40);
-  --chart-4: oklch(0.55 0.18 330);
-  --chart-5: oklch(0.57 0.15 200);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.97 0.005 240);
-  --sidebar-foreground: oklch(0.25 0.02 250);
-  --sidebar-primary: oklch(0.47 0.23 264);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.91 0.03 264);
-  --sidebar-accent-foreground: oklch(0.35 0.12 264);
-  --sidebar-border: oklch(0.88 0.01 240);
-  --sidebar-ring: oklch(0.47 0.23 264 / 40%);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.90 0.006 140);
+  --input: oklch(0.90 0.006 140);
+  --ring: oklch(0.55 0.19 142 / 40%);
+  --chart-1: oklch(0.55 0.19 142);
+  --chart-2: oklch(0.60 0.16 185);
+  --chart-3: oklch(0.65 0.18 45);
+  --chart-4: oklch(0.58 0.18 310);
+  --chart-5: oklch(0.60 0.15 250);
+  --radius: 0.875rem;
+  --sidebar: oklch(0.985 0.003 120);
+  --sidebar-foreground: oklch(0.20 0.02 140);
+  --sidebar-primary: oklch(0.55 0.19 142);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.03 142);
+  --sidebar-accent-foreground: oklch(0.25 0.12 142);
+  --sidebar-border: oklch(0.90 0.006 140);
+  --sidebar-ring: oklch(0.55 0.19 142 / 40%);
 }
 
 .dark {
-  --background: oklch(0.12 0.01 250);
-  --foreground: oklch(0.96 0.005 240);
-  --card: oklch(0.16 0.015 250);
-  --card-foreground: oklch(0.96 0.005 240);
-  --popover: oklch(0.16 0.015 250);
-  --popover-foreground: oklch(0.96 0.005 240);
-  --primary: oklch(0.65 0.22 264);
-  --primary-foreground: oklch(0.12 0.01 250);
-  --secondary: oklch(0.22 0.015 250);
-  --secondary-foreground: oklch(0.96 0.005 240);
-  --muted: oklch(0.20 0.015 250);
-  --muted-foreground: oklch(0.62 0.02 250);
-  --accent: oklch(0.24 0.04 264);
-  --accent-foreground: oklch(0.75 0.15 264);
+  --background: oklch(0.13 0.01 140);
+  --foreground: oklch(0.97 0.005 120);
+  --card: oklch(0.17 0.012 140);
+  --card-foreground: oklch(0.97 0.005 120);
+  --popover: oklch(0.17 0.012 140);
+  --popover-foreground: oklch(0.97 0.005 120);
+  --primary: oklch(0.70 0.19 142);
+  --primary-foreground: oklch(0.12 0.02 140);
+  --secondary: oklch(0.22 0.015 140);
+  --secondary-foreground: oklch(0.97 0.005 120);
+  --muted: oklch(0.20 0.012 140);
+  --muted-foreground: oklch(0.65 0.02 140);
+  --accent: oklch(0.24 0.04 142);
+  --accent-foreground: oklch(0.80 0.15 142);
   --destructive: oklch(0.65 0.22 27);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.65 0.22 264 / 40%);
-  --chart-1: oklch(0.65 0.22 264);
-  --chart-2: oklch(0.62 0.18 145);
-  --chart-3: oklch(0.68 0.20 40);
-  --chart-4: oklch(0.62 0.18 330);
-  --chart-5: oklch(0.62 0.15 200);
-  --sidebar: oklch(0.10 0.01 250);
-  --sidebar-foreground: oklch(0.96 0.005 240);
-  --sidebar-primary: oklch(0.65 0.22 264);
-  --sidebar-primary-foreground: oklch(0.12 0.01 250);
-  --sidebar-accent: oklch(0.20 0.04 264);
-  --sidebar-accent-foreground: oklch(0.75 0.15 264);
+  --ring: oklch(0.70 0.19 142 / 40%);
+  --chart-1: oklch(0.70 0.19 142);
+  --chart-2: oklch(0.68 0.16 185);
+  --chart-3: oklch(0.72 0.18 45);
+  --chart-4: oklch(0.68 0.18 310);
+  --chart-5: oklch(0.68 0.15 250);
+  --sidebar: oklch(0.11 0.01 140);
+  --sidebar-foreground: oklch(0.97 0.005 120);
+  --sidebar-primary: oklch(0.70 0.19 142);
+  --sidebar-primary-foreground: oklch(0.12 0.02 140);
+  --sidebar-accent: oklch(0.20 0.04 142);
+  --sidebar-accent-foreground: oklch(0.80 0.15 142);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.65 0.22 264 / 40%);
+  --sidebar-ring: oklch(0.70 0.19 142 / 40%);
 }
 
 @layer base {
@@ -121,8 +121,42 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+/* ──── Upwork Custom Layout Box & Pill Utilities ──── */
+.upwork-card {
+  @apply rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs transition-all duration-200 hover:border-primary/30 hover:shadow-sm;
+}
+
+.upwork-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-tight transition-colors;
+}
+
+.upwork-badge-emerald {
+  @apply bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-medium;
+}
+
+.upwork-badge-amber {
+  @apply bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium;
+}
+
+.upwork-badge-rose {
+  @apply bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 font-medium;
+}
+
+.upwork-badge-slate {
+  @apply bg-muted text-muted-foreground border border-border font-medium;
+}
+
+.upwork-section-header {
+  @apply text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2.5;
+}
+
+.upwork-box-label {
+  @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
 }
 
 @keyframes save-pulse {

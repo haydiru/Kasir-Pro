@@ -19,6 +19,26 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ## 📌 Phase 1: Frontend (Tampilan & Interaksi Halaman)
 
+### 🎨 [DONE-UI-01] Redesign UI/UX KasirPro ke Estetika Modern Upwork (Emerald Palette, Layout Box & Pill Badges)
+- **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. **Upwork Emerald Design System (`app/globals.css`)**: Mengganti aksen warna utama menjadi Upwork Emerald Green (`oklch(0.55 0.19 142)` / `#108a00` di light mode & `#14a800` di dark mode), kanvas bersih off-white (`oklch(0.982 0.002 120)`), dan radius `--radius: 0.875rem` (14px).
+  2. **Navigasi & Header (`components/sidebar.tsx`, `components/topbar.tsx`)**:
+     - Sidebar dengan emblem hijau emerald, rounded-xl navigation items dengan active indicator badge, dan user profile card box.
+     - Topbar dengan pill status badge aktif, rounded-full icon controls, dan date header.
+  3. **Dashboard Admin (`admin/dashboard/dashboard-client.tsx`)**:
+     - Summary metrics dalam format Upwork layout box dengan border hairline `border-border/80` dan hover elevation.
+     - Segmented pill switcher untuk filter rentang waktu (Hari Ini, 7 Hari, 30 Hari, 90 Hari, Tahun Ini, Semua).
+  4. **Form Laporan Kasir (`cashier/report/page.tsx`)**:
+     - Step-by-step layout box cards dengan badge numbering dan ikon kategori.
+     - Interactive warning Flip banner bergaya capsule alert dengan 1-click `+ Gunakan`.
+     - Live variance status pill yang adaptif terhadap hasil hitung fisik uang kasir.
+  5. **Verifikasi Setoran Admin (`admin/verifications/verifications-client.tsx`)**:
+     - Upwork Proposal layout cards dengan audit split-view, pill verification tags, dan tabel riwayat setoran terverifikasi.
+  6. **Transaksi Flip (`admin/flip-transactions/flip-client.tsx`)**:
+     - Upwork stat cards dan list table dengan status pill badges (`upwork-badge-emerald`, `upwork-badge-amber`, `upwork-badge-slate`).
+  7. **Build Verification & Deployment**: Seluruh 36 rute Next.js berhasil dikompilasi dengan `npm run build` tanpa error TypeScript.
+
 ### [DONE-FE-01] Halaman Dashboard Kasir & Absensi Live (`/dashboard`, `/attendance`)
 - **Fitur Terimplementasi**:
   - Tombol Quick Clock-In / Clock-Out dengan pilihan Shift (Pagi / Siang / Malam).

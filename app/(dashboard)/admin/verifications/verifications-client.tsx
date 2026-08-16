@@ -140,25 +140,30 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
     <div className="space-y-6">
       {/* Pending Verifications */}
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="h-5 w-5 text-amber-500" />
-          <h2 className="text-base font-semibold">
-            Menunggu Verifikasi
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 shadow-2xs">
+            <ShieldCheck className="h-4.5 w-4.5" />
+          </div>
+          <h2 className="text-base font-bold tracking-tight text-foreground">
+            Menunggu Verifikasi Setoran
           </h2>
-          <Badge variant="secondary" className="text-xs">
+          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-500/20">
             {submittedReports.length}
-          </Badge>
+          </span>
         </div>
 
         {submittedReports.length === 0 ? (
-          <Card className="border-0 shadow-sm">
-            <CardContent className="py-12 text-center">
-              <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500/40 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Semua laporan sudah diverifikasi 🎉
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border border-border/80 bg-card p-12 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 mb-3 shadow-2xs">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-bold text-foreground">
+              Semua laporan shift telah diverifikasi
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tidak ada antrean setoran kasir yang menunggu approval saat ini.
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {submittedReports.map((report) => {
@@ -186,229 +191,245 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               });
 
               return (
-                <Card key={report.id} className="border-0 shadow-sm overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="flex flex-col md:flex-row">
-                      {/* Left: Report Info */}
-                      <div className="flex-1 p-5 space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-semibold">{report.user.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {report.store.name} • {formatLocalDate(report.date, timezone)} • Shift {report.shiftType}
-                            </p>
-                          </div>
-                          <Badge className={getStatusColor(report.status)}>
-                            {report.status}
-                          </Badge>
-                        </div>
-
-                        <Separator />
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                          <div>
-                            <p className="text-muted-foreground text-xs">Modal Awal</p>
-                            <p className="font-mono font-medium">{formatCurrency(report.startingCash)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">POS Tunai</p>
-                            <p className="font-mono font-medium">{formatCurrency(report.posCash)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">POS Debit</p>
-                            <p className="font-mono font-medium">{formatCurrency(report.posDebit)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-amber-600 uppercase tracking-tighter">Sisa Tagihan</p>
-                            <p className="font-mono font-bold text-amber-600">
-                              {formatCurrency(report.billMoneyReceived - report.expenditures.reduce((acc: number, curr: any) => acc + (curr.amountFromBill || 0), 0))}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">Uang Tagihan</p>
-                            <p className="font-mono font-medium">{formatCurrency(report.billMoneyReceived)}</p>
+                <div key={report.id} className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/40 transition-all duration-200">
+                  <div className="flex flex-col md:flex-row">
+                    {/* Left: Report Info */}
+                    <div className="flex-1 p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-bold text-base text-foreground">{report.user.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
+                              {report.store.name}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
+                              📅 {formatLocalDate(report.date, timezone)}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                              Shift {report.shiftType}
+                            </span>
                           </div>
                         </div>
-
-                        {reportUnmatchedFlips.length > 0 && (
-                          <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/20 p-4 mt-3 space-y-2.5">
-                            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-xs">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>{reportUnmatchedFlips.length} Transaksi Flip Belum Tercatat di Laporan Ini:</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {reportUnmatchedFlips.map((fw: any) => (
-                                <div 
-                                  key={fw.id} 
-                                  className="flex items-center justify-between gap-3 bg-white dark:bg-card border border-rose-200/80 dark:border-rose-900/40 p-2.5 px-3 rounded-lg shadow-sm"
-                                >
-                                  <div className="flex flex-col min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="font-mono font-extrabold text-xs text-rose-600 dark:text-rose-400">
-                                        #{fw.flipId?.replace(/^#/, "")}
-                                      </span>
-                                      <Badge variant="secondary" className="text-[9px] font-bold px-1.5 py-0 h-4 uppercase bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
-                                        {fw.serviceType}
-                                      </Badge>
-                                    </div>
-                                    {(fw.customerName || fw.bankOrProvider) && (
-                                      <span className="text-xs font-semibold text-foreground truncate mt-1">
-                                        👤 {fw.customerName || "Tanpa Nama"} {fw.bankOrProvider ? `(${fw.bankOrProvider})` : ""}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-right shrink-0">
-                                    <span className="font-mono font-black text-sm text-foreground">
-                                      {formatCurrency(fw.nominal)}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {report.digitalTransactions.length > 0 && (
-                          <div className="rounded-lg border overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="bg-muted/30">
-                                  <TableHead className="text-xs">Jenis & ID Flip</TableHead>
-                                  <TableHead className="text-xs">Detail / Customer</TableHead>
-                                  <TableHead className="text-xs text-right">Nominal</TableHead>
-                                  <TableHead className="text-xs text-right">Laba</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {report.digitalTransactions.map((dt: any) => {
-                                  const rawFlipId = dt.flipId ? dt.flipId.replace(/^#/, "").trim() : null;
-                                  const matchedFlip = findMatchedFlip(dt, flipWebhooks);
-
-                                  return (
-                                    <TableRow key={dt.id}>
-                                      <TableCell className="text-xs">
-                                        <div className="flex flex-col gap-1">
-                                          <Badge variant="outline" className="text-[10px] w-fit font-bold">{dt.serviceType}</Badge>
-                                          {rawFlipId && (
-                                            <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono w-fit font-bold px-1.5 py-0.5">
-                                              #{rawFlipId}
-                                            </Badge>
-                                          )}
-                                          <span className="text-[9px] text-muted-foreground font-bold">
-                                            {dt.isNonCash ? `Non-Tunai (${dt.paymentMethod || "Tanpa Ket."})` : "Tunai"}
-                                          </span>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-xs">
-                                        <div className="flex flex-col">
-                                          <span className="font-medium text-foreground">{dt.detailContact || "—"}</span>
-                                          {matchedFlip?.customerName && (
-                                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                                              👤 {matchedFlip.customerName}
-                                            </span>
-                                          )}
-                                          {matchedFlip?.bankOrProvider && (
-                                            <span className="text-[10px] text-muted-foreground">
-                                              🏦 {matchedFlip.bankOrProvider} {matchedFlip?.customerNumber ? `(${matchedFlip.customerNumber})` : ""}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-xs text-right font-mono font-bold">{formatCurrency(dt.grossAmount)}</TableCell>
-                                      <TableCell className="text-xs text-right font-mono text-emerald-600 font-bold">+{formatCurrency(dt.profitAmount)}</TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-
-                        {report.expenditures.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">
-                              Pengeluaran ({report.expenditures.length})
-                            </p>
-                            <div className="space-y-1.5">
-                               {report.expenditures.map((ex: any) => {
-                                const total = ex.amountFromCashier + ex.amountFromBill + ex.amountFromTransfer;
-                                return (
-                                  <div key={ex.id} className="flex flex-col rounded-md border px-3 py-2 text-xs bg-muted/20">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <div className="flex items-center gap-2">
-                                        <FileText className="h-3 w-3 text-muted-foreground" />
-                                        <span className="font-bold">{ex.supplierName}</span>
-                                      </div>
-                                      <span className="font-mono font-black text-rose-600">
-                                        {formatCurrency(total)}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 ml-5 text-[10px] text-muted-foreground leading-tight">
-                                      {ex.amountFromCashier > 0 && <span>Tunai: {formatCurrency(ex.amountFromCashier)}</span>}
-                                      {ex.amountFromBill > 0 && <span className="text-amber-600 font-bold">Tagihan: {formatCurrency(ex.amountFromBill)}</span>}
-                                      {ex.amountFromTransfer > 0 && <span>Transfer: {formatCurrency(ex.amountFromTransfer)}</span>}
-                                      {ex.receiptUrl && (
-                                        <a href={ex.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 ml-auto font-bold">
-                                          <ExternalLink className="h-2 w-2" /> Bukti
-                                        </a>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                          report.status === "Submitted"
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                        }`}>
+                          {report.status}
+                        </span>
                       </div>
 
-                      {/* Right: Verification Summary */}
-                      <div className="w-full md:w-64 border-t md:border-t-0 md:border-l bg-muted/20 p-5 flex flex-col gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Cash Seharusnya</p>
-                          <p className="text-lg font-bold font-mono">{formatCurrency(expected)}</p>
+                      <Separator className="border-border/60" />
+
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                          <p className="text-muted-foreground font-semibold">Modal Awal</p>
+                          <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.startingCash)}</p>
                         </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Cash Manual Kasir</p>
-                          <p className="text-lg font-bold font-mono">{formatCurrency(report.manualCashCount)}</p>
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                          <p className="text-muted-foreground font-semibold">POS Tunai</p>
+                          <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.posCash)}</p>
                         </div>
-                        <Separator />
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                          <p className="text-muted-foreground font-semibold">POS Debit</p>
+                          <p className="font-mono font-bold text-sm text-indigo-600 mt-0.5">{formatCurrency(report.posDebit)}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                          <p className="text-muted-foreground font-semibold">Uang Tagihan</p>
+                          <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.billMoneyReceived)}</p>
+                        </div>
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5">
+                          <p className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tight">Sisa Tagihan</p>
+                          <p className="font-mono font-bold text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+                            {formatCurrency(report.billMoneyReceived - report.expenditures.reduce((acc: number, curr: any) => acc + (curr.amountFromBill || 0), 0))}
+                          </p>
+                        </div>
+                      </div>
+
+                      {reportUnmatchedFlips.length > 0 && (
+                        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 space-y-2.5 shadow-2xs">
+                          <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-bold text-xs">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            <span>{reportUnmatchedFlips.length} Transaksi Flip Belum Tercatat di Laporan Ini:</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {reportUnmatchedFlips.map((fw: any) => (
+                              <div 
+                                key={fw.id} 
+                                className="flex items-center justify-between gap-3 bg-card border border-rose-500/30 p-2.5 px-3 rounded-xl shadow-2xs"
+                              >
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400">
+                                      #{fw.flipId?.replace(/^#/, "")}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-full bg-rose-500/15 px-2 py-0.2 text-[9px] font-bold text-rose-700 dark:text-rose-300 uppercase">
+                                      {fw.serviceType}
+                                    </span>
+                                  </div>
+                                  {(fw.customerName || fw.bankOrProvider) && (
+                                    <span className="text-xs font-semibold text-foreground truncate mt-1">
+                                      👤 {fw.customerName || "Tanpa Nama"} {fw.bankOrProvider ? `(${fw.bankOrProvider})` : ""}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="font-mono font-black text-sm text-foreground">
+                                    {formatCurrency(fw.nominal)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {report.digitalTransactions.length > 0 && (
+                        <div className="rounded-xl border border-border/80 overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/40">
+                                <TableHead className="text-xs font-bold">Jenis & ID Flip</TableHead>
+                                <TableHead className="text-xs font-bold">Detail / Customer</TableHead>
+                                <TableHead className="text-xs font-bold text-right">Nominal</TableHead>
+                                <TableHead className="text-xs font-bold text-right">Laba</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {report.digitalTransactions.map((dt: any) => {
+                                const rawFlipId = dt.flipId ? dt.flipId.replace(/^#/, "").trim() : null;
+                                const matchedFlip = findMatchedFlip(dt, flipWebhooks);
+
+                                return (
+                                  <TableRow key={dt.id}>
+                                    <TableCell className="text-xs">
+                                      <div className="flex flex-col gap-1">
+                                        <span className="inline-flex items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-bold w-fit border border-border/60">
+                                          {dt.serviceType}
+                                        </span>
+                                        {rawFlipId && (
+                                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold px-2 py-0.5 w-fit">
+                                            #{rawFlipId}
+                                          </span>
+                                        )}
+                                        <span className="text-[9px] text-muted-foreground font-bold">
+                                          {dt.isNonCash ? `Non-Tunai (${dt.paymentMethod || "Tanpa Ket."})` : "Tunai"}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      <div className="flex flex-col">
+                                        <span className="font-medium text-foreground">{dt.detailContact || "—"}</span>
+                                        {matchedFlip?.customerName && (
+                                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                                            👤 {matchedFlip.customerName}
+                                          </span>
+                                        )}
+                                        {matchedFlip?.bankOrProvider && (
+                                          <span className="text-[10px] text-muted-foreground">
+                                            🏦 {matchedFlip.bankOrProvider} {matchedFlip?.customerNumber ? `(${matchedFlip.customerNumber})` : ""}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-right font-mono font-bold">{formatCurrency(dt.grossAmount)}</TableCell>
+                                    <TableCell className="text-xs text-right font-mono text-emerald-600 font-bold">+{formatCurrency(dt.profitAmount)}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+
+                      {report.expenditures.length > 0 && (
                         <div>
-                          <p className="text-xs text-muted-foreground">Selisih Kasir</p>
-                          <p className={`text-lg font-bold font-mono ${diff < 0 ? "text-destructive" : diff > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                          <p className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider">
+                            Pengeluaran ({report.expenditures.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {report.expenditures.map((ex: any) => {
+                              const total = ex.amountFromCashier + ex.amountFromBill + ex.amountFromTransfer;
+                              return (
+                                <div key={ex.id} className="flex flex-col rounded-xl border border-border/80 px-3.5 py-2 text-xs bg-muted/20">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="font-bold text-foreground">{ex.supplierName}</span>
+                                    </div>
+                                    <span className="font-mono font-black text-rose-600">
+                                      {formatCurrency(total)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 ml-5 text-[10px] text-muted-foreground leading-tight">
+                                    {ex.amountFromCashier > 0 && <span>Tunai: {formatCurrency(ex.amountFromCashier)}</span>}
+                                    {ex.amountFromBill > 0 && <span className="text-amber-600 font-bold">Tagihan: {formatCurrency(ex.amountFromBill)}</span>}
+                                    {ex.amountFromTransfer > 0 && <span>Transfer: {formatCurrency(ex.amountFromTransfer)}</span>}
+                                    {ex.receiptUrl && (
+                                      <a href={ex.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5 ml-auto font-bold">
+                                        <ExternalLink className="h-2 w-2" /> Bukti
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Verification Summary */}
+                    <div className="w-full md:w-68 border-t md:border-t-0 md:border-l border-border/80 bg-muted/30 p-5 flex flex-col justify-between gap-4">
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cash Sistem</p>
+                          <p className="text-lg font-black font-mono text-foreground mt-0.5">{formatCurrency(expected)}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cash Fisik Kasir</p>
+                          <p className="text-lg font-black font-mono text-foreground mt-0.5">{formatCurrency(report.manualCashCount)}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Selisih Kasir</p>
+                          <p className={`text-lg font-black font-mono mt-0.5 ${diff < 0 ? "text-destructive" : diff > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                             {diff >= 0 ? "+" : ""}
                             {formatCurrency(diff)}
                           </p>
                         </div>
 
                         {diff !== 0 && (
-                          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
-                            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-xs text-amber-700">
-                              Ada selisih {formatCurrency(Math.abs(diff))} antara hitungan kasir dan sistem
+                          <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium leading-tight">
+                              Ada selisih {formatCurrency(Math.abs(diff))} antara kasir dan sistem
                             </p>
                           </div>
                         )}
+                      </div>
 
-                        <div className="mt-auto flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            className="bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/20"
-                            onClick={() => handleDelete(report.id)}
-                            disabled={isDeleting === report.id}
-                            title="Hapus Laporan"
-                          >
-                            <Trash2 className={`h-4 w-4 ${isDeleting === report.id ? "animate-pulse" : ""}`} />
-                          </Button>
-                          <Button className="flex-1" onClick={() => handleOpenVerify(report)}>
-                            <ShieldCheck className="mr-2 h-4 w-4" />
-                            Verifikasi
-                          </Button>
-                        </div>
+                      <div className="flex gap-2 pt-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/20 h-10 w-10 shrink-0"
+                          onClick={() => handleDelete(report.id)}
+                          disabled={isDeleting === report.id}
+                          title="Hapus Laporan"
+                        >
+                          <Trash2 className={`h-4 w-4 ${isDeleting === report.id ? "animate-pulse" : ""}`} />
+                        </Button>
+                        <Button 
+                          className="flex-1 rounded-xl font-bold h-10 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90" 
+                          onClick={() => handleOpenVerify(report)}
+                        >
+                          <ShieldCheck className="mr-1.5 h-4 w-4" />
+                          Verifikasi
+                        </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -418,42 +439,51 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
       {/* Recently Verified */}
       {verifiedReports.length > 0 && (
         <div>
-          <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            Terverifikasi
-          </h2>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kasir</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead className="text-right">Selisih</TableHead>
-                    <TableHead>Catatan</TableHead>
-                      <TableHead>Diverifikasi Oleh</TableHead>
-                    <TableHead>Diverifikasi</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {verifiedReports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium">{report.user.name}</TableCell>
-                      <TableCell>{formatLocalDate(report.date, timezone)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">{report.shiftType}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <span className={(report.finalAdminVariance ?? 0) < 0 ? "text-destructive" : (report.finalAdminVariance ?? 0) > 0 ? "text-emerald-600" : ""}>
-                          {(report.finalAdminVariance ?? 0) >= 0 ? "+" : ""}
-                          {formatCurrency(report.finalAdminVariance ?? 0)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-40 truncate">
-                        {report.adminNotes || "—"}
-                      </TableCell>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs">
+              <CheckCircle2 className="h-4.5 w-4.5" />
+            </div>
+            <h2 className="text-base font-bold tracking-tight text-foreground">
+              Riwayat Setoran Terverifikasi
+            </h2>
+            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+              {verifiedReports.length}
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead className="font-bold text-xs">Kasir</TableHead>
+                  <TableHead className="font-bold text-xs">Tanggal</TableHead>
+                  <TableHead className="font-bold text-xs">Shift</TableHead>
+                  <TableHead className="font-bold text-xs text-right">Selisih Akhir</TableHead>
+                  <TableHead className="font-bold text-xs">Catatan Admin</TableHead>
+                  <TableHead className="font-bold text-xs">Diverifikasi Oleh</TableHead>
+                  <TableHead className="font-bold text-xs">Waktu</TableHead>
+                  <TableHead className="font-bold text-xs text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {verifiedReports.map((report) => (
+                  <TableRow key={report.id}>
+                    <TableCell className="font-bold text-xs text-foreground">{report.user.name}</TableCell>
+                    <TableCell className="text-xs">{formatLocalDate(report.date, timezone)}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border/60">
+                        {report.shiftType}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold text-xs">
+                      <span className={(report.finalAdminVariance ?? 0) < 0 ? "text-destructive" : (report.finalAdminVariance ?? 0) > 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                        {(report.finalAdminVariance ?? 0) >= 0 ? "+" : ""}
+                        {formatCurrency(report.finalAdminVariance ?? 0)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-40 truncate">
+                      {report.adminNotes || "—"}
+                    </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {report.verifiedBy?.name || "—"}
                       </TableCell>
@@ -489,10 +519,9 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
 
       {/* Verification Dialog */}
       <Dialog

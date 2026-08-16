@@ -212,40 +212,40 @@ export function FlipTransactionsClient({
   function getStatusBadge(tx: any) {
     if (tx.excluded) {
       return (
-        <Badge className="bg-muted text-muted-foreground border-border shadow-none text-[10px] font-bold uppercase gap-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground border border-border">
           <EyeOff className="h-3 w-3" /> Dikecualikan
-        </Badge>
+        </span>
       );
     }
     if (tx.matched) {
       return (
-        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 shadow-none text-[10px] font-bold uppercase gap-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
           <CheckCircle2 className="h-3 w-3" /> Cocok
-        </Badge>
+        </span>
       );
     }
     return (
-      <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 shadow-none text-[10px] font-bold uppercase gap-1">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300 border border-amber-500/20">
         <AlertTriangle className="h-3 w-3" /> Belum Cocok
-      </Badge>
+      </span>
     );
   }
 
   function getServiceBadge(type: string) {
     const colors: Record<string, string> = {
-      Transfer: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      PDAM: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
-      Listrik: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
-      Indihome: "bg-red-500/10 text-red-600 border-red-500/20",
-      "Pulsa/Paket Data": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-      "Top Up E-Walet": "bg-green-500/10 text-green-600 border-green-500/20",
+      Transfer: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+      PDAM: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20",
+      Listrik: "bg-yellow-500/10 text-yellow-800 dark:text-yellow-300 border-yellow-500/20",
+      Indihome: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+      "Pulsa/Paket Data": "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+      "Top Up E-Walet": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
     };
     return (
-      <Badge
-        className={`${colors[type] || "bg-muted text-foreground"} shadow-none text-[10px] font-bold uppercase`}
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${colors[type] || "bg-muted text-foreground border-border"}`}
       >
         {type}
-      </Badge>
+      </span>
     );
   }
 
@@ -263,131 +263,134 @@ export function FlipTransactionsClient({
     <div className="max-w-7xl mx-auto space-y-6 pb-20">
       {/* Header */}
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          Transaksi Flip
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
+          Transaksi Flip & Digital
+          <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-0.5 text-xs font-bold text-primary">
+            Email Webhook
+          </span>
         </h1>
-        <p className="text-muted-foreground">
-          Daftar transaksi digital dari email Flip untuk sinkronisasi dengan laporan kasir.
+        <p className="text-sm text-muted-foreground">
+          Daftar transaksi digital yang diekstrak otomatis dari email Flip untuk pencocokan shift kasir.
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards Upwork style */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Mail className="h-5 w-5 text-primary" />
-            </div>
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Email</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Email</p>
+              <p className="text-2xl font-black tracking-tight text-foreground mt-1">{stats.total}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-emerald-500/10 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs">
+              <Mail className="h-5 w-5" />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-emerald-600">{stats.matched}</p>
-              <p className="text-xs text-muted-foreground">Cocok</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Cocok (Matched)</p>
+              <p className="text-2xl font-black tracking-tight text-emerald-600 mt-1">{stats.matched}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs">
+              <CheckCircle2 className="h-5 w-5" />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-amber-600">{stats.unmatched}</p>
-              <p className="text-xs text-muted-foreground">Belum Cocok</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Belum Cocok</p>
+              <p className="text-2xl font-black tracking-tight text-amber-600 mt-1">{stats.unmatched}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-muted rounded-lg">
-              <EyeOff className="h-5 w-5 text-muted-foreground" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 shadow-2xs">
+              <AlertTriangle className="h-5 w-5" />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-muted-foreground">{stats.excluded}</p>
-              <p className="text-xs text-muted-foreground">Dikecualikan</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Dikecualikan</p>
+              <p className="text-2xl font-black tracking-tight text-muted-foreground mt-1">{stats.excluded}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground shadow-2xs">
+              <EyeOff className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filter */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                📅 Bulan
-              </label>
-              <Select
-                value={String(month)}
-                onValueChange={(v) => {
-                  const m = Number(v);
-                  setMonth(m);
-                  fetchForMonthYear(m, year);
-                }}
-              >
-                <SelectTrigger className="w-40 h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((m) => (
-                    <SelectItem key={m.value} value={String(m.value)}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                📅 Tahun
-              </label>
-              <Select
-                value={String(year)}
-                onValueChange={(v) => {
-                  const y = Number(v);
-                  setYear(y);
-                  fetchForMonthYear(month, y);
-                }}
-              >
-                <SelectTrigger className="w-28 h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              onClick={handleSearch}
-              disabled={isLoading}
-              className="h-11 rounded-xl px-6 gap-2"
+      {/* Filter Box */}
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              📅 Bulan
+            </label>
+            <Select
+              value={String(month)}
+              onValueChange={(v) => {
+                const m = Number(v);
+                setMonth(m);
+                fetchForMonthYear(m, year);
+              }}
             >
-              <Search className="h-4 w-4" />
-              {isLoading ? "Memuat..." : "Tampilkan Data"}
-            </Button>
+              <SelectTrigger className="w-40 h-10 rounded-xl border-border/80 text-xs font-bold">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={String(m.value)} className="text-xs rounded-lg">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              📅 Tahun
+            </label>
+            <Select
+              value={String(year)}
+              onValueChange={(v) => {
+                const y = Number(v);
+                setYear(y);
+                fetchForMonthYear(month, y);
+              }}
+            >
+              <SelectTrigger className="w-28 h-10 rounded-xl border-border/80 text-xs font-bold">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)} className="text-xs rounded-lg">
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleSearch}
+            disabled={isLoading}
+            className="h-10 rounded-xl px-6 gap-2 text-xs font-bold bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+          >
+            <Search className="h-4 w-4" />
+            {isLoading ? "Memuat..." : "Tampilkan Data"}
+          </Button>
+        </div>
+      </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-xl overflow-hidden bg-card/40 backdrop-blur-xl ring-1 ring-white/10 rounded-2xl">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+      <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent border-border/50 h-14">
                   {isSuperAdmin && (
@@ -547,8 +550,7 @@ export function FlipTransactionsClient({
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Floating Action Bar for Bulk Delete (Super Admin only) */}
       {isSuperAdmin && selectedIds.length > 0 && (
