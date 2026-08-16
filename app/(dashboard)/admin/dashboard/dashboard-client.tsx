@@ -330,7 +330,7 @@ export function DashboardClient({
                 <ShoppingBag className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-base font-black tracking-tight">Analisa Pola Konsumsi Masyarakat (Weekday vs Weekend)</CardTitle>
+                <CardTitle className="text-base font-black tracking-tight">Analisis Pola Konsumsi Masyarakat (Weekday vs Weekend)</CardTitle>
                 <CardDescription className="text-xs">
                   Perbandingan tren belanja hari kerja (Senin-Jumat) vs akhir pekan (Sabtu-Minggu) dan metode pembayaran favorit.
                 </CardDescription>
@@ -358,20 +358,16 @@ export function DashboardClient({
               </div>
               <div>
                 <p className="text-2xl font-black text-foreground">{formatCurrency(weekdayVsWeekend.weekday.totalOmzet)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata: <span className="font-bold">{formatCurrency(weekdayVsWeekend.weekday.avgOmzetPerShift)}</span>/shift</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata {formatCurrency(weekdayVsWeekend.weekday.avgOmzetPerShift)} / Shift</p>
               </div>
-              <div className="space-y-1.5 pt-2 border-t text-xs">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Metode Pembayaran</span>
-                  <span className="font-bold text-foreground">Cash {weekdayVsWeekend.weekday.cashPercent}% vs Debit {weekdayVsWeekend.weekday.debitPercent}%</span>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-xs">
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Porsi Tunai</span>
+                  <span className="font-bold">{weekdayVsWeekend.weekday.cashPercent}% ({formatCurrency(weekdayVsWeekend.weekday.omzetCash)})</span>
                 </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
-                  <div className="bg-blue-500 h-full" style={{ width: `${weekdayVsWeekend.weekday.cashPercent}%` }} />
-                  <div className="bg-purple-500 h-full" style={{ width: `${weekdayVsWeekend.weekday.debitPercent}%` }} />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
-                  <span>Laba Digital Disumbang</span>
-                  <span className="font-bold text-teal-600">+{formatCurrency(weekdayVsWeekend.weekday.digitalProfit)}</span>
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Porsi Debit/Digital</span>
+                  <span className="font-bold text-indigo-600">{weekdayVsWeekend.weekday.debitPercent}% ({formatCurrency(weekdayVsWeekend.weekday.omzetDebit)})</span>
                 </div>
               </div>
             </div>
@@ -380,37 +376,57 @@ export function DashboardClient({
             <div className="p-4 rounded-xl border border-border/80 bg-card space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-amber-500" />
+                  <Sparkles className="h-4 w-4 text-purple-500" />
                   <span className="font-bold text-sm">Akhir Pekan (Weekend)</span>
                 </div>
                 <Badge variant="secondary" className="text-[10px]">Sabtu - Minggu ({weekdayVsWeekend.weekend.shiftCount} Shift)</Badge>
               </div>
               <div>
                 <p className="text-2xl font-black text-foreground">{formatCurrency(weekdayVsWeekend.weekend.totalOmzet)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata: <span className="font-bold">{formatCurrency(weekdayVsWeekend.weekend.avgOmzetPerShift)}</span>/shift</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Rata-rata {formatCurrency(weekdayVsWeekend.weekend.avgOmzetPerShift)} / Shift</p>
               </div>
-              <div className="space-y-1.5 pt-2 border-t text-xs">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Metode Pembayaran</span>
-                  <span className="font-bold text-foreground">Cash {weekdayVsWeekend.weekend.cashPercent}% vs Debit {weekdayVsWeekend.weekend.debitPercent}%</span>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-xs">
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Porsi Tunai</span>
+                  <span className="font-bold">{weekdayVsWeekend.weekend.cashPercent}% ({formatCurrency(weekdayVsWeekend.weekend.omzetCash)})</span>
                 </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
-                  <div className="bg-blue-500 h-full" style={{ width: `${weekdayVsWeekend.weekend.cashPercent}%` }} />
-                  <div className="bg-purple-500 h-full" style={{ width: `${weekdayVsWeekend.weekend.debitPercent}%` }} />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
-                  <span>Laba Digital Disumbang</span>
-                  <span className="font-bold text-teal-600">+{formatCurrency(weekdayVsWeekend.weekend.digitalProfit)}</span>
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Porsi Debit/Digital</span>
+                  <span className="font-bold text-purple-600">{weekdayVsWeekend.weekend.debitPercent}% ({formatCurrency(weekdayVsWeekend.weekend.omzetDebit)})</span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Top Payment Method & Category Summary */}
+          <div className="grid gap-3 sm:grid-cols-3 pt-2">
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border/50 space-y-1">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Metode Dominan Weekday</span>
+              <p className="font-black text-sm">{weekdayVsWeekend.weekday.debitPercent > 50 ? "💳 Non-Tunai / Debit" : "💵 Uang Tunai"}</p>
+              <p className="text-[11px] text-muted-foreground">{weekdayVsWeekend.weekday.debitPercent > 50 ? `${weekdayVsWeekend.weekday.debitPercent}% transaksi via mesin/digital` : `${weekdayVsWeekend.weekday.cashPercent}% kasir menerima tunai`}</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border/50 space-y-1">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Metode Dominan Weekend</span>
+              <p className="font-black text-sm">{weekdayVsWeekend.weekend.debitPercent > 50 ? "💳 Non-Tunai / Debit" : "💵 Uang Tunai"}</p>
+              <p className="text-[11px] text-muted-foreground">{weekdayVsWeekend.weekend.debitPercent > 50 ? `${weekdayVsWeekend.weekend.debitPercent}% transaksi via mesin/digital` : `${weekdayVsWeekend.weekend.cashPercent}% kasir menerima tunai`}</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
+              <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider block">Insight Perilaku Belanja</span>
+              <p className="font-bold text-xs text-foreground leading-snug">
+                {weekdayVsWeekend.weekendSurgePercent > 15
+                  ? "Lonjakan omzet signifikan di akhir pekan. Pastikan stok etalase terisi penuh sebelum Jumat malam."
+                  : weekdayVsWeekend.weekendSurgePercent < -10
+                  ? "Omzet hari kerja lebih tinggi. Maksimalkan promosi & bundling belanja di hari Sabtu-Minggu."
+                  : "Aktivitas belanja stabil antara hari kerja dan akhir pekan."}
+              </p>
+            </div>
+          </div>
+
           {/* Consumer Behavior Narrative Cards */}
           {consumerInsights.length > 0 && (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2 pt-2 border-t border-border/50">
               {consumerInsights.map((ci) => (
-                <div key={ci.id} className="p-3.5 rounded-xl border bg-background/80 space-y-1">
+                <div key={ci.id} className="p-3.5 rounded-xl border border-border/60 bg-background/80 space-y-1">
                   <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
                     {ci.title}
                   </p>
@@ -436,7 +452,7 @@ export function DashboardClient({
                 <div>
                   <CardTitle className="text-base font-black tracking-tight">Rekomendasi Strategis Peningkatan Penjualan</CardTitle>
                   <CardDescription className="text-xs">
-                    Analisa otomatis berbasis data transaksi & performa pegawai pada periode terpilih.
+                    Analisis otomatis berbasis data transaksi & performa pegawai pada periode terpilih.
                   </CardDescription>
                 </div>
               </div>
@@ -490,7 +506,7 @@ export function DashboardClient({
                 <BarChart3 className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-lg font-black tracking-tight">Analisa Trend Per User & Produktivitas Kasir</CardTitle>
+                <CardTitle className="text-lg font-black tracking-tight">Analisis Trend Per User & Produktivitas Kasir</CardTitle>
                 <CardDescription className="text-xs">
                   Evaluasi omzet, kontribusi laba digital, dan akurasi kas dari setiap pembuat laporan.
                 </CardDescription>

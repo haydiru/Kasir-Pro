@@ -508,25 +508,6 @@ export default function CashierReportPage() {
         </span>
       </div>
 
-      {/* Flip Warning */}
-      {unmatchedFlips.length > 0 && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-destructive">
-              {unmatchedFlips.length} transaksi Flip belum tercatat!
-            </p>
-            <ul className="mt-1 space-y-0.5">
-              {unmatchedFlips.map((f) => (
-                <li key={f.flipId} className="text-xs text-muted-foreground">
-                  #{f.flipId?.replace(/^#/, "")} — {f.serviceType}: {formatCurrency(f.nominal)}{f.customerName ? ` (${f.customerName})` : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
       {/* SECTION 1: Info Shift & Modal */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
@@ -538,115 +519,87 @@ export default function CashierReportPage() {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Kasir</Label>
-              <Input value={reportOwnerName || session?.user?.name || "Kasir"} disabled className="bg-muted/50" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Shift</Label>
+              <Label>Tipe Shift</Label>
               <Select
                 value={shiftType}
-                onValueChange={(v) => setShiftType(v)}
+                onValueChange={(val) => setShiftType(val)}
                 disabled={inputDisabled}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Pilih Shift" />
+                  <SelectValue placeholder="Pilih shift" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableShifts.map((s) => (
-                      <SelectItem key={s.id} value={s.name}>
-                        {s.name} ({s.startTime}-{s.endTime})
-                      </SelectItem>
+                    <SelectItem key={s.id} value={s.name}>
+                      Shift {s.name} ({s.startTime} - {s.endTime})
+                    </SelectItem>
                   ))}
-                  {/* Fallback if current shift is not in available (e.g. settings changed) */}
-                  {shiftType && !availableShifts.find(s => s.name === shiftType) && (
-                      <SelectItem value={shiftType}>{shiftType}</SelectItem>
+                  {availableShifts.length === 0 && (
+                    <>
+                      <SelectItem value="Pagi">Shift Pagi (07:00 - 15:00)</SelectItem>
+                      <SelectItem value="Siang">Shift Siang (15:00 - 23:00)</SelectItem>
+                      <SelectItem value="Malam">Shift Malam (23:00 - 07:00)</SelectItem>
+                    </>
                   )}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="starting-cash" className="text-xs text-muted-foreground">
-                Modal Awal Laci (Rp)
-              </Label>
+              <Label>Modal Awal (Kas Fisik)</Label>
               <Input
-                id="starting-cash"
                 type="number"
-                value={startingCash}
-                onChange={(e) => setStartingCash(Number(e.target.value))}
+                value={startingCash || ""}
+                onChange={(e) => setStartingCash(Number(e.target.value) || 0)}
+                placeholder="500000"
                 disabled={inputDisabled}
-                className="font-mono"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bill-money" className="text-xs text-muted-foreground">
-                Uang Tagihan Masuk (Rp)
-              </Label>
-              <Input
-                id="bill-money"
-                type="number"
-                value={billMoneyReceived || ""}
-                onChange={(e) => setBillMoneyReceived(Number(e.target.value))}
-                disabled={inputDisabled}
-                className="font-mono"
-                placeholder="0"
-              />
-              <p className="text-[10px] text-muted-foreground">
-                Uang dari Owner khusus untuk pembayaran tagihan supplier (bisa bersisa)
-              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* SECTION 2: POS */}
+      {/* SECTION 2: Omzet POS */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-primary" />
-            Data POS
+            <Calculator className="h-4 w-4 text-primary" />
+            Omzet POS (Mesin Kasir)
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="pos-cash" className="text-xs text-muted-foreground">
-                Penghasilan Tunai POS (Rp)
-              </Label>
+              <Label>Omzet POS Tunai</Label>
               <Input
-                id="pos-cash"
                 type="number"
                 value={posCash || ""}
-                onChange={(e) => setPosCash(Number(e.target.value))}
+                onChange={(e) => setPosCash(Number(e.target.value) || 0)}
                 placeholder="0"
                 disabled={inputDisabled}
-                className="font-mono"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pos-debit" className="text-xs text-muted-foreground">
-                Penghasilan Debit POS (Rp)
-              </Label>
+              <Label>Omzet POS Non-Tunai / Debit</Label>
               <Input
-                id="pos-debit"
                 type="number"
                 value={posDebit || ""}
-                onChange={(e) => setPosDebit(Number(e.target.value))}
+                onChange={(e) => setPosDebit(Number(e.target.value) || 0)}
                 placeholder="0"
                 disabled={inputDisabled}
-                className="font-mono"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* SECTION 3: Layanan Digital */}
+      {/* SECTION 3: Transaksi Digital */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Smartphone className="h-4 w-4 text-primary" />
-              Layanan Digital
+              Transaksi Digital (Flip / Transfer / PLN / Pulsa)
             </CardTitle>
             {!inputDisabled && (
               <Button variant="outline" size="sm" onClick={addDigitalRow}>
@@ -656,26 +609,92 @@ export default function CashierReportPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Flip Warning Banner */}
-          {unmatchedFlips.length > 0 && (
-            <div className="mb-4 p-3 bg-amber-500/10 border-l-2 border-amber-500 rounded-r-lg text-amber-600 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-semibold">Ada Transaksi Flip yang Belum Diinput</p>
-                <p className="text-xs">
-                  Ditemukan <b>{unmatchedFlips.length} transaksi</b> di hari ini dari layanan Flip yang belum Bapak/Ibu input ke dalam tebal di bawah. 
-                  Mohon periksa kotak masuk email atau dashboard Flip Bapak/Ibu.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {unmatchedFlips.map(f => (
-                    <Badge key={f.id} variant="outline" className="border-amber-500/30 text-amber-600 text-[10px] font-mono gap-1">
-                      #{f.flipId?.replace(/^#/, "")} • {f.serviceType}: {formatCurrency(f.nominal)}{f.customerName ? ` (${f.customerName})` : ""}
-                    </Badge>
-                  ))}
+          {/* Flip Warning Banner (Dynamically checks entered Flip IDs) */}
+          {(() => {
+            const enteredFlipIds = new Set(
+              digitalTx
+                .map((tx) => (tx.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+                .filter(Boolean)
+            );
+            const activeUnmatched = unmatchedFlips.filter(
+              (f) => !enteredFlipIds.has((f.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+            );
+
+            if (activeUnmatched.length === 0) return null;
+
+            return (
+              <div className="mb-4 p-3.5 bg-amber-500/10 border-l-4 border-amber-500 rounded-r-xl text-amber-700 dark:text-amber-300 flex items-start gap-3 shadow-xs">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-sm font-bold">Ada Transaksi Flip yang Belum Diinput</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Ditemukan <b>{activeUnmatched.length} transaksi Flip</b> hari ini yang belum dimasukkan ke dalam tabel di bawah. Klik tombol <b>"+ Gunakan"</b> pada transaksi di bawah untuk mengisinya secara otomatis:
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1.5">
+                    {activeUnmatched.map((f) => (
+                      <div
+                        key={f.id || f.flipId}
+                        className="inline-flex items-center gap-2 bg-background border border-amber-500/30 rounded-lg px-2.5 py-1 text-xs shadow-2xs"
+                      >
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                          #{f.flipId?.replace(/^#/, "")}
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="font-medium text-foreground">
+                          {f.serviceType}: {formatCurrency(f.nominal)}
+                        </span>
+                        {f.customerName && (
+                          <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">
+                            ({f.customerName})
+                          </span>
+                        )}
+                        {!inputDisabled && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-5 px-1.5 text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300"
+                            onClick={() => {
+                              const cleanId = (f.flipId?.replace(/^#/, "") || "").trim();
+                              // Check if there is an empty digital row first
+                              const emptyIdx = digitalTx.findIndex(
+                                (tx) => !tx.flipId && tx.grossAmount === 0
+                              );
+                              if (emptyIdx >= 0) {
+                                updateDigitalTx(digitalTx[emptyIdx].id, "flipId", cleanId);
+                                updateDigitalTx(digitalTx[emptyIdx].id, "grossAmount", f.nominal);
+                                updateDigitalTx(digitalTx[emptyIdx].id, "serviceType", f.serviceType || "Transfer");
+                                if (f.customerNumber || f.customerName) {
+                                  updateDigitalTx(digitalTx[emptyIdx].id, "detailContact", f.customerNumber || f.customerName);
+                                }
+                              } else {
+                                setDigitalTx((prev) => [
+                                  ...prev,
+                                  {
+                                    id: uid(),
+                                    serviceType: f.serviceType || "Transfer",
+                                    grossAmount: f.nominal,
+                                    profitAmount: 0,
+                                    detailContact: f.customerNumber || f.customerName || "",
+                                    flipId: cleanId,
+                                    isNonCash: false,
+                                    paymentMethod: "",
+                                  },
+                                ]);
+                              }
+                              toast.success(`Transaksi Flip #${cleanId} dimasukkan ke tabel`);
+                            }}
+                          >
+                            + Gunakan
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {digitalTx.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">

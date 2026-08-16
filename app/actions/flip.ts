@@ -132,31 +132,32 @@ export async function getUnmatchedFlipForReport(
       return { success: false, error: "Report not found" };
     }
 
-    // Get all non-excluded flip transactions strictly within the shift timeframe
-    const shiftStart = report.date;
-    const shiftEnd = report.submittedAt || new Date();
+    const timezone = report.store?.timezone || "Asia/Jakarta";
+    const { start, end } = getTZDateRange(report.date, timezone);
+    const shiftEnd = report.submittedAt ? new Date(report.submittedAt) : end;
 
     const flipTxs = await prisma.flipWebhook.findMany({
       where: {
         storeId: report.storeId,
         excluded: false,
-        transactionTime: { gte: shiftStart, lte: shiftEnd },
+        transactionTime: { gte: start, lte: shiftEnd },
       },
+      orderBy: { transactionTime: "desc" },
     });
 
-    // Get flipIds from report's digital transactions (strip leading #)
+    // Get flipIds from report's digital transactions (strip leading # and uppercase)
     const reportFlipIds = new Set(
       report.digitalTransactions
-        .map((dt) => dt.flipId?.replace(/^#/, "") || "")
+        .map((dt) => (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
         .filter(Boolean)
     );
 
     // Unmatched = in email but NOT in report
-    const unmatched = flipTxs.filter((ft) => !reportFlipIds.has(ft.flipId));
+    const unmatched = flipTxs.filter((ft) => !reportFlipIds.has((ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase()));
 
     // Update matched status for those that ARE matched
     const matchedIds = flipTxs
-      .filter((ft) => reportFlipIds.has(ft.flipId))
+      .filter((ft) => reportFlipIds.has((ft.flipId?.replace(/^#/, "") || "").trim().toUpperCase()))
       .map((ft) => ft.id);
 
     if (matchedIds.length > 0) {

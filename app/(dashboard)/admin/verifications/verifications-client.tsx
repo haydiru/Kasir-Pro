@@ -165,20 +165,21 @@ export function VerificationsClient({ submittedReports, verifiedReports, unmatch
               const expected = calcExpectedCash(report);
               const diff = report.manualCashCount - expected;
               
-              const dayStartMs = new Date(report.date).getTime();
-              const dayEndMs = report.submittedAt ? new Date(report.submittedAt).getTime() : new Date().getTime();
+              const tz = timezone || "Asia/Jakarta";
+              const { start, end } = getTZDateRange(new Date(report.date), tz);
+              const dayStartMs = start.getTime();
+              const dayEndMs = report.submittedAt ? new Date(report.submittedAt).getTime() : end.getTime();
+
+              const reportFlipIds = new Set(
+                report.digitalTransactions
+                  .map((dt: any) => (dt.flipId?.replace(/^#/, "") || "").trim().toUpperCase())
+                  .filter(Boolean)
+              );
 
               const reportUnmatchedFlips = unmatchedFlips.filter((fw) => {
                 const txTime = new Date(fw.transactionTime).getTime();
                 const isWithinShift = txTime >= dayStartMs && txTime <= dayEndMs;
-                
-                const reportFlipIds = new Set(
-                  report.digitalTransactions
-                    .map((dt: any) => dt.flipId?.replace(/^#/, "") || "")
-                    .filter(Boolean)
-                );
-                
-                const fwId = fw.flipId?.replace(/^#/, "") || "";
+                const fwId = (fw.flipId?.replace(/^#/, "") || "").trim().toUpperCase();
                 const isNotInReport = !reportFlipIds.has(fwId);
                 
                 return isWithinShift && isNotInReport;

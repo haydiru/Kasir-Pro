@@ -63,8 +63,9 @@ export default async function AdminVerificationsPage() {
     where: {
       storeId,
       excluded: false,
-      matched: false
-    }
+    },
+    orderBy: { transactionTime: 'desc' },
+    take: 500,
   });
 
   const unmatchedFlips = unmatched.map(fw => ({
