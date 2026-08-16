@@ -52,6 +52,15 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
 
+### 🚀 [DONE-BUG-05] Perbaikan Warning Transaksi Flip (Timeframe Query & Dynamic Interactive Matching) & Koreksi Typo Bahasa Indonesia
+- **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. **Akurasi Rentang Waktu Warning Flip**: Memperbaiki `getUnmatchedFlipForReport` di `app/actions/flip.ts` dan `verifications-client.tsx` agar menggunakan awal hari kalender lokal toko (`getTZDateRange(report.date, timezone).start` = 00:00:00 WIB) sehingga transaksi Flip di pagi hari (sebelum shift dibuka) tidak terlewat atau hilang dari warning.
+  2. **Pencocokan Real-Time Dinamis & Tombol "+ Gunakan"**: Di halaman Laporan Kasir (`/cashier/report`), badge warning transaksi Flip yang belum diinput kini reaktif secara dinamis saat kasir mengetik/memasukkan ID Flip ke tabel. Dilengkapi tombol "+ Gunakan" untuk langsung memasukkan detail Flip ke tabel transaksi digital dengan 1 klik.
+  3. **Penyelarasan Verifikasi Admin**: Menghubungkan seluruh transaksi Flip aktif pada tanggal shift terkait di `/admin/verifications` agar warning selisih Flip muncul akurat dan real-time.
+  4. **Koreksi Typo & Bahasa Indonesia**: Memperbaiki typo seperti `"tebal di bawah"` ➔ `"tabel di bawah"`, standardisasi KBBI (`"Analisa"` ➔ `"Analisis"`), dan penyempurnaan teks instruksi kasir.
+  5. Pengujian kompilasi `npm run build` sukses 100% dan ter-push ke GitHub repository.
+
 ### 🚀 [DONE-PERF-02] Optimasi Kecepatan Hapus Instan Transaksi Flip (Optimistic UI Update & 1-Query Delete)
 - **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
 - **Hasil Pekerjaan**:
