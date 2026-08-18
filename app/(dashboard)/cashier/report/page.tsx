@@ -533,7 +533,7 @@ export default function CashierReportPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-foreground">Tipe Shift</Label>
             <Select
@@ -570,6 +570,20 @@ export default function CashierReportPage() {
               placeholder="500000"
               disabled={inputDisabled}
               className="h-10 rounded-xl border-border/80 text-xs font-mono font-bold"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-foreground">
+              Uang Tagihan Diterima (Rp)
+            </Label>
+            <Input
+              type="number"
+              value={billMoneyReceived || ""}
+              onChange={(e) => setBillMoneyReceived(Number(e.target.value) || 0)}
+              placeholder="0"
+              disabled={inputDisabled}
+              className="h-10 rounded-xl border-border/80 text-xs font-mono font-bold text-amber-600 dark:text-amber-400"
             />
           </div>
         </div>
@@ -1040,6 +1054,28 @@ export default function CashierReportPage() {
               <span className="font-mono text-lg text-primary">{formatCurrency(expectedCash)}</span>
             </div>
           </div>
+
+          {/* Bill Money Breakdown if any */}
+          {(billMoneyReceived > 0 || expFromBill > 0) && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-foreground mb-1">
+                <span>📋 Rekap Uang Tagihan Kasir</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Uang Tagihan Diterima</span>
+                <span className="font-mono font-bold text-amber-700 dark:text-amber-300">{formatCurrency(billMoneyReceived)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">− Dipakai untuk Bayar Nota Tagihan</span>
+                <span className="font-mono font-bold text-destructive">−{formatCurrency(expFromBill)}</span>
+              </div>
+              <Separator className="my-1 border-amber-500/20" />
+              <div className="flex justify-between font-bold text-foreground">
+                <span>Sisa Uang Tagihan (Terpisah dari Laci)</span>
+                <span className="font-mono font-bold text-amber-700 dark:text-amber-300">{formatCurrency(sisaUangTagihan)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Manual count input */}
           <div className="space-y-1.5">
