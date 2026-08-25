@@ -64,22 +64,40 @@ export function FlipTransactionsClient({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Background sync on mount dengan visual loading indicator
+  // Background sync on mount dengan visual loading indicator & auto timeout
   useEffect(() => {
+    let isMounted = true;
     setIsSyncing(true);
+
+    // Batas aman 10 detik agar UI dijamin tidak pernah macet
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setIsSyncing(false);
+    }, 10000);
+
     syncFlipEmailsFromGmail()
       .then((res) => {
+        if (!isMounted) return;
         if (res?.newCount && res.newCount > 0) {
           toast.success(`${res.newCount} transaksi Flip baru berhasil disinkronkan dari Gmail`);
           getFlipTransactions(month, year).then((r) => {
-            if (r.success && r.data) setTransactions(r.data);
+            if (isMounted && r.success && r.data) setTransactions(r.data);
           });
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Auto sync error:", err);
+      })
       .finally(() => {
-        setIsSyncing(false);
+        if (isMounted) {
+          clearTimeout(safetyTimer);
+          setIsSyncing(false);
+        }
       });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const months = [
@@ -124,6 +142,11 @@ export function FlipTransactionsClient({
   async function handleManualSync() {
     if (isSyncing) return;
     setIsSyncing(true);
+
+    const safetyTimer = setTimeout(() => {
+      setIsSyncing(false);
+    }, 15000);
+
     try {
       const res = await syncFlipEmailsFromGmail(true);
       if (res?.error) {
@@ -141,6 +164,7 @@ export function FlipTransactionsClient({
     } catch {
       toast.error("Gagal menyinkronkan email dari Gmail");
     } finally {
+      clearTimeout(safetyTimer);
       setIsSyncing(false);
     }
   }

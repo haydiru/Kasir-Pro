@@ -136,10 +136,18 @@ export async function syncFlipEmailsForStore(storeId: string, force = false) {
     // Catat waktu penarikan terbaru
     lastSyncMap.set(storeId, now);
 
-    // 1. Cari pesan dari Gmail API dengan filter komprehensif seluruh transaksi Flip
-    const query = encodeURIComponent('(from:flip.id OR "flip.id") (subject:"berhasil" OR subject:"sukses" OR subject:"pembelian" OR subject:"transfer" OR subject:"transaksi") -subject:"Flip Freedom" -subject:"Top Up Saldo"');
+    // 1. Filter tanggal: Ambil email dalam 3 hari terakhir saja agar proses instan & hemat kuota
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const y = threeDaysAgo.getFullYear();
+    const m = String(threeDaysAgo.getMonth() + 1).padStart(2, "0");
+    const d = String(threeDaysAgo.getDate()).padStart(2, "0");
+    const afterDateStr = `${y}/${m}/${d}`;
+
+    // Cari pesan dari Gmail API dengan filter 3 hari terakhir
+    const query = encodeURIComponent(`(from:flip.id OR "flip.id") after:${afterDateStr} (subject:"berhasil" OR subject:"sukses" OR subject:"pembelian" OR subject:"transfer" OR subject:"transaksi") -subject:"Flip Freedom" -subject:"Top Up Saldo"`);
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=200`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=50`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -155,83 +163,92 @@ export async function syncFlipEmailsForStore(storeId: string, force = false) {
     const messages = listData.messages || [];
 
     if (messages.length === 0) {
-      return { success: true, processed: 0, newCount: 0, message: "Tidak ada email notifikasi Flip ditemukan di Gmail Anda." };
+      return { success: true, processed: 0, newCount: 0, message: "Tidak ada email notifikasi Flip baru dalam 3 hari terakhir." };
     }
 
     let processedCount = 0;
     let newCount = 0;
 
-    // 2. Iterasi setiap pesan, ambil konten full dan urai
-    for (const msg of messages) {
-      const msgRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+    // 2. Ambil konten email secara paralel dalam batch kecil (chunk 8 pesan) agar cepat dan tidak timeout
+    const chunkSize = 8;
+    for (let i = 0; i < messages.length; i += chunkSize) {
+      const chunk = messages.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (msg: any) => {
+          try {
+            const msgRes = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            if (!msgRes.ok) return;
+
+            const msgData = await msgRes.json();
+            const payload = msgData.payload;
+            if (!payload) return;
+
+            const headers = payload.headers || [];
+            const subjectHeader = headers.find((h: any) => h.name?.toLowerCase() === "subject");
+            const subject = subjectHeader ? subjectHeader.value : "";
+            if (!subject) return;
+
+            const body = extractBodyFromPayload(payload);
+            if (!body) return;
+
+            // 3. Urai isi email menggunakan parseFlipEmail
+            const parsed = parseFlipEmail(subject, body);
+            if (!parsed || !parsed.flipId) return;
+
+            processedCount++;
+
+            // 4. Upsert secara aman berdasarkan flipId + storeId
+            const existing = await prisma.flipWebhook.findUnique({
+              where: {
+                flipId_storeId: {
+                  flipId: parsed.flipId,
+                  storeId,
+                },
+              },
+            });
+
+            if (!existing) {
+              newCount++;
+            }
+
+            await prisma.flipWebhook.upsert({
+              where: {
+                flipId_storeId: {
+                  flipId: parsed.flipId,
+                  storeId,
+                },
+              },
+              update: {
+                nominal: parsed.nominal,
+                transactionTime: parsed.transactionTime,
+                customerName: parsed.customerName,
+                customerNumber: parsed.customerNumber,
+                bankOrProvider: parsed.bankOrProvider,
+                emailSubject: parsed.emailSubject,
+              },
+              create: {
+                storeId,
+                flipId: parsed.flipId,
+                serviceType: parsed.serviceType,
+                nominal: parsed.nominal,
+                customerName: parsed.customerName,
+                customerNumber: parsed.customerNumber,
+                bankOrProvider: parsed.bankOrProvider,
+                transactionTime: parsed.transactionTime,
+                emailSubject: parsed.emailSubject,
+              },
+            });
+          } catch (itemErr) {
+            console.error("Error processing individual Flip email:", msg.id, itemErr);
+          }
+        })
       );
-
-      if (!msgRes.ok) continue;
-
-      const msgData = await msgRes.json();
-      const payload = msgData.payload;
-      if (!payload) continue;
-
-      const headers = payload.headers || [];
-      const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject");
-      const subject = subjectHeader ? subjectHeader.value : "";
-
-      if (!subject) continue;
-
-      const body = extractBodyFromPayload(payload);
-      if (!body) continue;
-
-      // 3. Urai isi email menggunakan parseFlipEmail
-      const parsed = parseFlipEmail(subject, body);
-      if (!parsed || !parsed.flipId) continue;
-
-      processedCount++;
-
-      // 4. Upsert secara AMAN berdasarkan flipId + storeId
-      const existing = await prisma.flipWebhook.findUnique({
-        where: {
-          flipId_storeId: {
-            flipId: parsed.flipId,
-            storeId,
-          },
-        },
-      });
-
-      if (!existing) {
-        newCount++;
-      }
-
-      await prisma.flipWebhook.upsert({
-        where: {
-          flipId_storeId: {
-            flipId: parsed.flipId,
-            storeId,
-          },
-        },
-        update: {
-          nominal: parsed.nominal,
-          transactionTime: parsed.transactionTime,
-          customerName: parsed.customerName,
-          customerNumber: parsed.customerNumber,
-          bankOrProvider: parsed.bankOrProvider,
-          emailSubject: parsed.emailSubject,
-        },
-        create: {
-          storeId,
-          flipId: parsed.flipId,
-          serviceType: parsed.serviceType,
-          nominal: parsed.nominal,
-          customerName: parsed.customerName,
-          customerNumber: parsed.customerNumber,
-          bankOrProvider: parsed.bankOrProvider,
-          transactionTime: parsed.transactionTime,
-          emailSubject: parsed.emailSubject,
-        },
-      });
     }
 
     // 5. Bersihkan data sampah terdahulu yang tidak sesuai kriteria
