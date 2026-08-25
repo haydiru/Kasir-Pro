@@ -37,6 +37,7 @@ import {
   Eye,
   Trash2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -58,18 +59,27 @@ export function FlipTransactionsClient({
   const [month, setMonth] = useState(initialMonth);
   const [year, setYear] = useState(initialYear);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isTogglingId, setIsTogglingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Background non-blocking sync: Eksekusi di latar belakang HANYA saat pertama kali halaman dimuat
+  // Background sync on mount dengan visual loading indicator
   useEffect(() => {
-    syncFlipEmailsFromGmail().then((res) => {
-      if (res?.newCount && res.newCount > 0) {
-        getFlipTransactions(month, year).then((r) => {
-          if (r.success && r.data) setTransactions(r.data);
-        });
-      }
-    }).catch(() => {});
+    setIsSyncing(true);
+    syncFlipEmailsFromGmail()
+      .then((res) => {
+        if (res?.newCount && res.newCount > 0) {
+          toast.success(`${res.newCount} transaksi Flip baru berhasil disinkronkan dari Gmail`);
+          getFlipTransactions(month, year).then((r) => {
+            if (r.success && r.data) setTransactions(r.data);
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setIsSyncing(false);
+      });
   }, []);
 
   const months = [
@@ -95,7 +105,7 @@ export function FlipTransactionsClient({
     try {
       const res = await getFlipTransactions(m, y);
       if (res.success && res.data) {
-        setTransactions(r => res.data);
+        setTransactions(res.data);
         toast.success(`Data ${months[m - 1].label} ${y} dimuat`);
       } else {
         toast.error(res.error || "Gagal memuat data");
@@ -111,7 +121,32 @@ export function FlipTransactionsClient({
     await fetchForMonthYear(month, year);
   }
 
+  async function handleManualSync() {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await syncFlipEmailsFromGmail(true);
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        const newCount = res?.newCount || 0;
+        toast.success(
+          newCount > 0
+            ? `Sinkronisasi berhasil: ${newCount} transaksi baru ditambahkan!`
+            : "Sinkronisasi selesai: Semua email Flip sudah mutakhir."
+        );
+        const r = await getFlipTransactions(month, year);
+        if (r.success && r.data) setTransactions(r.data);
+      }
+    } catch {
+      toast.error("Gagal menyinkronkan email dari Gmail");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   async function handleToggleExclude(id: string) {
+    setIsTogglingId(id);
     try {
       const res = await toggleFlipExcluded(id);
       if (res.success && res.data) {
@@ -130,6 +165,8 @@ export function FlipTransactionsClient({
       }
     } catch {
       toast.error("Terjadi kesalahan");
+    } finally {
+      setIsTogglingId(null);
     }
   }
 
@@ -261,18 +298,43 @@ export function FlipTransactionsClient({
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20">
-      {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
-          Transaksi Flip & Digital
-          <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-0.5 text-xs font-bold text-primary">
-            Email Webhook
-          </span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Daftar transaksi digital yang diekstrak otomatis dari email Flip untuk pencocokan shift kasir.
-        </p>
+      {/* Header with Sync Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
+            Transaksi Flip & Digital
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-0.5 text-xs font-bold text-primary">
+              Email Webhook
+            </span>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Daftar transaksi digital yang diekstrak otomatis dari email Flip untuk pencocokan shift kasir.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleManualSync}
+            disabled={isSyncing || isLoading}
+            className="h-10 rounded-xl px-4 gap-2 text-xs font-bold border-border/80 hover:border-primary/50 shadow-xs transition-all"
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-primary" : ""}`} />
+            {isSyncing ? "Menyinkronkan Gmail..." : "Sinkronkan Gmail"}
+          </Button>
+        </div>
       </div>
+
+      {/* Sync Status Banner */}
+      {isSyncing && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-xs font-semibold animate-pulse">
+          <RefreshCw className="h-4 w-4 animate-spin shrink-0 text-primary" />
+          <div className="flex-1">
+            <p className="font-bold">Sedang menyinkronkan email transaksi Flip dari Gmail...</p>
+            <p className="text-[11px] opacity-85 mt-0.5">Sistem sedang memeriksa transaksi email terbaru dan menyelaraskan status pencocokan laporan shift.</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards Upwork style */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -378,10 +440,14 @@ export function FlipTransactionsClient({
           </div>
           <Button
             onClick={handleSearch}
-            disabled={isLoading}
+            disabled={isLoading || isSyncing}
             className="h-10 rounded-xl px-6 gap-2 text-xs font-bold bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
           >
-            <Search className="h-4 w-4" />
+            {isLoading ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
             {isLoading ? "Memuat..." : "Tampilkan Data"}
           </Button>
         </div>
@@ -426,7 +492,19 @@ export function FlipTransactionsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={isSuperAdmin ? 8 : 7}
+                      className="text-center py-20 text-muted-foreground"
+                    >
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                        <span className="text-xs font-semibold text-foreground">Memuat data transaksi Flip...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : transactions.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={isSuperAdmin ? 8 : 7}
@@ -438,6 +516,7 @@ export function FlipTransactionsClient({
                 ) : (
                   transactions.map((tx) => {
                     const isSelected = selectedIds.includes(tx.id);
+                    const isTogglingThis = isTogglingId === tx.id;
                     return (
                       <TableRow
                         key={tx.id}
@@ -506,6 +585,7 @@ export function FlipTransactionsClient({
                             <Button
                               variant="ghost"
                               size="sm"
+                              disabled={isTogglingThis}
                               className={`h-8 rounded-xl text-xs gap-1.5 ${
                                 tx.excluded
                                   ? "text-primary hover:text-primary"
@@ -518,7 +598,9 @@ export function FlipTransactionsClient({
                                   : "Tandai bukan transaksi kasir"
                               }
                             >
-                              {tx.excluded ? (
+                              {isTogglingThis ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : tx.excluded ? (
                                 <>
                                   <Eye className="h-3.5 w-3.5" /> Aktifkan
                                 </>
