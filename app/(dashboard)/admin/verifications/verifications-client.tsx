@@ -556,61 +556,73 @@ export function VerificationsClient({
           }
         }}
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
+        <DialogContent className="max-w-md top-4 sm:top-6 md:top-8 lg:top-1/2 translate-y-0 lg:-translate-y-1/2 max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-5">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Calculator className="h-5 w-5 text-primary" />
               Verifikasi Laporan
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {selectedReport?.user.name} — {selectedReport ? formatLocalDate(selectedReport.date, timezone) : ""} Shift {selectedReport?.shiftType}
             </DialogDescription>
           </DialogHeader>
-          <form key={selectedReport?.id || "verify-form"} action={verifyAction} className="space-y-4 pt-2">
+          <form key={selectedReport?.id || "verify-form"} action={verifyAction} className="space-y-3 pt-1">
             <input type="hidden" name="reportId" value={selectedReport?.id || ""} />
             
             {selectedReport && (
-              <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-                <div className="flex justify-between text-sm">
+              <div className="rounded-xl bg-muted/40 border border-border/60 p-3 space-y-1.5 text-xs sm:text-sm">
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Cash Seharusnya</span>
-                  <span className="font-mono font-medium">{formatCurrency(calcExpectedCash(selectedReport))}</span>
+                  <span className="font-mono font-bold text-foreground">{formatCurrency(calcExpectedCash(selectedReport))}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Cash Manual Kasir</span>
-                  <span className="font-mono font-medium">{formatCurrency(selectedReport.manualCashCount)}</span>
+                  <span className="font-mono font-bold text-foreground">{formatCurrency(selectedReport.manualCashCount)}</span>
                 </div>
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="admin-variance">Selisih Fisik Aktual (Rp)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-variance" className="text-xs sm:text-sm font-semibold">Selisih Fisik Aktual (Rp)</Label>
               <Input
                 id="admin-variance"
                 name="variance"
                 type="number"
                 placeholder="Contoh: -5000 (minus jika kurang)"
-                className="font-mono"
+                className="font-mono h-10 rounded-xl text-sm"
                 defaultValue={selectedReport ? selectedReport.manualCashCount - calcExpectedCash(selectedReport) : 0}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Input 0 jika sesuai, minus jika kurang, plus jika lebih
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="admin-notes">Catatan Verifikasi</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-notes" className="text-xs sm:text-sm font-semibold">Catatan Verifikasi</Label>
               <Textarea
                 id="admin-notes"
                 name="notes"
                 placeholder="Contoh: Uang kembalian kurang Rp5.000..."
-                rows={3}
+                rows={2}
+                className="rounded-xl text-xs sm:text-sm min-h-[56px] resize-none"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setVerifyDialogOpen(false)}>Batal</Button>
-              <Button type="submit" className="flex-1" disabled={isVerifying}>
-                {isVerifying ? "Menyimpan" : "Approve"}
+            <div className="flex gap-2.5 pt-1">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="flex-1 rounded-xl h-10 font-semibold text-xs sm:text-sm" 
+                onClick={() => setVerifyDialogOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1 rounded-xl h-10 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs text-xs sm:text-sm" 
+                disabled={isVerifying}
+              >
+                {isVerifying ? "Menyimpan..." : "Approve"}
               </Button>
             </div>
           </form>
