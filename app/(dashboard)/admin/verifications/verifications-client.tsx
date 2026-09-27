@@ -152,20 +152,20 @@ export function VerificationsClient({
       {/* Pending Verifications */}
       <div>
         <div className="flex items-center gap-2.5 mb-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 shadow-2xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 shadow-2xs">
             <ShieldCheck className="h-4.5 w-4.5" />
           </div>
           <h2 className="text-base font-bold tracking-tight text-foreground">
             Menunggu Verifikasi Setoran
           </h2>
-          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-500/20">
+          <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-500/20">
             {submittedReports.length}
           </span>
         </div>
 
         {submittedReports.length === 0 ? (
-          <div className="rounded-2xl border border-border/80 bg-card p-12 text-center shadow-xs">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 mb-3 shadow-2xs">
+          <div className="rounded-xl border border-border/80 bg-card p-12 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 mb-3 shadow-2xs">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <p className="text-sm font-bold text-foreground">
@@ -214,7 +214,7 @@ export function VerificationsClient({
               });
 
               return (
-                <div key={report.id} className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/40 transition-all duration-200">
+                <div key={report.id} className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/40 transition-all duration-200">
                   <div className="flex flex-col md:flex-row">
                     {/* Left: Report Info */}
                     <div className="flex-1 p-5 space-y-4">
@@ -222,18 +222,18 @@ export function VerificationsClient({
                         <div>
                           <h3 className="font-bold text-base text-foreground">{report.user.name}</h3>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
+                            <span className="inline-flex items-center rounded-md bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
                               {report.store.name}
                             </span>
-                            <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
+                            <span className="inline-flex items-center rounded-md bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/60">
                               📅 {formatLocalDate(report.date, timezone)}
                             </span>
-                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                            <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
                               Shift {report.shiftType}
                             </span>
                           </div>
                         </div>
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold ${
                           report.status === "Submitted"
                             ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
                             : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
@@ -245,23 +245,23 @@ export function VerificationsClient({
                       <Separator className="border-border/60" />
 
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                        <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                           <p className="text-muted-foreground font-semibold">Modal Awal</p>
                           <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.startingCash)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                        <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                           <p className="text-muted-foreground font-semibold">POS Tunai</p>
                           <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.posCash)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                        <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                           <p className="text-muted-foreground font-semibold">POS Debit</p>
                           <p className="font-mono font-bold text-sm text-indigo-600 mt-0.5">{formatCurrency(report.posDebit)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                        <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                           <p className="text-muted-foreground font-semibold">Uang Tagihan</p>
                           <p className="font-mono font-bold text-sm text-foreground mt-0.5">{formatCurrency(report.billMoneyReceived)}</p>
                         </div>
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5">
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
                           <p className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tight">Sisa Tagihan</p>
                           <p className="font-mono font-bold text-sm text-amber-700 dark:text-amber-300 mt-0.5">
                             {formatCurrency(report.billMoneyReceived - report.expenditures.reduce((acc: number, curr: any) => acc + (curr.amountFromBill || 0), 0))}
@@ -270,7 +270,7 @@ export function VerificationsClient({
                       </div>
 
                       {reportUnmatchedFlips.length > 0 && (
-                        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 space-y-2.5 shadow-2xs">
+                        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 space-y-2.5 shadow-2xs">
                           <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-bold text-xs">
                             <AlertTriangle className="h-4 w-4 shrink-0" />
                             <span>{reportUnmatchedFlips.length} Transaksi Flip Belum Tercatat di Laporan Ini:</span>
@@ -279,14 +279,14 @@ export function VerificationsClient({
                             {reportUnmatchedFlips.map((fw: any) => (
                               <div 
                                 key={fw.id} 
-                                className="flex items-center justify-between gap-3 bg-card border border-rose-500/30 p-2.5 px-3 rounded-xl shadow-2xs"
+                                className="flex items-center justify-between gap-3 bg-card border border-rose-500/30 p-2.5 px-3 rounded-lg shadow-2xs"
                               >
                                 <div className="flex flex-col min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400">
                                       #{fw.flipId?.replace(/^#/, "")}
                                     </span>
-                                    <span className="inline-flex items-center rounded-full bg-rose-500/15 px-2 py-0.2 text-[9px] font-bold text-rose-700 dark:text-rose-300 uppercase">
+                                    <span className="inline-flex items-center rounded-md bg-rose-500/15 px-2 py-0.2 text-[9px] font-bold text-rose-700 dark:text-rose-300 uppercase">
                                       {fw.serviceType}
                                     </span>
                                   </div>
@@ -308,7 +308,7 @@ export function VerificationsClient({
                       )}
 
                       {report.digitalTransactions.length > 0 && (
-                        <div className="rounded-xl border border-border/80 overflow-hidden">
+                        <div className="rounded-lg border border-border/80 overflow-hidden">
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/40">
@@ -327,11 +327,11 @@ export function VerificationsClient({
                                   <TableRow key={dt.id}>
                                     <TableCell className="text-xs">
                                       <div className="flex flex-col gap-1">
-                                        <span className="inline-flex items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-bold w-fit border border-border/60">
+                                        <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-[10px] font-bold w-fit border border-border/60">
                                           {dt.serviceType}
                                         </span>
                                         {rawFlipId && (
-                                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold px-2 py-0.5 w-fit">
+                                          <span className="inline-flex items-center rounded-md bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold px-2 py-0.5 w-fit">
                                             #{rawFlipId}
                                           </span>
                                         )}
@@ -374,7 +374,7 @@ export function VerificationsClient({
                             {report.expenditures.map((ex: any) => {
                               const total = ex.amountFromCashier + ex.amountFromBill + ex.amountFromTransfer;
                               return (
-                                <div key={ex.id} className="flex flex-col rounded-xl border border-border/80 px-3.5 py-2 text-xs bg-muted/20">
+                                <div key={ex.id} className="flex flex-col rounded-lg border border-border/80 px-3.5 py-2 text-xs bg-muted/20">
                                   <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
                                       <FileText className="h-3.5 w-3.5 text-muted-foreground" />
@@ -405,15 +405,15 @@ export function VerificationsClient({
                     {/* Right: Verification Summary */}
                     <div className="w-full md:w-68 border-t md:border-t-0 md:border-l border-border/80 bg-muted/30 p-5 flex flex-col justify-between gap-4">
                       <div className="space-y-3">
-                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                        <div className="rounded-lg border border-border/60 bg-card p-3 shadow-2xs">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cash Sistem</p>
                           <p className="text-lg font-black font-mono text-foreground mt-0.5">{formatCurrency(expected)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                        <div className="rounded-lg border border-border/60 bg-card p-3 shadow-2xs">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cash Fisik Kasir</p>
                           <p className="text-lg font-black font-mono text-foreground mt-0.5">{formatCurrency(report.manualCashCount)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
+                        <div className="rounded-lg border border-border/60 bg-card p-3 shadow-2xs">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Selisih Kasir</p>
                           <p className={`text-lg font-black font-mono mt-0.5 ${diff < 0 ? "text-destructive" : diff > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                             {diff >= 0 ? "+" : ""}
@@ -422,7 +422,7 @@ export function VerificationsClient({
                         </div>
 
                         {diff !== 0 && (
-                          <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
                             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                             <p className="text-xs text-amber-700 dark:text-amber-300 font-medium leading-tight">
                               Ada selisih {formatCurrency(Math.abs(diff))} antara kasir dan sistem
@@ -435,7 +435,7 @@ export function VerificationsClient({
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/20 h-10 w-10 shrink-0"
+                          className="rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/20 h-10 w-10 shrink-0"
                           onClick={() => handleDelete(report.id)}
                           disabled={isDeleting === report.id}
                           title="Hapus Laporan"
@@ -443,7 +443,7 @@ export function VerificationsClient({
                           <Trash2 className={`h-4 w-4 ${isDeleting === report.id ? "animate-pulse" : ""}`} />
                         </Button>
                         <Button 
-                          className="flex-1 rounded-xl font-bold h-10 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90" 
+                          className="flex-1 rounded-lg font-bold h-10 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90" 
                           onClick={() => handleOpenVerify(report)}
                         >
                           <ShieldCheck className="mr-1.5 h-4 w-4" />
@@ -463,18 +463,18 @@ export function VerificationsClient({
       {verifiedReports.length > 0 && (
         <div>
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 shadow-2xs">
               <CheckCircle2 className="h-4.5 w-4.5" />
             </div>
             <h2 className="text-base font-bold tracking-tight text-foreground">
               Riwayat Setoran Terverifikasi
             </h2>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
               {verifiedReports.length}
             </span>
           </div>
 
-          <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs">
+          <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
@@ -494,7 +494,7 @@ export function VerificationsClient({
                     <TableCell className="font-bold text-xs text-foreground">{report.user.name}</TableCell>
                     <TableCell className="text-xs">{formatLocalDate(report.date, timezone)}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border/60">
+                      <span className="inline-flex items-center rounded-md bg-muted/60 px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border/60">
                         {report.shiftType}
                       </span>
                     </TableCell>
@@ -570,7 +570,7 @@ export function VerificationsClient({
             <input type="hidden" name="reportId" value={selectedReport?.id || ""} />
             
             {selectedReport && (
-              <div className="rounded-xl bg-muted/40 border border-border/60 p-3 space-y-1.5 text-xs sm:text-sm">
+              <div className="rounded-lg bg-muted/40 border border-border/60 p-3 space-y-1.5 text-xs sm:text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cash Seharusnya</span>
                   <span className="font-mono font-bold text-foreground">{formatCurrency(calcExpectedCash(selectedReport))}</span>
@@ -589,7 +589,7 @@ export function VerificationsClient({
                 name="variance"
                 type="number"
                 placeholder="Contoh: -5000 (minus jika kurang)"
-                className="font-mono h-10 rounded-xl text-sm"
+                className="font-mono h-10 rounded-md text-sm"
                 defaultValue={selectedReport ? selectedReport.manualCashCount - calcExpectedCash(selectedReport) : 0}
               />
               <p className="text-[11px] text-muted-foreground">
@@ -604,7 +604,7 @@ export function VerificationsClient({
                 name="notes"
                 placeholder="Contoh: Uang kembalian kurang Rp5.000..."
                 rows={2}
-                className="rounded-xl text-xs sm:text-sm min-h-[56px] resize-none"
+                className="rounded-md text-xs sm:text-sm min-h-[56px] resize-none"
               />
             </div>
 
@@ -612,14 +612,14 @@ export function VerificationsClient({
               <Button 
                 type="button" 
                 variant="outline" 
-                className="flex-1 rounded-xl h-10 font-semibold text-xs sm:text-sm" 
+                className="flex-1 rounded-md h-10 font-semibold text-xs sm:text-sm" 
                 onClick={() => setVerifyDialogOpen(false)}
               >
                 Batal
               </Button>
               <Button 
                 type="submit" 
-                className="flex-1 rounded-xl h-10 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs text-xs sm:text-sm" 
+                className="flex-1 rounded-md h-10 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs text-xs sm:text-sm" 
                 disabled={isVerifying}
               >
                 {isVerifying ? "Menyimpan..." : "Approve"}

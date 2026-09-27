@@ -23,6 +23,15 @@ export const metadata: Metadata = {
   title: "KasirPro — Laporan Shift Minimarket",
   description:
     "Aplikasi Kasir & Laporan Shift Minimarket. Digitalisasi pencatatan shift harian, verifikasi setoran, dan rekonsiliasi transaksi digital.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 import { SessionProvider } from "@/components/session-provider";
