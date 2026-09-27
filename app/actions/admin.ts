@@ -134,7 +134,12 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
     const variance = parseFloat(adminVarianceStr);
 
     const report = await prisma.shiftReport.findUnique({
-      where: { id: reportId }
+      where: { id: reportId },
+      include: {
+        user: true,
+        digitalTransactions: true,
+        expenditures: true,
+      }
     });
 
     if (!report || report.storeId !== admin.storeId) {
@@ -157,6 +162,7 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
         }
       });
 
+      // 1. Akun Kas Pegangan Admin (CASH_ADMIN) - hanya memegang uang cash fisik
       let adminAccount = await tx.financialAccount.findFirst({
         where: { storeId: admin.storeId, userId: admin.id, type: "CASH_ADMIN" }
       });
@@ -174,12 +180,51 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
         });
       }
 
-      // Check if it's already logged or if amount is 0
-      const existingTx = await tx.financialTransaction.findUnique({
+      // 2. Akun Rekening Bank Perusahaan (BANK_STORE) - menampung transfer & debit
+      let bankAccount = await tx.financialAccount.findFirst({
+        where: { storeId: admin.storeId, type: "BANK_STORE" }
+      });
+
+      if (!bankAccount) {
+        bankAccount = await tx.financialAccount.create({
+          data: {
+            storeId: admin.storeId,
+            name: "Rekening Bank Utama",
+            type: "BANK_STORE",
+            balance: 0,
+          }
+        });
+      }
+
+      // 3. Rollback transaksi lama jika sudah pernah tercatat (idempotent / reverify safe)
+      const existingTxs = await tx.financialTransaction.findMany({
         where: { shiftReportId: report.id }
       });
 
-      if (!existingTx && report.manualCashCount > 0) {
+      for (const et of existingTxs) {
+        if (et.type === "INCOME") {
+          await tx.financialAccount.update({
+            where: { id: et.accountId },
+            data: { balance: { decrement: et.amount } }
+          });
+        } else if (et.type === "EXPENSE") {
+          await tx.financialAccount.update({
+            where: { id: et.accountId },
+            data: { balance: { increment: et.amount } }
+          });
+        }
+      }
+
+      if (existingTxs.length > 0) {
+        await tx.financialTransaction.deleteMany({
+          where: { shiftReportId: report.id }
+        });
+      }
+
+      const reportDateStr = report.date.toISOString().split("T")[0];
+
+      // 4. Catat Setoran Cash Fisik ke Kas Pegangan Admin yang memverifikasi
+      if (report.manualCashCount > 0) {
         await tx.financialTransaction.create({
           data: {
             storeId: admin.storeId,
@@ -188,7 +233,7 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
             type: "INCOME",
             category: "Setoran Shift",
             amount: report.manualCashCount,
-            description: `Setoran shift ${report.shiftType} dari ${report.date.toISOString().split('T')[0]}`,
+            description: `Setoran shift ${report.shiftType} (Tunai Fisik) dari ${report.user.name} (${reportDateStr})`,
             shiftReportId: report.id
           }
         });
@@ -199,7 +244,78 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
         });
       }
 
-      // ─── ADDITION: Trigger Notification if Admin Notes provided ───
+      // 5. Catat Omzet POS Debit / QRIS ke Rekening Bank Perusahaan
+      if (report.posDebit > 0) {
+        await tx.financialTransaction.create({
+          data: {
+            storeId: admin.storeId,
+            accountId: bankAccount.id,
+            userId: admin.id,
+            type: "INCOME",
+            category: "Setoran Shift (Debit / QRIS)",
+            amount: report.posDebit,
+            description: `Omzet POS Debit/QRIS shift ${report.shiftType} dari ${report.user.name} (${reportDateStr})`,
+            shiftReportId: report.id
+          }
+        });
+
+        await tx.financialAccount.update({
+          where: { id: bankAccount.id },
+          data: { balance: { increment: report.posDebit } }
+        });
+      }
+
+      // 6. Catat Transaksi Digital Non-Tunai / Transfer ke Rekening Bank Perusahaan
+      const nonCashDigital = (report.digitalTransactions || [])
+        .filter((d: any) => d.isNonCash)
+        .reduce((sum: number, d: any) => sum + (d.grossAmount || 0), 0);
+
+      if (nonCashDigital > 0) {
+        await tx.financialTransaction.create({
+          data: {
+            storeId: admin.storeId,
+            accountId: bankAccount.id,
+            userId: admin.id,
+            type: "INCOME",
+            category: "Transaksi Digital (Transfer)",
+            amount: nonCashDigital,
+            description: `Layanan digital transfer/non-tunai shift ${report.shiftType} (${reportDateStr})`,
+            shiftReportId: report.id
+          }
+        });
+
+        await tx.financialAccount.update({
+          where: { id: bankAccount.id },
+          data: { balance: { increment: nonCashDigital } }
+        });
+      }
+
+      // 7. Catat Pengeluaran Supplier yang Dibayar Transfer Bank dari Rekening Perusahaan
+      const transferExpenditures = (report.expenditures || []).filter((e: any) => (e.amountFromTransfer || 0) > 0);
+      const totalTransferExpense = transferExpenditures.reduce((sum: number, e: any) => sum + (e.amountFromTransfer || 0), 0);
+
+      if (totalTransferExpense > 0) {
+        const suppliersList = transferExpenditures.map((e: any) => e.supplierName).filter(Boolean).join(", ");
+        await tx.financialTransaction.create({
+          data: {
+            storeId: admin.storeId,
+            accountId: bankAccount.id,
+            userId: admin.id,
+            type: "EXPENSE",
+            category: "Tagihan",
+            amount: totalTransferExpense,
+            description: `Pengeluaran transfer bank shift ${report.shiftType}: ${suppliersList || "Supplier"} (${reportDateStr})`,
+            shiftReportId: report.id
+          }
+        });
+
+        await tx.financialAccount.update({
+          where: { id: bankAccount.id },
+          data: { balance: { decrement: totalTransferExpense } }
+        });
+      }
+
+      // 8. Trigger Notification jika ada catatan admin
       if (adminNotes && adminNotes.trim().length > 0) {
         const reportDate = report.date.toLocaleDateString("id-ID", {
           day: "numeric",
@@ -213,13 +329,15 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
             title: "Catatan Verifikasi Baru",
             message: `Admin memberikan catatan pada laporan ${report.shiftType} tanggal ${reportDate}: "${adminNotes.slice(0, 50)}${adminNotes.length > 50 ? '...' : ''}"`,
             type: "ADMIN_NOTE",
-            link: "/cashier/history" // Path to where they can see their history
+            link: "/cashier/history"
           }
         });
       }
     });
 
     revalidatePath("/admin/verifications");
+    revalidatePath("/admin/cashflow");
+    revalidatePath("/admin/dashboard");
     return {
       status: "SUCCESS",
       message: "Laporan berhasil diverifikasi.",
@@ -257,20 +375,27 @@ export async function unverifyShiftReport(prevState: AdminActionState | undefine
     }
 
     await prisma.$transaction(async (tx) => {
-      const existingTx = await tx.financialTransaction.findUnique({
+      const existingTxs = await tx.financialTransaction.findMany({
         where: { shiftReportId: report.id }
       });
 
-      if (existingTx) {
-        await tx.financialAccount.update({
-          where: { id: existingTx.accountId },
-          data: { balance: { decrement: existingTx.amount } }
-        });
-
-        await tx.financialTransaction.delete({
-          where: { id: existingTx.id }
-        });
+      for (const existingTx of existingTxs) {
+        if (existingTx.type === "INCOME") {
+          await tx.financialAccount.update({
+            where: { id: existingTx.accountId },
+            data: { balance: { decrement: existingTx.amount } }
+          });
+        } else if (existingTx.type === "EXPENSE") {
+          await tx.financialAccount.update({
+            where: { id: existingTx.accountId },
+            data: { balance: { increment: existingTx.amount } }
+          });
+        }
       }
+
+      await tx.financialTransaction.deleteMany({
+        where: { shiftReportId: report.id }
+      });
 
       await tx.shiftReport.update({
         where: { id: reportId },
@@ -285,6 +410,8 @@ export async function unverifyShiftReport(prevState: AdminActionState | undefine
     });
 
     revalidatePath("/admin/verifications");
+    revalidatePath("/admin/cashflow");
+    revalidatePath("/admin/dashboard");
     return {
       status: "SUCCESS",
       message: "Verifikasi laporan dibatalkan.",

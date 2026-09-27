@@ -111,7 +111,7 @@ model ShiftReport {
   digitalTransactions  DigitalTransaction[]
   expenditures         Expenditure[]
   auditLogs            AuditLog[]
-  financialTransaction FinancialTransaction?
+  financialTransactions FinancialTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -252,7 +252,7 @@ model FinancialTransaction {
   description String?
   receiptUrl  String? // Foto bukti
 
-  shiftReportId String? @unique // Link jika ini hasil setor shift otomatis
+  shiftReportId String? // Link jika ini hasil setor shift otomatis
 
   account     FinancialAccount  @relation("FromAccount", fields: [accountId], references: [id], onDelete: Cascade)
   toAccount   FinancialAccount? @relation("ToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
@@ -265,6 +265,7 @@ model FinancialTransaction {
 
   @@index([storeId])
   @@index([accountId])
+  @@index([shiftReportId])
 }
 
 model Notification {

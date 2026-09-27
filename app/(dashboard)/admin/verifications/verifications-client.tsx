@@ -569,18 +569,66 @@ export function VerificationsClient({
           <form key={selectedReport?.id || "verify-form"} action={verifyAction} className="space-y-3 pt-1">
             <input type="hidden" name="reportId" value={selectedReport?.id || ""} />
             
-            {selectedReport && (
-              <div className="rounded-lg bg-muted/40 border border-border/60 p-3 space-y-1.5 text-xs sm:text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash Seharusnya</span>
-                  <span className="font-mono font-bold text-foreground">{formatCurrency(calcExpectedCash(selectedReport))}</span>
+            {selectedReport && (() => {
+              const trfExp = (selectedReport.expenditures || []).reduce((s: number, e: any) => s + (e.amountFromTransfer || 0), 0);
+              return (
+                <div className="rounded-lg bg-muted/40 border border-border/60 p-3 space-y-2 text-xs">
+                  <div className="flex justify-between items-center pb-1.5 border-b border-border/40">
+                    <span className="text-muted-foreground">Cash Sistem (Seharusnya)</span>
+                    <span className="font-mono font-bold text-foreground">{formatCurrency(calcExpectedCash(selectedReport))}</span>
+                  </div>
+
+                  <div className="space-y-1 pt-0.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Alokasi Arus Dana Setelah Verifikasi:
+                    </p>
+                    
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                        <span className="font-semibold text-foreground">Cash Fisik (Setoran Kasir)</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(selectedReport.manualCashCount)}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground">→ Masuk Kas Pegangan Anda</span>
+                      </div>
+                    </div>
+
+                    {(selectedReport.posDebit || 0) > 0 && (
+                      <div className="flex justify-between items-center pt-1 border-t border-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                          <span className="font-semibold text-foreground">POS Debit / QRIS</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                            {formatCurrency(selectedReport.posDebit)}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">→ Masuk Bank Perusahaan</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {trfExp > 0 && (
+                      <div className="flex justify-between items-center pt-1 border-t border-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                          <span className="font-semibold text-foreground">Pengeluaran Transfer Bank</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                            -{formatCurrency(trfExp)}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">→ Dipotong Bank Perusahaan</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash Manual Kasir</span>
-                  <span className="font-mono font-bold text-foreground">{formatCurrency(selectedReport.manualCashCount)}</span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="space-y-1.5">
               <Label htmlFor="admin-variance" className="text-xs sm:text-sm font-semibold">Selisih Fisik Aktual (Rp)</Label>
