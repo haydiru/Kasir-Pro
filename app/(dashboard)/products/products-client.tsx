@@ -17,6 +17,7 @@ import {
   DollarSign,
   ChevronLeft,
   ChevronRight,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,47 +107,31 @@ export default function ProductsClient({
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20">
-      {/* Header */}
+      {/* Header — 1 Clean Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
-            Master Data Barang
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-0.5 text-xs font-bold text-primary">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+              Master Data Barang
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
               Katalog Toko
             </span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Kelola kode barcode, harga modal, harga jual, dan pantau riwayat kenaikan harga barang otomatis.
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Kelola data barang, harga modal & jual, serta riwayat perubahan harga otomatis.
           </p>
         </div>
 
-        {/* Action Buttons Header */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setIsImportOpen(true)}
-            className="h-10 rounded-xl px-4 gap-2 text-xs font-bold border-border/80 hover:border-primary/50 shadow-xs"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-            Import Excel
-          </Button>
-
-          <a
-            href="/api/products/export"
-            download
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-background border border-border/80 hover:border-primary/50 text-xs font-bold text-foreground shadow-xs transition-all"
-          >
-            <Download className="h-4 w-4 text-primary" />
-            Export Excel
-          </a>
-
+        {/* Primary Header CTAs */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <Button
             variant="outline"
             onClick={() => setIsScannerOpen(true)}
-            className="h-10 rounded-xl px-4 gap-2 text-xs font-bold border-purple-500/30 text-purple-700 dark:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 shadow-xs"
+            className="h-10 rounded-xl px-4 gap-2 text-xs font-bold border-purple-500/30 text-purple-700 dark:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 shadow-2xs transition-all"
           >
             <Sparkles className="h-4 w-4 text-purple-600" />
-            Scan Nota (AI)
+            Scan Nota AI
           </Button>
 
           <Button
@@ -154,7 +139,7 @@ export default function ProductsClient({
               setEditingProduct(null);
               setIsFormOpen(true);
             }}
-            className="h-10 rounded-xl px-5 gap-2 text-xs font-bold bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+            className="h-10 rounded-xl px-4.5 gap-2 text-xs font-bold bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 transition-all"
           >
             <Plus className="h-4 w-4" />
             Tambah Barang
@@ -163,137 +148,205 @@ export default function ProductsClient({
       </div>
 
       {/* Upwork Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Produk</p>
-              <p className="text-2xl font-black tracking-tight text-foreground mt-1">{totalCount}</p>
+            <div className="space-y-0.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Produk</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{totalCount}</p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs shrink-0">
               <Package className="h-5 w-5" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Modal Naik (Alert)</p>
-              <p className="text-2xl font-black tracking-tight text-amber-600 mt-1">{unconfirmedHikes}</p>
+            <div className="space-y-0.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modal Naik (Alert)</p>
+              <p className={`text-2xl font-black tracking-tight ${unconfirmedHikes > 0 ? "text-amber-600" : "text-foreground"}`}>
+                {unconfirmedHikes}
+              </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 shadow-2xs">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-2xs shrink-0 ${
+              unconfirmedHikes > 0 ? "bg-amber-500/10 text-amber-600 animate-pulse" : "bg-muted text-muted-foreground"
+            }`}>
               <AlertTriangle className="h-5 w-5" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Aset Modal</p>
-              <p className="text-xl font-black tracking-tight text-foreground mt-1 truncate">
+            <div className="space-y-0.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Aset Modal</p>
+              <p className="text-xl sm:text-2xl font-black tracking-tight text-foreground truncate max-w-[140px]">
                 {formatCurrency(totalAssetValue)}
               </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shadow-2xs shrink-0">
               <DollarSign className="h-5 w-5" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-primary/40">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Stok Kritis (&lt; 5)</p>
-              <p className="text-2xl font-black tracking-tight text-rose-600 mt-1">{lowStockCount}</p>
+            <div className="space-y-0.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Stok Menipis (&lt; 5)</p>
+              <p className={`text-2xl font-black tracking-tight ${lowStockCount > 0 ? "text-rose-600" : "text-foreground"}`}>
+                {lowStockCount}
+              </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 shadow-2xs">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-2xs shrink-0 ${
+              lowStockCount > 0 ? "bg-rose-500/10 text-rose-600" : "bg-muted text-muted-foreground"
+            }`}>
               <Boxes className="h-5 w-5" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari berdasarkan nama barang, nomor barcode, atau ID SKU..."
-              className="h-10 pl-10 rounded-xl border-border/80 text-xs font-medium"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="h-10 px-6 rounded-xl text-xs font-bold bg-primary text-primary-foreground shrink-0 shadow-xs"
-          >
-            {isLoading ? "Mencari..." : "Cari Barang"}
-          </Button>
+      {/* Toolbar: Search on Left + Excel Import/Export on Right */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <form onSubmit={handleSearch} className="relative flex-1 max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama barang, nomor barcode, atau SKU..."
+            className="h-10 pl-9.5 pr-16 rounded-xl border-border/80 bg-card text-xs font-medium focus-visible:ring-primary shadow-2xs"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                fetchProducts(1, "");
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground hover:text-foreground cursor-pointer px-1.5 py-0.5 rounded bg-muted"
+            >
+              Reset
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary hover:text-primary/80 cursor-pointer px-2 py-1 rounded-md"
+            >
+              Cari
+            </button>
+          )}
         </form>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Button
+            variant="outline"
+            onClick={() => setIsImportOpen(true)}
+            className="h-10 rounded-xl px-3.5 gap-2 text-xs font-bold border-border/80 hover:border-primary/50 bg-card shadow-2xs"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            Import Excel
+          </Button>
+
+          <a
+            href="/api/products/export"
+            download
+            className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl bg-card border border-border/80 hover:border-primary/50 text-xs font-bold text-foreground shadow-2xs transition-all"
+          >
+            <Download className="h-4 w-4 text-primary" />
+            Export Excel
+          </a>
+        </div>
       </div>
 
-      {/* Table */}
+      {/* Table Container */}
       <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow className="hover:bg-transparent border-border/50 h-14">
-                <TableHead className="font-black text-xs uppercase tracking-widest pl-6">
-                  Identitas Barang
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-center">
-                  Stok & Satuan
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-right">
-                  Harga Modal
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-right">
-                  Harga Jual
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-center">
-                  Margin Laba
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-center">
-                  Histori Modal
-                </TableHead>
-                <TableHead className="font-black text-xs uppercase tracking-widest text-center pr-6">
-                  Aksi
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-20 text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Package className="h-6 w-6 animate-spin text-primary" />
-                      <span className="text-xs font-semibold text-foreground">Memuat data barang...</span>
-                    </div>
-                  </TableCell>
+        {isLoading ? (
+          <div className="py-24 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Package className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-xs font-semibold text-foreground">Memuat data barang toko...</span>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-20 px-4 flex flex-col items-center justify-center space-y-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
+              <Package className="h-7 w-7 text-muted-foreground/70" />
+            </div>
+            <div className="space-y-1 max-w-sm">
+              <p className="text-sm font-bold text-foreground">
+                {search ? "Barang Tidak Ditemukan" : "Katalog Barang Masih Kosong"}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {search
+                  ? `Tidak ada produk yang cocok dengan pencarian "${search}". Coba kata kunci lain.`
+                  : "Mulai isi data barang toko Anda dengan menambahkan produk satuan atau import massal dari file Excel."}
+              </p>
+            </div>
+            {!search && (
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsImportOpen(true)}
+                  className="h-9 rounded-xl text-xs font-bold gap-1.5"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                  Import Excel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setIsFormOpen(true);
+                  }}
+                  className="h-9 rounded-xl text-xs font-bold bg-primary text-primary-foreground gap-1.5 shadow-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  Tambah Barang
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow className="hover:bg-transparent border-border/50 h-12">
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider pl-6">
+                    Barang & Identitas
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-center">
+                    Stok
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-right">
+                    Harga Modal
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-right">
+                    Harga Jual
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-center">
+                    Margin
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-center">
+                    Status Modal
+                  </TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider text-center pr-6">
+                    Aksi
+                  </TableHead>
                 </TableRow>
-              ) : products.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-20 text-muted-foreground italic">
-                    Belum ada data barang. Klik "+ Tambah Barang" atau "Import Excel" untuk memulai.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                products.map((p) => {
+              </TableHeader>
+              <TableBody>
+                {products.map((p) => {
                   const marginNominal = p.sellingPrice - p.costPrice;
                   const marginPct = p.sellingPrice > 0 ? (marginNominal / p.sellingPrice) * 100 : 0;
                   const lastHike = p.priceHistory?.[0]?.difference > 0 && !p.priceHistory?.[0]?.isConfirmed;
 
                   return (
-                    <TableRow key={p.id} className="border-border/20 hover:bg-primary/5 transition-all h-14">
+                    <TableRow key={p.id} className="border-border/30 hover:bg-primary/5 transition-all h-14">
                       {/* Name & Codes */}
                       <TableCell className="pl-6">
-                        <div className="flex flex-col max-w-[280px]">
-                          <span className="text-sm font-bold text-foreground truncate">{p.name}</span>
+                        <div className="flex flex-col max-w-[300px]">
+                          <span className="text-xs sm:text-sm font-bold text-foreground truncate">{p.name}</span>
                           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground font-mono">
                             {p.barcode && (
                               <span className="bg-muted px-1.5 py-0.2 rounded font-semibold text-foreground">
@@ -319,19 +372,19 @@ export default function ProductsClient({
                       </TableCell>
 
                       {/* Cost Price */}
-                      <TableCell className="text-right font-mono font-bold text-sm text-foreground">
+                      <TableCell className="text-right font-mono font-bold text-xs sm:text-sm text-foreground">
                         {formatCurrency(p.costPrice)}
                       </TableCell>
 
                       {/* Selling Price */}
-                      <TableCell className="text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                      <TableCell className="text-right font-mono font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(p.sellingPrice)}
                       </TableCell>
 
                       {/* Margin % */}
                       <TableCell className="text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                             marginPct >= 15
                               ? "bg-emerald-500/10 text-emerald-600"
                               : marginPct >= 5
@@ -402,11 +455,11 @@ export default function ProductsClient({
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
+                })}
             </TableBody>
           </Table>
         </div>
+      )}
       </div>
 
       {/* Modals */}
