@@ -30,6 +30,9 @@ model Store {
   returnedItems         ReturnedItem[]
   employeeShoppingFunds    EmployeeShoppingFund[]
   employeeShoppingExpenses EmployeeShoppingExpense[]
+  enableAiReceiptScan      Boolean                @default(false)
+  products                 Product[]
+  receiptScans             ReceiptAiScan[]
 }
 
 model User {
@@ -431,5 +434,105 @@ model EmployeeShoppingExpense {
 
   @@index([storeId])
   @@index([userId])
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  storeId      String
+  itemCode     String?  // ID Barang / SKU internal (contoh: "BRG-001")
+  barcode      String?  // Barcode produk (contoh: "8992753123456")
+  name         String   // Nama Barang
+  stock        Int      @default(0) // Jumlah Stok
+  costPrice    Float    @default(0) // Harga Modal (Harga Beli)
+  sellingPrice Float    @default(0) // Harga Jual
+  unit         String?  @default("PCS") // Satuan: PCS, DUS, PACK, RENCENG, KG
+  category     String?  // Kategori opsional
+  isActive     Boolean  @default(true) // Soft delete flag
+
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  priceHistory ProductPriceHistory[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([storeId, barcode])
+  @@index([storeId])
+  @@index([barcode])
+  @@index([itemCode])
+  @@index([name])
+}
+
+model ProductPriceHistory {
+  id              String   @id @default(uuid())
+  productId       String
+  oldCostPrice    Float
+  newCostPrice    Float
+  oldSellingPrice Float
+  newSellingPrice Float
+  difference      Float
+  percentage      Float
+  sourceType      String   // 'RECEIPT_AI_SCAN', 'EXCEL_IMPORT', 'MANUAL_EDIT'
+  reason          String?
+  receiptUrl      String?
+  changedById     String?
+  isConfirmed     Boolean  @default(false)
+  confirmedAt     DateTime?
+  confirmedById   String?
+
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model ReceiptAiScan {
+  id                String   @id @default(uuid())
+  storeId           String
+  expenditureId     String?
+  shoppingExpenseId String?
+  receiptUrl        String
+  supplierName      String?
+  invoiceDate       DateTime?
+  totalAmount       Float?
+  status            String   @default("COMPLETED") // 'PROCESSING', 'COMPLETED', 'ERROR'
+  createdById       String
+
+  items             ReceiptScannedItem[]
+  store             Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([expenditureId])
+}
+
+model ReceiptScannedItem {
+  id                 String   @id @default(uuid())
+  scanId             String
+  rawName            String
+  barcodeOrCode      String?
+  qty                Float    @default(1)
+  unitPrice          Float
+  totalPrice         Float
+  
+  matchStatus        String   @default("UNMATCHED") // 'MATCHED', 'UNMATCHED', 'CONFIRMED'
+  matchedProductId   String?
+  priceIncreased     Boolean  @default(false)
+  oldCostPrice       Float?
+  
+  isMarkedNotInKasir Boolean  @default(false)
+  isAdjustedInKasir  Boolean  @default(false)
+  adjustedById       String?
+  adjustedAt         DateTime?
+
+  scan               ReceiptAiScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime @default(now())
+
+  @@index([scanId])
+  @@index([matchedProductId])
 }
 

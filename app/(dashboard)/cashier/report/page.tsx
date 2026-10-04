@@ -48,7 +48,10 @@ import {
   UserSquare2,
   FileEdit,
   ClipboardList,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
+import { uploadReceipt } from "@/app/actions/upload";
 import {
   formatCurrency,
   formatDateTime,
@@ -132,6 +135,8 @@ export default function CashierReportPage() {
   const [activeShiftInfo, setActiveShiftInfo] = useState<{name: string, date: string} | null>(null);
   const [storeTimezone, setStoreTimezone] = useState("Asia/Jakarta");
   const [isCreatingReport, setIsCreatingReport] = useState(false);
+  const [isAiScanEnabled, setIsAiScanEnabled] = useState(false);
+  const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
 
   const { data: session } = useSession();
   const router = useRouter();
@@ -168,6 +173,10 @@ export default function CashierReportPage() {
             toast.error(reportRes.error || "Gagal memuat laporan.");
           }
           return;
+        }
+
+        if (reportRes.data?.enableAiReceiptScan !== undefined) {
+          setIsAiScanEnabled(!!reportRes.data.enableAiReceiptScan);
         }
 
         const { report } = reportRes.data;
@@ -312,6 +321,20 @@ export default function CashierReportPage() {
         description: "Mohon isi nama supplier pada semua baris pengeluaran, atau hapus baris yang kosong jika tidak digunakan."
       });
       return;
+    }
+
+    if (isAiScanEnabled) {
+      const missingReceipt = expenditures.find(
+        (ex) =>
+          ((ex.amountFromBill || 0) > 0 || (ex.amountFromCashier || 0) > 0 || (ex.amountFromTransfer || 0) > 0) &&
+          (!ex.receiptUrl || ex.receiptUrl.trim() === "")
+      );
+      if (missingReceipt) {
+        toast.error("Foto nota wajib diunggah!", {
+          description: `Toko mewajibkan foto nota belanja untuk pengeluaran "${missingReceipt.supplierName || 'supplier'}". Silakan upload foto nota sebelum mengirim laporan.`
+        });
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -892,6 +915,15 @@ export default function CashierReportPage() {
           )}
         </div>
 
+        {isAiScanEnabled && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-700 dark:text-purple-300 font-medium">
+            <Sparkles className="h-4 w-4 shrink-0 text-purple-600" />
+            <span>
+              <strong>Pemeriksaan Nota AI Aktif:</strong> Toko Anda mewajibkan upload foto nota pada setiap pengeluaran untuk verifikasi dan deteksi kenaikan harga modal otomatis.
+            </span>
+          </div>
+        )}
+
         {expenditures.length === 0 ? (
           <div className="text-center py-10 rounded-xl border border-dashed border-border/80 bg-muted/20">
             <p className="text-xs text-muted-foreground font-medium">
@@ -947,15 +979,69 @@ export default function CashierReportPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px] font-bold text-foreground">Foto Nota</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[11px] font-bold text-foreground">
+                          Foto Nota {isAiScanEnabled && <span className="text-rose-500 font-bold">*</span>}
+                        </Label>
+                        {ex.receiptUrl && (
+                          <a
+                            href={ex.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-bold text-primary hover:underline"
+                          >
+                            Lihat
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        id={`receipt-file-${ex.id}`}
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!canEdit || uploadingReceiptId === ex.id}
+                        onChange={async (e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setUploadingReceiptId(ex.id);
+                            const fd = new FormData();
+                            fd.append("file", e.target.files[0]);
+                            const res = await uploadReceipt(fd);
+                            setUploadingReceiptId(null);
+                            if (res.success && res.url) {
+                              updateExpenditure(ex.id, "receiptUrl", res.url);
+                              toast.success("Foto nota berhasil diunggah!");
+                            } else {
+                              toast.error(res.error || "Gagal mengunggah foto nota");
+                            }
+                          }
+                        }}
+                      />
                       <Button
+                        type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full h-9 text-xs rounded-xl border-border/80"
-                        disabled={!canEdit}
+                        onClick={() => document.getElementById(`receipt-file-${ex.id}`)?.click()}
+                        className={`w-full h-9 text-xs rounded-xl border-border/80 ${
+                          ex.receiptUrl ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-700 font-bold" : ""
+                        }`}
+                        disabled={!canEdit || uploadingReceiptId === ex.id}
                       >
-                        <UploadCloud className="mr-1 h-3.5 w-3.5" />
-                        Upload
+                        {uploadingReceiptId === ex.id ? (
+                          <>
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            Upload...
+                          </>
+                        ) : ex.receiptUrl ? (
+                          <>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+                            Ganti Nota
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
+                            {isAiScanEnabled ? "Upload Nota *" : "Upload Nota"}
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>

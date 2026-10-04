@@ -132,3 +132,33 @@ export async function updateStoreDetails(prevState: any, formData: FormData) {
     return { error: "Gagal memperbarui toko" };
   }
 }
+
+export async function toggleAiReceiptScan(enabled: boolean) {
+  try {
+    const session = await auth();
+    if (!session?.user?.storeId || (session.user.role !== "admin" && session.user.role !== "super_admin")) {
+      return { success: false, error: "Akses ditolak" };
+    }
+
+    const updated = await prisma.store.update({
+      where: { id: session.user.storeId },
+      data: { enableAiReceiptScan: enabled },
+    });
+
+    revalidatePath("/admin/store-settings");
+    revalidatePath("/cashier/report");
+    revalidatePath("/shopping-funds");
+
+    return {
+      success: true,
+      enabled: updated.enableAiReceiptScan,
+      message: enabled
+        ? "Fitur ekstraksi nota AI (GPT Luna) berhasil diaktifkan. Kasir kini wajib foto nota saat belanja."
+        : "Fitur ekstraksi nota AI dinonaktifkan. Pengunggahan foto nota kembali opsional.",
+    };
+  } catch (error: any) {
+    console.error("toggleAiReceiptScan error:", error);
+    return { success: false, error: "Gagal memperbarui status fitur AI nota" };
+  }
+}
+

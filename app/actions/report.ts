@@ -59,7 +59,7 @@ export async function getActiveReport(): Promise<ActionResponse> {
 
     const store = await prisma.store.findUnique({
       where: { id: session.user.storeId },
-      select: { timezone: true }
+      select: { timezone: true, enableAiReceiptScan: true }
     });
     const timezone = store?.timezone || "Asia/Jakarta";
 
@@ -104,13 +104,13 @@ export async function getActiveReport(): Promise<ActionResponse> {
       return { 
         success: false, 
         error: "NoActiveReport",
-        data: { shiftType, date: reportDate } 
+        data: { shiftType, date: reportDate, enableAiReceiptScan: store?.enableAiReceiptScan ?? false } 
       };
     }
 
     return { 
       success: true, 
-      data: { report: serialize(report), isReadOnly: false, timezone } 
+      data: { report: serialize(report), isReadOnly: false, timezone, enableAiReceiptScan: store?.enableAiReceiptScan ?? false } 
     };
   } catch (error: any) {
     console.error("getActiveReport error:", error);
@@ -127,7 +127,7 @@ export async function getReportById(id: string): Promise<ActionResponse> {
 
     const store = await prisma.store.findUnique({
       where: { id: session.user.storeId },
-      select: { timezone: true }
+      select: { timezone: true, enableAiReceiptScan: true }
     });
     const timezone = store?.timezone || "Asia/Jakarta";
 
@@ -149,7 +149,7 @@ export async function getReportById(id: string): Promise<ActionResponse> {
 
     return { 
       success: true, 
-      data: { report: serialize(report), isReadOnly: report.status === "Verified", timezone } 
+      data: { report: serialize(report), isReadOnly: report.status === "Verified", timezone, enableAiReceiptScan: store?.enableAiReceiptScan ?? false } 
     };
   } catch (error: any) {
     console.error("getReportById error:", error);

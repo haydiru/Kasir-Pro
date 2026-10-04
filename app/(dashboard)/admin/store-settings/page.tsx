@@ -11,6 +11,7 @@ import StoreUpdateForm from "./store-update-form";
 import FlipApiKeySection from "./flip-api-key-section";
 import GoogleCalendarSection from "./google-calendar-section";
 import GmailFlipSection from "./gmail-flip-section";
+import AiReceiptScanSection from "./ai-receipt-scan-section";
 import { headers } from "next/headers";
 
 export default async function StoreSettingsPage() {
@@ -101,6 +102,10 @@ export default async function StoreSettingsPage() {
                Gunakan fitur <b>Jadwal Khusus</b> untuk mengatur jam operasional yang berbeda pada hari tertentu seperti libur akhir pekan.
              </p>
           </div>
+
+          <AiReceiptScanSection
+            initialEnabled={store.enableAiReceiptScan ?? false}
+          />
 
           <GmailFlipSection
             gmailAuth={gmailAuth}
