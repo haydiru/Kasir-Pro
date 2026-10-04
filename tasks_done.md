@@ -17,7 +17,38 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ---
 
-## 📌 Phase 1: Frontend (Tampilan & Interaksi Halaman)
+## 📦 Phase 3: Master Data Barang, AI Receipt Scanning & Price History Tracking
+
+### [DONE-PROD-01] Master Data Barang, Import/Export Excel, Riwayat Kenaikan Modal & Ekstraksi Nota AI (GPT Luna)
+- **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (4 Oktober 2026)
+- **Fitur & Solusi Terimplementasi**:
+  1. **Master Data Barang (`/products`)**:
+     - Database model `Product`: ID Barang (`itemCode`), Barcode (`barcode`), Nama Barang (`name`), Jumlah Stok (`stock`), Harga Modal (`costPrice`), Harga Jual (`sellingPrice`), Satuan (`unit`), Kategori (`category`). Multi-tenant per toko.
+     - Antarmuka Upwork Emerald dengan pencarian nama/barcode/ID, kartu ringkasan aset stok, dialog tambah/edit barang satuan, dan kalkulator margin laba langsung.
+  2. **Import & Export Excel (`xlsx`)**:
+     - Endpoint `/api/products/export`: 1-klik unduh seluruh katalog barang toko dalam format Excel `.xlsx` rapi.
+     - Endpoint `/api/products/import`: Membaca file Excel batch, membuat produk baru atau memperbarui produk yang ada.
+     - Otomatis mendeteksi kenaikan harga modal saat import Excel dan mencatatnya ke audit trail.
+  3. **Audit Trail Riwayat Kenaikan Harga Modal (`ProductPriceHistory`)**:
+     - Model `ProductPriceHistory`: Menyimpan riwayat perubahan harga secara permanen (modal lama vs baru, jual lama vs baru, selisih Rp & %, sumber: Excel / Nota AI / Manual, dan foto nota bukti).
+     - Modal timeline *"Riwayat Harga"* pada setiap barang untuk memantau fluktuasi harga tanpa pernah menimpa catatan lama.
+  4. **Ekstraksi Nota Belanja AI via OpenRouter (`GPT Luna`)**:
+     - Menggunakan model keluarga GPT Luna (`openai/gpt-6-luna` / `~openai/gpt-luna-latest`) dengan fallback vision API.
+     - Mengekstrak baris barang, kuantitas, harga beli satuan, dan total belanja dari foto nota.
+     - Algoritma pencocokan 3-tier (Barcode ➔ Nama Persis ➔ Fuzzy Match).
+     - Jika harga modal naik: otomatis menandai peringatan dan mencatat riwayat harga.
+     - Jika item tidak cocok / ragu-ragu: user dapat memilih barang database via dropdown pencarian atau menandai *"Belum Ada di Kasir"* / *"+ Tambah ke Data Barang"*.
+     - Tombol konfirmasi cepat bagi kasir/admin: *"✓ Sudah Disesuaikan di Aplikasi Kasir"*.
+  5. **Sakelar Fitur per Toko (Default: Nonaktif)**:
+     - Field `Store.enableAiReceiptScan` (default `false`).
+     - Diatur melalui sakelar interaktif di menu *Pengaturan Toko* (`/admin/store-settings`).
+     - Saat nonaktif (default): upload foto nota pengeluaran bersifat opsional dan AI tidak membebani proses.
+     - Saat aktif: upload foto nota belanja kasir menjadi wajib dan divalidasi sebelum laporan dikirim.
+- **File Referensi**: [app/(dashboard)/products/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/products/page.tsx), [app/actions/product.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/product.ts), [app/actions/receipt-ai.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/receipt-ai.ts), [lib/openrouter.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/lib/openrouter.ts)
+
+---
+
+## 🎨 Phase 1: Frontend (Tampilan & Interaksi Halaman)
 
 ### 🎨 [DONE-UI-01] Redesign UI/UX KasirPro ke Estetika Modern Upwork (Emerald Palette, Layout Box & Pill Badges)
 - **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
