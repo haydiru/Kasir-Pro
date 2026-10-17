@@ -17,7 +17,7 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ---
 
-## 📦 Phase 3: Master Data Barang, AI Receipt Scanning & Price History Tracking
+## 📦 Phase 2: Master Data Barang, AI Receipt Scanning & Price History Tracking
 
 ### [DONE-PROD-01] Master Data Barang, Import/Export Excel, Riwayat Kenaikan Modal & Ekstraksi Nota AI (GPT Luna)
 - **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (4 Oktober 2026)
@@ -46,9 +46,18 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
      - Saat aktif: upload foto nota belanja kasir menjadi wajib dan divalidasi sebelum laporan dikirim.
 - **File Referensi**: [app/(dashboard)/products/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/products/page.tsx), [app/actions/product.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/product.ts), [app/actions/receipt-ai.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/receipt-ai.ts), [lib/openrouter.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/lib/openrouter.ts)
 
+### [DONE-PROD-02] Polishing Tata Letak Master Data Barang & Integrasi Toolbar Responsif
+- **Status**: ✅ **COMPLETED & VERIFIED** (16 Oktober 2026)
+- **Fitur & Solusi Terimplementasi**:
+  - Penataan ulang layout halaman `/products` menjadi single-row header bersih dengan status total varian barang.
+  - Toolbar terpadu: Kolom pencarian responsif (nama/barcode/SKU), tombol Export Excel, Import Excel, dan "+ Tambah Barang" tersusun presisi dalam satu baris fleksibel.
+  - State kosong (*empty state*) modern dengan ikon visual, penjelasan informatif, dan tombol aksi cepat import Excel.
+  - Form dialog tambah & edit barang dengan kalkulasi margin keuntungan real-time dan badge kategori.
+- **File Referensi**: [app/(dashboard)/products/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/products/page.tsx)
+
 ---
 
-## 🎨 Phase 1: Frontend (Tampilan & Interaksi Halaman)
+## 🎨 Phase 3: Frontend (Tampilan & Interaksi Halaman)
 
 ### 🎨 [DONE-UI-01] Redesign UI/UX KasirPro ke Estetika Modern Upwork (Emerald Palette, Layout Box & Pill Badges)
 - **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
@@ -68,7 +77,16 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
      - Upwork Proposal layout cards dengan audit split-view, pill verification tags, dan tabel riwayat setoran terverifikasi.
   6. **Transaksi Flip (`admin/flip-transactions/flip-client.tsx`)**:
      - Upwork stat cards dan list table dengan status pill badges (`upwork-badge-emerald`, `upwork-badge-amber`, `upwork-badge-slate`).
-  7. **Build Verification & Deployment**: Seluruh 36 rute Next.js berhasil dikompilasi dengan `npm run build` tanpa error TypeScript.
+  7. **Build Verification & Deployment**: Seluruh rute Next.js berhasil dikompilasi dengan `npm run build` tanpa error TypeScript.
+
+### 🎨 [DONE-BRAND-FAVICON] Penyelarasan Favicon & Brand Identity Toko Emerald Green
+- **Status**: ✅ **COMPLETED & VERIFIED** (16 Oktober 2026)
+- **Masalah Yang Diatasi**:
+  - Favicon browser sebelumnya berbeda desain/warna dengan logo Storefront hijau emerald KasirPro yang ada di sidebar halaman beranda.
+- **Hasil Pekerjaan**:
+  - Menyelaraskan seluruh aset favicon: `app/icon.svg`, `public/icon.svg`, `public/favicon.ico`, dan `app/apple-icon.png`.
+  - Menggunakan gradient Upwork Emerald Green (`#108a00` ke `#16a34a`) dengan lambang kanopi toko minimarket (storefront awning & door) bergaris putih bersih, identik dengan ikon sidebar aplikasi.
+- **File Referensi**: [app/icon.svg](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/icon.svg), [public/icon.svg](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/public/icon.svg)
 
 ### [DONE-FE-01] Halaman Dashboard Kasir & Absensi Live (`/dashboard`, `/attendance`)
 - **Fitur Terimplementasi**:
@@ -102,44 +120,6 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Batch action massal (Kirim Semua, Selesaikan Semua, Hapus Massal via Floating Action Bar).
   - Transition status: `PENDING` -> `RETURNED` -> `RESOLVED` (dengan tombol Undo).
 - **File Referensi**: [app/(dashboard)/retur/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/retur/page.tsx)
-
-### 🚀 [DONE-BUG-05] Perbaikan Warning Transaksi Flip (Timeframe Query & Dynamic Interactive Matching) & Koreksi Typo Bahasa Indonesia
-- **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
-- **Hasil Pekerjaan**:
-  1. **Akurasi Rentang Waktu Warning Flip**: Memperbaiki `getUnmatchedFlipForReport` di `app/actions/flip.ts` dan `verifications-client.tsx` agar menggunakan awal hari kalender lokal toko (`getTZDateRange(report.date, timezone).start` = 00:00:00 WIB) sehingga transaksi Flip di pagi hari (sebelum shift dibuka) tidak terlewat atau hilang dari warning.
-  2. **Pencocokan Real-Time Dinamis & Tombol "+ Gunakan"**: Di halaman Laporan Kasir (`/cashier/report`), badge warning transaksi Flip yang belum diinput kini reaktif secara dinamis saat kasir mengetik/memasukkan ID Flip ke tabel. Dilengkapi tombol "+ Gunakan" untuk langsung memasukkan detail Flip ke tabel transaksi digital dengan 1 klik.
-  3. **Penyelarasan Verifikasi Admin**: Menghubungkan seluruh transaksi Flip aktif pada tanggal shift terkait di `/admin/verifications` agar warning selisih Flip muncul akurat dan real-time.
-  4. **Koreksi Typo & Bahasa Indonesia**: Memperbaiki typo seperti `"tebal di bawah"` ➔ `"tabel di bawah"`, standardisasi KBBI (`"Analisa"` ➔ `"Analisis"`), dan penyempurnaan teks instruksi kasir.
-  5. Pengujian kompilasi `npm run build` sukses 100% dan ter-push ke GitHub repository.
-
-### 🚀 [DONE-PERF-02] Optimasi Kecepatan Hapus Instan Transaksi Flip (Optimistic UI Update & 1-Query Delete)
-- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
-- **Hasil Pekerjaan**:
-  1. Menambahkan **Optimistic UI Removal** pada tombol "Hapus" tunggal maupun "Hapus Massal": baris tabel langsung hilang secara **instan (0ms)** saat diklik tanpa menunggu latency jaringan serverless Vercel.
-  2. Memangkas query database server action `deleteFlipTransaction` dari 2x query (`findUnique` + `delete`) menjadi 1x direct query `deleteMany` berbasis `id` & `storeId`.
-  3. Pengujian kompilasi `npm run build` dan push ke GitHub tuntas 100%.
-
-### 🚀 [DONE-BUG-04] Penambahan Parser Email Flip Tipe "Pembelian ... berhasil" (Pulsa / PLN / Tagihan)
-- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
-- **Hasil Pekerjaan**:
-  1. Menambahkan dukungan parser untuk tipe email Flip berformat **Pembelian** (`Pembelian Pulsa #... berhasil`) tanpa mengubah/mengganggu parser format terdahulu (`Transfer`, `ST...`, `FT...`).
-  2. Ekstraksi otomatis dari tabel HTML email:
-     - `ID Transaksi`: (contoh `DPT260813121029178ylX`) -> `flipId`
-     - `Produk`: (contoh `Pulsa Indosat 25.000`) -> `bankOrProvider`
-     - `Nomor HP`: (contoh `+6285855148952`) -> `customerNumber`
-     - `Waktu Proses`: (contoh `13 Agustus 2026, 12:10 WIB`) -> `transactionTime`
-     - `Total Pembayaran`: (contoh `Rp25.800`) -> `nominal`
-     - `serviceType`: `Pulsa/Paket Data`
-  3. Menambahkan proteksi penyaringan subjek agar `pengisian ulang saldo` / `top up saldo` / `Flip Freedom` / `QRIS` tidak masuk ke tabel transaksi kasir.
-  4. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
-
-### 🚀 [DONE-SYNC-01] Cooldown Auto-Sync 1 Jam & Tombol Manual Sync Gmail Flip (`/admin/flip-transactions`)
-- **Status**: ✅ **COMPLETED & VERIFIED** (09 Agustus 2026)
-- **Hasil Pekerjaan**:
-  1. Menambahkan batasan cooldown 1 jam (60 menit) untuk auto-sync Gmail pada server (`app/actions/flip-gmail.ts`) dan client (`localStorage`).
-  2. Menambahkan tombol **"Sinkronkan Gmail"** manual dengan indikator animasi spinner (`RotateCw`) dan toast notification di halaman `/admin/flip-transactions`.
-  3. Menampilkan status indikator jam waktu sync terakhir (*Terakhir sync: HH:mm*) pada bar filter.
-  4. Pengujian kompilasi `npm run build` tuntas 100% tanpa error.
 
 ### [DONE-FE-05] Halaman Laporan Pengeluaran & Pemberian Dana (`/shopping-funds`)
 - **Fitur Terimplementasi**:
@@ -176,11 +156,98 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ---
 
-## ⚙️ Phase 2: Backend & Database (Server Actions, API & Schema)
+## ⚡ Phase 4: Integrasi Flip Webhook, Gmail Sync & Shift Window Filtering
+
+### 🚀 [DONE-FLIP-SHIFT-WINDOW] Shift Timeframe Filtering & Anti-Duplicate Warning Transaksi Flip
+- **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (16 Agustus 2026)
+- **Masalah Yang Diatasi**:
+  - Transaksi Flip di luar jam kerja shift kasir muncul di banner peringatan.
+  - Transaksi Flip yang sudah dilaporkan di shift lain tetap memicu warning sehingga berisiko terjadi pelaporan ganda (double-entry).
+- **Fitur & Solusi Terimplementasi**:
+  - Mengembangkan fungsi `getTZShiftRange` di `lib/utils.ts` untuk membatasi pencarian transaksi Flip tepat pada rentang jam mulai hingga jam selesai shift kasir berdasarkan zona waktu toko.
+  - Menambahkan pengecekan eksklusi anti-duplikasi: Jika suatu ID Flip sudah pernah dilaporkan dalam shift manapun (`ShiftReport.digitalTransactions`), ID tersebut otomatis dikeluarkan dari query warning shift lain.
+  - Menghilangkan false-positive warning dan menjamin data laporan tidak pernah tercatat ganda.
+- **File Referensi**: [app/actions/flip.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/flip.ts), [lib/utils.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/lib/utils.ts)
+
+### 🚀 [DONE-FLIP-PERF] Optimasi Kecepatan Sync Gmail Flip (3-Day Date Window & Parallel Chunking)
+- **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (25 Agustus 2026)
+- **Masalah Yang Diatasi**:
+  - Tombol sinkronisasi Gmail pada `/admin/flip-transactions` mengalami loading lama atau macet (*stuck*) karena memindai terlalu banyak riwayat email.
+- **Fitur & Solusi Terimplementasi**:
+  - Membatasi kueri Gmail API hanya pada 3 hari terakhir (`after:YYYY/MM/DD`).
+  - Menggunakan teknik parallel chunk fetching (8 email per chunk) untuk mempercepat parsing data.
+  - Menambahkan animasi loading spinner berputar (`RotateCw`) dan indikator status sinkronisasi.
+  - Dilengkapi *safety auto-timeout* sisi klien (12 detik) agar interaksi tombol tidak membeku (*freeze*).
+- **File Referensi**: [app/actions/flip-gmail.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/flip-gmail.ts), [app/(dashboard)/admin/flip-transactions/flip-client.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/admin/flip-transactions/flip-client.tsx)
+
+### 🚀 [DONE-BUG-05] Perbaikan Warning Transaksi Flip (Timeframe Query & Dynamic Interactive Matching)
+- **Status**: ✅ **COMPLETED & VERIFIED** (16 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. **Akurasi Rentang Waktu Warning Flip**: Memperbaiki `getUnmatchedFlipForReport` di `app/actions/flip.ts` dan `verifications-client.tsx` agar menggunakan awal hari kalender lokal toko (`getTZDateRange(report.date, timezone).start` = 00:00:00 WIB).
+  2. **Pencocokan Real-Time Dinamis & Tombol "+ Gunakan"**: Di halaman Laporan Kasir (`/cashier/report`), badge warning transaksi Flip yang belum diinput kini reaktif secara dinamis saat kasir mengetik/memasukkan ID Flip ke tabel. Dilengkapi tombol "+ Gunakan" untuk langsung memasukkan detail Flip ke tabel transaksi digital dengan 1 klik.
+  3. **Penyelarasan Verifikasi Admin**: Menghubungkan seluruh transaksi Flip aktif pada tanggal shift terkait di `/admin/verifications` agar warning selisih Flip muncul akurat dan real-time.
+  4. **Koreksi Typo & Bahasa Indonesia**: Memperbaiki typo seperti `"tebal di bawah"` ➔ `"tabel di bawah"`, standardisasi KBBI (`"Analisa"` ➔ `"Analisis"`).
+- **File Referensi**: [app/actions/flip.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/flip.ts)
+
+### 🚀 [DONE-PERF-02] Optimasi Kecepatan Hapus Instan Transaksi Flip (Optimistic UI Update & 1-Query Delete)
+- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Menambahkan **Optimistic UI Removal** pada tombol "Hapus" tunggal maupun "Hapus Massal": baris tabel langsung hilang secara **instan (0ms)** saat diklik tanpa menunggu latency jaringan serverless Vercel.
+  2. Memangkas query database server action `deleteFlipTransaction` dari 2x query (`findUnique` + `delete`) menjadi 1x direct query `deleteMany` berbasis `id` & `storeId`.
+- **File Referensi**: [app/actions/flip.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/flip.ts)
+
+### 🚀 [DONE-BUG-04] Penambahan Parser Email Flip Tipe "Pembelian ... berhasil" (Pulsa / PLN / Tagihan)
+- **Status**: ✅ **COMPLETED & VERIFIED** (13 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Menambahkan dukungan parser untuk tipe email Flip berformat **Pembelian** (`Pembelian Pulsa #... berhasil`) tanpa mengubah/mengganggu parser format terdahulu (`Transfer`, `ST...`, `FT...`).
+  2. Ekstraksi otomatis dari tabel HTML email: `ID Transaksi`, `Produk`, `Nomor HP`, `Waktu Proses`, `Total Pembayaran`, `serviceType`.
+  3. Menambahkan proteksi penyaringan subjek agar `pengisian ulang saldo` / `top up saldo` / `Flip Freedom` / `QRIS` tidak masuk ke tabel transaksi kasir.
+- **File Referensi**: [app/actions/flip-gmail.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/flip-gmail.ts)
+
+### 🚀 [DONE-SYNC-01] Cooldown Auto-Sync 1 Jam & Tombol Manual Sync Gmail Flip (`/admin/flip-transactions`)
+- **Status**: ✅ **COMPLETED & VERIFIED** (09 Agustus 2026)
+- **Hasil Pekerjaan**:
+  1. Menambahkan batasan cooldown 1 jam (60 menit) untuk auto-sync Gmail pada server (`app/actions/flip-gmail.ts`) dan client (`localStorage`).
+  2. Menambahkan tombol **"Sinkronkan Gmail"** manual dengan indikator animasi spinner (`RotateCw`) dan toast notification di halaman `/admin/flip-transactions`.
+  3. Menampilkan status indikator jam waktu sync terakhir (*Terakhir sync: HH:mm*) pada bar filter.
+- **File Referensi**: [app/(dashboard)/admin/flip-transactions/flip-client.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/admin/flip-transactions/flip-client.tsx)
+
+---
+
+## 💰 Phase 5: Form Laporan Kasir, Verifikasi Admin & Arus Kas (Cashflow)
+
+### [DONE-BILL-MONEY] Pemulihan Field Uang Tagihan Diterima (`billMoneyReceived`)
+- **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (16 Agustus 2026)
+- **Masalah Yang Diatasi**:
+  - Field `billMoneyReceived` (Uang Tagihan Diterima) sempat tersembunyi pada refactor tampilan tertentu di halaman laporan kasir.
+- **Hasil Pekerjaan**:
+  - Mengembalikan field `billMoneyReceived` secara utuh pada **Seksi 1 (Info Shift & Modal)** serta perhitungan kas fisik di **Seksi 5 (Rekapitulasi Kas)**.
+  - Memastikan data lama dan rumus kalkulasi setoran kasir tetap 100% konsisten dan tidak ada struktur formulir yang hilang tanpa izin.
+- **File Referensi**: [app/(dashboard)/cashier/report/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/cashier/report/page.tsx)
+
+### [DONE-CASHFLOW-01] Pemisahan Uang Tunai ke Verifikator vs Transfer Bank ke Rekening PT
+- **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (16 April 2026)
+- **Fitur Terimplementasi**:
+  - Memisahkan pencatatan setoran kasir: `toVerifierCash` (uang fisik yang diserahkan langsung ke supervisor/admin toko) dan `companyTransferAmount` (uang tunai kasir yang disetor via mesin setor tunai/transfer ke rekening bank perusahaan).
+  - Integrasi pencatatan otomatis ke Buku Besar Kas Toko (`/admin/cashflow`).
+  - Rekapitulasi saldo kas fisik operasional vs saldo kas rekening bank.
+- **File Referensi**: [app/(dashboard)/admin/cashflow/cashflow-client.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/admin/cashflow/cashflow-client.tsx), [app/actions/cashflow.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/cashflow.ts)
+
+### [DONE-NOTIF-01] Pusat Notifikasi Real-Time & Server Action Notifications
+- **Status**: ✅ **COMPLETED & VERIFIED** (27 Juli 2026)
+- **Fitur Terimplementasi**:
+  - Halaman `/notifications` dengan antarmuka Upwork layout box, badge hitung notifikasi belum dibaca, dan filter status.
+  - Server actions `getNotifications`, `markAsRead`, dan `markAllAsRead` di `app/actions/notifications.ts`.
+  - Bell alert indicator di topbar yang menyala saat ada laporan baru atau selisih kas fisik.
+- **File Referensi**: [app/(dashboard)/notifications/page.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/(dashboard)/notifications/page.tsx), [app/actions/notifications.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/notifications.ts)
+
+---
+
+## ⚙️ Phase 6: Backend & Database (Server Actions, API & Schema)
 
 ### [DONE-BE-01] Prisma Database Schema & Models (`prisma/schema.prisma`)
 - **Fitur Terimplementasi**:
-  - Model `User`, `Store`, `Attendance`, `ShiftReport`, `DigitalTransaction`, `Expenditure`, `PettyCashFund`, `PettyCashExpense`, `ReturnedItem`, `EmptyItem`, `Supplier`, `FlipWebhook`.
+  - Model `User`, `Store`, `Attendance`, `ShiftReport`, `DigitalTransaction`, `Expenditure`, `FinancialAccount`, `FinancialTransaction`, `Notification`, `EmptyItem`, `StoreGoogleAuth`, `Bill`, `Supplier`, `ReturnedItem`, `EmployeeShoppingFund`, `EmployeeShoppingExpense`, `Product`, `ProductPriceHistory`, `ReceiptAiScan`, `ReceiptScannedItem`, `ShiftSetting`, `AuditLog`, `FlipWebhook`.
   - Relasi komprehensif, enum role & status, indexing pada `storeId`, `date`, dan `createdAt`.
 - **File Referensi**: [prisma/schema.prisma](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/prisma/schema.prisma)
 

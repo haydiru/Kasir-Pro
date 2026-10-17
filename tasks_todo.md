@@ -12,79 +12,67 @@ Setiap task diatur dengan cakupan yang **terukur & fungsional** (maksimal 1 hala
 - **Cakupan Halaman**: 1 Page (`/panduan`)
 - **Rincian Fitur Detail**:
   - [ ] Tabbed UI berisi SOP Pembukaan Shift, Operasional Digital (Flip/PLN), Pencatatan Retur, dan Penutupan Kas.
-  - [ ] Pencarian kata kunci instruksi SOP (Search Bar).
-  - [ ] Modul Video/Infografis visual panduan penanganan selisih uang kasir.
+  - [ ] Pencarian kata kunci instruksi SOP (Search Bar responsif).
+  - [ ] Modul Video/Infografis visual panduan penanganan selisih uang kasir dan panduan foto nota belanja AI.
   - [ ] Tombol konfirmasi "Saya Sudah Membaca & Memahami SOP" bagi kasir baru.
 
-### 📋 [TODO-FE-02] Halaman Pramuniaga Entries & Checklist Stok (`/pramuniaga/entries`)
+### 📋 [TODO-FE-02] Halaman Pramuniaga Entries & Checklist Tugas Toko (`/pramuniaga/entries`)
 - **Cakupan Halaman**: 1 Page (`/pramuniaga/entries`)
 - **Rincian Fitur Detail**:
   - [ ] Checklist tugas kebersihan & kerapian rak toko per shift pramuniaga.
   - [ ] Form input penataan display barang (Facing Out) & cek tanggal kadaluwarsa (Expired Date Check).
-  - [ ] Form pelaporan barang rusak di rak toko (sebelum diretur).
-  - [ ] Riwayat catatan pramuniaga harian dengan status verifikasi supervisor.
+  - [ ] Form pelaporan barang rusak di rak toko (sebelum dipindahkan ke retur).
+  - [ ] Riwayat catatan pramuniaga harian dengan status verifikasi supervisor/admin.
 
-### 📋 [TODO-FE-03] Halaman Admin Notifikasi & Alert Center (`/notifications`)
-- **Cakupan Halaman**: 1 Page (`/notifications`) - *Mengatasi 404 & menyempurnakan UI*
+### 📋 [TODO-FE-03] Barcode Scanner Camera (PWA / WebRTC) untuk Master Barang & Kasir
+- **Cakupan Halaman**: Modal Kamera Scanner di `/products` dan `/cashier/report`
 - **Rincian Fitur Detail**:
-  - [ ] Pusat notifikasi real-time untuk Admin & Super Admin.
-  - [ ] Alert otomatis untuk:
-    - Laporan shift kasir dengan selisih kas > Rp 10.000.
-    - Transaksi Flip E-Wallet yang belum terpasangkan (unmatched Flip count).
-    - Pemberian dana kas kecil yang belum dilaporkan.
-    - Barang retur pending lebih dari 3 hari.
-  - [ ] Filter notifikasi: `Semua`, `Belum Dibaca`, `Penting / Warning`, `Transaksi`.
-  - [ ] Tombol "Tandai Semua Telah Dibaca" & tautan langsung ke halaman terkait.
+  - [ ] Pemindaian barcode kamera langsung menggunakan library HTML5 QR/Barcode Code Scanner (QuaggaJS / @zxing/library).
+  - [ ] Auto-focus dan switch kamera belakang (Environment mode).
+  - [ ] 1-klik cari barang di Master Data Barang (`/products`) menggunakan barcode fisik produk.
+  - [ ] Opsi pencarian cepat barcode untuk input barang pengeluaran belanja.
 
-### 📋 [TODO-FE-04] Halaman Admin Cashflow & Modul Kas Kecil (`/admin/cashflow`) - Part 1: UI Ledger
-- **Cakupan Halaman**: 1 Page (`/admin/cashflow`)
+### 📋 [TODO-FE-04] Multi-Branch Consolidated Summary Dashboard (Overview Lintas Cabang untuk Super Admin)
+- **Cakupan Halaman**: 1 Page (`/admin/branches-overview`)
 - **Rincian Fitur Detail**:
-  - [ ] Buku Besar (Ledger) Pemasukan vs Pengeluaran Kas Toko.
-  - [ ] Visualisasi Grafik Arus Kas Harian & Mingguan.
-  - [ ] Widget Saldo Kas Utama vs Saldo Kas Kecil Operasional.
-  - [ ] Filter transaksi arus kas berdasarkan tanggal, jenis (Debit/Kredit), dan kategori.
-
-### 📋 [TODO-FE-05] Halaman Admin Cashflow (`/admin/cashflow`) - Part 2: Export & Audit Trail
-- **Cakupan Halaman**: 1 Page (`/admin/cashflow`)
-- **Rincian Fitur Detail**:
-  - [ ] Export Laporan Arus Kas ke format Excel (.xlsx) & PDF.
-  - [ ] Audit Trail pencatatan mutasi kas oleh Super Admin vs Admin.
-  - [ ] Filter khusus transaksi kas kecil yang dihapus oleh Super Admin untuk testing/revisi.
+  - [ ] Matriks komparasi omzet seluruh cabang toko dalam satu tampilan ringkas.
+  - [ ] Grafik tren performa cabang terbaik vs cabang dengan pertumbuhan lambat.
+  - [ ] Filter pembanding rentang waktu dan ekspor ringkasan performa multi-cabang.
 
 ---
 
 ## ⚙️ Phase 2: Backend & Database Enhancements (Server Actions, API & Schema)
 
-### 🗄️ [TODO-BE-01] Server Action Notifications & Real-Time Sync (`app/actions/notification.ts`)
-- **Cakupan Fitur**: Backend Server Action Notifikasi
-- **Rincian Fitur Detail**:
-  - [ ] `getNotifications(limit, unreadOnly)`: Mengambil daftar notifikasi store.
-  - [ ] `markNotificationAsRead(id)` & `markAllNotificationsAsRead()`: Update status dibaca.
-  - [ ] Triggers otomatis pada server action `createShiftReport`, `createPettyCashExpense`, dan `syncFlipTransactions`.
-
-### 🗄️ [TODO-BE-02] Server Action Pramuniaga & Task Checklist (`app/actions/pramuniaga.ts`)
-- **Cakupan Fitur**: Backend Server Action Pramuniaga
+### 🗄️ [TODO-BE-01] Server Action & Data Model Checklist Pramuniaga (`app/actions/pramuniaga.ts`)
+- **Cakupan Fitur**: Backend Server Action Pramuniaga & Prisma Schema
 - **Rincian Fitur Detail**:
   - [ ] Model Prisma `PramuniagaEntry` & `ChecklistItem`.
-  - [ ] `submitPramuniagaTask`: Simpan checklist & bukti foto pengerjaan tugas.
+  - [ ] `submitPramuniagaTask`: Simpan checklist & bukti foto pengerjaan tugas ke Vercel Blob.
   - [ ] `getPramuniagaEntries`: Fetch riwayat laporan tugas pramuniaga per tanggal & shift.
+  - [ ] Notifikasi otomatis ke supervisor jika ada tugas kebersihan atau display yang belum tuntas.
 
-### 🗄️ [TODO-BE-03] API & Cron Sync Improvement untuk Flip Email Auto-Matching (`app/api/cron/sync-flip-gmail/route.ts`)
-- **Cakupan Fitur**: Automated Background Job & Matching Logic
+### 🗄️ [TODO-BE-02] Automated Low-Stock & Price Spike Notification Bot (WhatsApp / Telegram Webhook)
+- **Cakupan Fitur**: Background Alert Engine
 - **Rincian Fitur Detail**:
-  - [ ] Auto-match algoritma tingkat lanjut matching nominal + waktu transaksi Flip.
-  - [ ] Webhook retry mechanism jika API Flip / Gmail mengalami error atau rate limit.
-  - [ ] Pembersihan log webhook Flip yang sudah lewat dari 90 hari secara terjadwal.
+  - [ ] Trigger otomatis saat kenaikan harga modal terdeteksi dari hasil Scan AI atau Import Excel.
+  - [ ] Webhook pengiriman ringkasan barang yang naik ke grup WhatsApp / Telegram Owner Toko.
+  - [ ] Peringatan otomatis stok minimum barang fast-moving yang habis di rak.
+
+### 🗄️ [TODO-BE-03] Background Cleanup Job untuk Mutasi Flip Webhook & Log Lama
+- **Cakupan Fitur**: Scheduled Database Optimization
+- **Rincian Fitur Detail**:
+  - [ ] Cron endpoint untuk membersihkan log `FlipWebhook` dan audit log yang sudah berusia lebih dari 90 hari.
+  - [ ] Pengarsipan data berkala tanpa memengaruhi laporan historis shift kasir.
 
 ---
 
 ## 📊 Phase 3: Advanced Analytics, Export & Performance Optimization
 
 ### 🚀 [TODO-ADV-01] Export Excel Rekap Performa Pegawai & Omzet Toko (`app/actions/export.ts`)
-- **Cakupan Fitur**: Excel Export Engine (ExcelJS / SheetJS)
+- **Cakupan Fitur**: Excel Export Engine (SheetJS / ExcelJS)
 - **Rincian Fitur Detail**:
   - [ ] Download file Excel Rekap Penjualan Kasir (Termasuk Total Omzet, Cash, Debit, % Debit, Laba Digital, dan Akurasi Kas).
-  - [ ] Format worksheet rapi dengan styling header, warna kondisi selisih, dan rumus total otomatis.
+  - [ ] Format worksheet rapi dengan styling header emerald, highlight warna selisih, dan rumus total otomatis.
 
 ### 🚀 [TODO-ADV-02] Cache Optimization & Speed Enhancement (`app/actions/dashboard.ts`)
 - **Cakupan Fitur**: Performance & Query Optimization
