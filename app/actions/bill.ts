@@ -4,6 +4,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getTZDateRange } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
+
+const BILL_LOG_FIELDS = ["supplierName", "supplierId", "dueDate", "amount", "status", "calendarEventId", "createdById"] as const;
+function billSnapshot(bill: Record<string, any>) {
+  return Object.fromEntries(BILL_LOG_FIELDS.map((f) => [f, bill[f]]));
+}
 
 // Helper untuk mendapatkan Google Access Token yang valid (menyegarkan jika kedaluwarsa)
 async function getGoogleAccessToken(storeId: string): Promise<string | null> {
@@ -188,27 +194,53 @@ export async function createBill(data: {
       return { error: "User tidak diasosiasikan dengan toko mana pun" };
     }
 
-    if (!data.supplierName.trim()) {
+    if (!data.supplierName?.trim()) {
       return { error: "Nama supplier harus diisi" };
     }
 
-    if (data.amount <= 0) {
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       return { error: "Nominal harus lebih besar dari 0" };
     }
 
     const parsedDueDate = new Date(data.dueDate);
+    if (isNaN(parsedDueDate.getTime())) {
+      return { error: "Tanggal jatuh tempo tidak valid" };
+    }
+
+    // Supplier (optional) must belong to the same store
+    if (data.supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: data.supplierId, storeId },
+        select: { id: true },
+      });
+      if (!supplier) {
+        return { error: "Supplier tidak ditemukan" };
+      }
+    }
 
     // 1. Simpan tagihan di Database Lokal
-    const newBill = await prisma.bill.create({
-      data: {
-        storeId,
-        supplierName: data.supplierName.trim(),
-        supplierId: data.supplierId || null,
-        dueDate: parsedDueDate,
-        amount: data.amount,
-        status: "BELUM_BAYAR",
-        createdById: session.user.id,
-      },
+    const newBill = await prisma.$transaction(async (tx) => {
+      const created = await tx.bill.create({
+        data: {
+          storeId,
+          supplierName: data.supplierName.trim(),
+          supplierId: data.supplierId || null,
+          dueDate: parsedDueDate,
+          amount,
+          status: "BELUM_BAYAR",
+          createdById: session.user.id,
+        },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "CREATE",
+        entityType: "Bill",
+        entityId: created.id,
+        summary: `Mencatat tagihan ${created.supplierName} Rp${created.amount}`,
+        after: billSnapshot(created),
+      });
+      return created;
     });
 
     // 2. Sinkronisasi ke Google Calendar jika terhubung
@@ -235,6 +267,8 @@ export async function createBill(data: {
   }
 }
 
+const BILL_STATUSES = ["LUNAS", "BELUM_BAYAR"];
+
 export async function updateBillStatus(
   billId: string,
   newStatus: string,
@@ -255,7 +289,11 @@ export async function updateBillStatus(
     if (!storeId) {
       return { error: "Store not associated" };
     }
-    
+
+    if (!BILL_STATUSES.includes(newStatus)) {
+      return { error: "Status tagihan tidak valid" };
+    }
+
     // Cari tagihan
     const bill = await prisma.bill.findUnique({
       where: { id: billId },
@@ -269,10 +307,111 @@ export async function updateBillStatus(
       return { error: "Akses ditolak" };
     }
 
+    const isAdmin = session.user.role === "admin" || session.user.role === "super_admin";
+
+    // Validate everything BEFORE changing the bill, so a rejected request never
+    // leaves the bill marked LUNAS without its expenditure (or vice versa).
+    let lunasPayload: { reportId: string; cashier: number; bill: number; transfer: number } | null = null;
+
+    if (newStatus === "LUNAS") {
+      if (!paymentAmounts) {
+        return { error: "Detail jumlah pembayaran harus diisi" };
+      }
+      if (!targetReportId) {
+        return { error: "Laporan shift tujuan harus ditentukan." };
+      }
+
+      const cashier = Number(paymentAmounts.cashier || 0);
+      const fromBill = Number(paymentAmounts.bill || 0);
+      const transfer = Number(paymentAmounts.transfer || 0);
+      if ([cashier, fromBill, transfer].some((n) => !Number.isFinite(n) || n < 0)) {
+        return { error: "Nominal pembayaran tidak valid" };
+      }
+      // Allocation must match the bill amount exactly (same rule as the payment form)
+      if (Math.abs(cashier + fromBill + transfer - bill.amount) >= 0.01) {
+        return { error: "Total alokasi pembayaran harus sama dengan nominal tagihan" };
+      }
+
+      // Cari draft laporan shift aktif
+      const report = await prisma.shiftReport.findUnique({
+        where: {
+          id: targetReportId,
+          storeId,
+          status: "Draft",
+        }
+      });
+
+      if (!report) {
+        return { error: "Laporan shift tujuan tidak ditemukan atau sudah tidak aktif." };
+      }
+
+      lunasPayload = { reportId: report.id, cashier, bill: fromBill, transfer };
+    } else if (newStatus === "BELUM_BAYAR") {
+      // Un-paying removes the linked expenditures; never allow that once they are
+      // part of a verified report, and only admins may touch submitted reports.
+      const linkedExpenditures = await prisma.expenditure.findMany({
+        where: { billId },
+        select: { report: { select: { status: true } } },
+      });
+      if (linkedExpenditures.some((e) => e.report.status === "Verified")) {
+        return { error: "Pembayaran tagihan sudah tercatat di laporan yang diverifikasi dan tidak bisa dibatalkan." };
+      }
+      if (!isAdmin && linkedExpenditures.some((e) => e.report.status !== "Draft")) {
+        return { error: "Pembayaran tagihan sudah tercatat di laporan yang dikirim. Hubungi Admin untuk membatalkan." };
+      }
+    }
+
     // 1. Update status tagihan lokal
-    const updatedBill = await prisma.bill.update({
-      where: { id: billId },
-      data: { status: newStatus },
+    const updatedBill = await prisma.$transaction(async (tx) => {
+      const updated = await tx.bill.update({
+        where: { id: billId },
+        data: { status: newStatus },
+      });
+
+      // Jejak audit: pengeluaran yang akan dihapus disimpan lengkap sebelum dihapus
+      const removedExpenditures = newStatus === "BELUM_BAYAR"
+        ? await tx.expenditure.findMany({ where: { billId } })
+        : [];
+
+      // 3. Integrasi ke Laporan Shift Aktif
+      if (lunasPayload) {
+        // Cari apakah sudah pernah dicatat di shift ini untuk mencegah duplikasi
+        const existingExpenditure = await tx.expenditure.findFirst({
+          where: { billId }
+        });
+
+        if (!existingExpenditure) {
+          await tx.expenditure.create({
+            data: {
+              reportId: lunasPayload.reportId,
+              createdBy: session.user.id,
+              supplierName: bill.supplierName,
+              amountFromCashier: lunasPayload.cashier,
+              amountFromBill: lunasPayload.bill,
+              amountFromTransfer: lunasPayload.transfer,
+              billId: bill.id,
+            }
+          });
+        }
+      } else if (newStatus === "BELUM_BAYAR") {
+        // Hapus pengeluaran terkait jika tagihan dibatalkan menjadi belum lunas
+        await tx.expenditure.deleteMany({
+          where: { billId }
+        });
+      }
+
+      await logActivity(tx, {
+        actor: session.user,
+        action: "STATUS_CHANGE",
+        entityType: "Bill",
+        entityId: billId,
+        summary: `Status tagihan ${bill.supplierName} Rp${bill.amount}: ${bill.status} → ${newStatus}` +
+          (removedExpenditures.length > 0 ? ` (${removedExpenditures.length} pengeluaran terkait dihapus)` : ""),
+        before: { status: bill.status, removedExpenditures },
+        after: { status: newStatus, payment: lunasPayload },
+      });
+
+      return updated;
     });
 
     // 2. Update event Google Calendar jika tercatat
@@ -285,53 +424,6 @@ export async function updateBillStatus(
         updatedBill.dueDate,
         updatedBill.status
       );
-    }
-
-    // 3. Integrasi ke Laporan Shift Aktif
-    if (newStatus === "LUNAS") {
-      if (!paymentAmounts) {
-        return { error: "Detail jumlah pembayaran harus diisi" };
-      }
-      if (!targetReportId) {
-        return { error: "Laporan shift tujuan harus ditentukan." };
-      }
-
-      // Cari draft laporan shift aktif
-      const report = await prisma.shiftReport.findUnique({
-        where: {
-          id: targetReportId,
-          storeId,
-          status: "Draft",
-        }
-      });
-
-      if (report) {
-        // Cari apakah sudah pernah dicatat di shift ini untuk mencegah duplikasi
-        const existingExpenditure = await prisma.expenditure.findFirst({
-          where: { billId }
-        });
-
-        if (!existingExpenditure) {
-          await prisma.expenditure.create({
-            data: {
-              reportId: report.id,
-              createdBy: session.user.id,
-              supplierName: bill.supplierName,
-              amountFromCashier: paymentAmounts.cashier || 0,
-              amountFromBill: paymentAmounts.bill || 0,
-              amountFromTransfer: paymentAmounts.transfer || 0,
-              billId: bill.id,
-            }
-          });
-        }
-      } else {
-        return { error: "Laporan shift tujuan tidak ditemukan atau sudah tidak aktif." };
-      }
-    } else if (newStatus === "BELUM_BAYAR") {
-      // Hapus pengeluaran terkait jika tagihan dibatalkan menjadi belum lunas
-      await prisma.expenditure.deleteMany({
-        where: { billId }
-      });
     }
 
     revalidatePath("/cashier/bills");
@@ -364,14 +456,31 @@ export async function deleteBill(billId: string) {
       return { error: "Akses ditolak" };
     }
 
+    // Only admins, or the employee who recorded an unpaid bill, may delete it
+    const isAdmin = session.user.role === "admin" || session.user.role === "super_admin";
+    const isOwnUnpaidBill = bill.createdById === session.user.id && bill.status === "BELUM_BAYAR";
+    if (!isAdmin && !isOwnUnpaidBill) {
+      return { error: "Hanya Admin yang dapat menghapus tagihan ini." };
+    }
+
     // 1. Hapus event Google Calendar jika ada
     if (bill.calendarEventId) {
       await deleteCalendarEvent(storeId, bill.calendarEventId);
     }
 
     // 2. Hapus tagihan dari database
-    await prisma.bill.delete({
-      where: { id: billId },
+    await prisma.$transaction(async (tx) => {
+      await tx.bill.delete({
+        where: { id: billId },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "DELETE",
+        entityType: "Bill",
+        entityId: billId,
+        summary: `Menghapus tagihan ${bill.supplierName} Rp${bill.amount} (${bill.status})`,
+        before: billSnapshot(bill),
+      });
     });
 
     revalidatePath("/cashier/bills");
@@ -407,11 +516,26 @@ export async function rescheduleBill(billId: string, newDueDate: string) {
     }
 
     const parsedDueDate = new Date(newDueDate);
+    if (isNaN(parsedDueDate.getTime())) {
+      return { error: "Tanggal jatuh tempo tidak valid" };
+    }
 
     // 1. Update bill due date
-    const updatedBill = await prisma.bill.update({
-      where: { id: billId },
-      data: { dueDate: parsedDueDate },
+    const updatedBill = await prisma.$transaction(async (tx) => {
+      const u = await tx.bill.update({
+        where: { id: billId },
+        data: { dueDate: parsedDueDate },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "UPDATE",
+        entityType: "Bill",
+        entityId: billId,
+        summary: `Mengubah jatuh tempo tagihan ${bill.supplierName}`,
+        before: { dueDate: bill.dueDate },
+        after: { dueDate: parsedDueDate },
+      });
+      return u;
     });
 
     // 2. Update Google Calendar event if it exists

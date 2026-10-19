@@ -3,6 +3,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { safeErrorMessage, UserFacingError } from "@/lib/auth-guard";
+import { logActivity } from "@/lib/activity-log";
 
 type ActionResponse = { success: boolean; data?: any; error?: string };
 
@@ -55,7 +57,7 @@ export async function ensureFinancialAccounts(): Promise<ActionResponse> {
     return { success: true };
   } catch (error: any) {
     console.error("ensureFinancialAccounts Error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "Gagal menyiapkan akun keuangan" };
   }
 }
 
@@ -89,7 +91,7 @@ export async function createFinancialTransaction(data: {
     // Transaction logic
     await prisma.$transaction(async (tx) => {
       // Buat riwayat mutasi
-      await tx.financialTransaction.create({
+      const created = await tx.financialTransaction.create({
         data: {
           storeId,
           accountId,
@@ -110,17 +112,17 @@ export async function createFinancialTransaction(data: {
           data: { balance: { increment: amount } }
         });
       } else if (type === "EXPENSE") {
-        if (account.balance < amount) throw new Error(`Saldo ${account.name} tidak mencukupi (Sisa: ${account.balance})`);
+        if (account.balance < amount) throw new UserFacingError(`Saldo ${account.name} tidak mencukupi (Sisa: ${account.balance})`);
         
         await tx.financialAccount.update({
           where: { id: accountId },
           data: { balance: { decrement: amount } }
         });
       } else if (type === "TRANSFER" && toAccountId) {
-        if (account.balance < amount) throw new Error(`Saldo ${account.name} tidak mencukupi (Sisa: ${account.balance})`);
+        if (account.balance < amount) throw new UserFacingError(`Saldo ${account.name} tidak mencukupi (Sisa: ${account.balance})`);
         
         const targetAccount = await tx.financialAccount.findUnique({ where: { id: toAccountId } });
-        if (!targetAccount || targetAccount.storeId !== storeId) throw new Error("Akun tujuan tidak valid");
+        if (!targetAccount || targetAccount.storeId !== storeId) throw new UserFacingError("Akun tujuan tidak valid");
 
         // Kurangi dari sumber
         await tx.financialAccount.update({
@@ -134,6 +136,23 @@ export async function createFinancialTransaction(data: {
           data: { balance: { increment: amount } }
         });
       }
+
+      const accountsAfter = await tx.financialAccount.findMany({
+        where: { id: { in: [accountId, ...(toAccountId ? [toAccountId] : [])] } },
+        select: { id: true, name: true, balance: true },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "CREATE",
+        entityType: "FinancialTransaction",
+        entityId: created.id,
+        summary: `Mencatat ${type} ${category} Rp${amount} di ${account.name}`,
+        before: { balances: [{ id: account.id, name: account.name, balance: account.balance }] },
+        after: {
+          type, category, amount, description, receiptUrl, accountId, toAccountId,
+          balances: accountsAfter,
+        },
+      });
     });
 
     revalidatePath("/admin/cashflow");
@@ -141,7 +160,7 @@ export async function createFinancialTransaction(data: {
     return { success: true };
   } catch (error: any) {
     console.error("createFinancialTransaction Error:", error);
-    return { success: false, error: error.message || "Gagal mencatat transaksi" };
+    return { success: false, error: safeErrorMessage(error, "Gagal mencatat transaksi") };
   }
 }
 
@@ -192,6 +211,7 @@ export async function getCashflowData() {
 
     return { success: true, accounts: serializedAccounts, transactions: serializedTransactions };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error("getCashflowData error:", error);
+    return { success: false, error: "Gagal memuat data buku kas" };
   }
 }

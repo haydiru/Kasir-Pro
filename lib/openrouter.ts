@@ -163,6 +163,6 @@ Tugas Anda:
     }
   } catch (error: any) {
     console.error("extractReceiptWithOpenRouter exception:", error);
-    return { success: false, error: error.message || "Terjadi kesalahan koneksi ke OpenRouter AI." };
+    return { success: false, error: "Terjadi kesalahan koneksi ke OpenRouter AI." };
   }
 }

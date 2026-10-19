@@ -42,7 +42,7 @@ const DAYS = [
   { value: "6", label: "Sabtu", color: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
 ];
 
-export default function ShiftClientActions({ shifts, storeId }: { shifts: any[], storeId: string }) {
+export default function ShiftClientActions({ shifts }: { shifts: any[], storeId: string }) {
   const [state, formAction, isPending] = useActionState(updateShiftSettings, undefined);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function ShiftClientActions({ shifts, storeId }: { shifts: any[],
   }, [state]);
 
   const handleAdd = async () => {
-    const res = await addShiftSetting(storeId);
+    const res = await addShiftSetting();
     if (res.error) toast.error(res.error);
     else toast.success("Shift baru ditambahkan. Klik simpan untuk menerapkan.");
   };

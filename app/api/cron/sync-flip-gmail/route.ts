@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncFlipEmailsForStore } from "@/app/actions/flip-gmail";
+import { timingSafeEqual } from "crypto";
+import { syncFlipEmailsForStore } from "@/lib/flip-gmail-sync";
+
+function isValidCronAuth(header: string | null, secret: string): boolean {
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(header || "");
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
 
 /**
  * GET /api/cron/sync-flip-gmail
@@ -10,10 +17,15 @@ import { syncFlipEmailsForStore } from "@/app/actions/flip-gmail";
  */
 export async function GET(req: NextRequest) {
   try {
-    // Opsional: Cek Authorization Header / API Key jika diset di .env
+    // Wajib: CRON_SECRET harus diset di .env. Tanpa secret, endpoint ini ditolak
+    // (fail closed) agar tidak bisa dipicu oleh siapa pun dari internet.
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      console.error("CRON_SECRET belum dikonfigurasi; cron sync-flip-gmail ditolak.");
+      return NextResponse.json({ success: false, error: "Cron is not configured" }, { status: 503 });
+    }
+    if (!isValidCronAuth(authHeader, cronSecret)) {
       return NextResponse.json({ success: false, error: "Unauthorized cron request" }, { status: 401 });
     }
 
@@ -44,7 +56,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Cron sync-flip-gmail error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }
 

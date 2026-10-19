@@ -25,7 +25,8 @@ export default async function StoreSettingsPage() {
   const store = await prisma.store.findUnique({
     where: { id: session.user.storeId },
     include: {
-      googleAuth: true,
+      // OAuth tokens stay on the server; the UI only needs to know a connection exists
+      googleAuth: { select: { id: true, type: true, expiryDate: true } },
       shiftSettings: {
         orderBy: [
           { dayOfWeek: "asc" },
@@ -89,7 +90,9 @@ export default async function StoreSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <StoreUpdateForm store={store} />
+              <StoreUpdateForm
+                store={{ id: store.id, name: store.name, address: store.address, timezone: store.timezone }}
+              />
             </CardContent>
           </Card>
           

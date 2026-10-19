@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { logActivity, pickChanges } from "@/lib/activity-log";
 
+const SUPPLIER_FIELDS = ["kode", "nama", "alamat", "kota", "provinsi", "negara", "kodePos", "telepon", "fax", "bank", "acc", "atasNama", "kontak", "email", "keterangan"];
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,7 +28,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Supplier tidak ditemukan" }, { status: 404 });
     }
 
-    const updated = await prisma.supplier.update({
+    const updated = await prisma.$transaction(async (tx) => {
+     const u = await tx.supplier.update({
       where: { id },
       data: {
         nama: body.nama ? body.nama.trim() : undefined,
@@ -44,8 +47,22 @@ export async function PATCH(
         email: body.email !== undefined ? (body.email ? body.email.trim() : null) : undefined,
         keterangan: body.keterangan !== undefined ? (body.keterangan ? body.keterangan.trim() : null) : undefined,
       },
+     });
+     const diff = pickChanges(supplier, u, SUPPLIER_FIELDS);
+     if (diff.changed.length > 0) {
+       const bankChanged = diff.changed.some((f) => ["bank", "acc", "atasNama"].includes(f));
+       await logActivity(tx, {
+         actor: session.user,
+         action: "UPDATE",
+         entityType: "Supplier",
+         entityId: id,
+         summary: `Mengubah supplier ${supplier.nama} (${diff.changed.join(", ")})${bankChanged ? " — REKENING BANK BERUBAH" : ""}`,
+         before: diff.before,
+         after: diff.after,
+       });
+     }
+     return u;
     });
-
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PATCH /api/suppliers/[id] error:", error);
@@ -77,8 +94,17 @@ export async function DELETE(
     }
 
     // Hapus data supplier
-    await prisma.supplier.delete({ where: { id } });
-
+    await prisma.$transaction(async (tx) => {
+      await tx.supplier.delete({ where: { id } });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "DELETE",
+        entityType: "Supplier",
+        entityId: id,
+        summary: `Menghapus supplier ${supplier.nama} (${supplier.kode})`,
+        before: supplier,
+      });
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/suppliers/[id] error:", error);

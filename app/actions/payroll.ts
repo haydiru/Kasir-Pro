@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { formatLocalDate } from "@/lib/utils";
 
+// Maximum number of payroll periods (months) the recap can navigate back/forward
+const MAX_PERIOD_OFFSET = 120;
+
 export interface PayrollRecapItem {
   userId: string;
   name: string;
@@ -106,7 +109,12 @@ function getPayrollRange(
 export async function getPayrollRecap(periodOffset: number = 0) {
   const session = await auth();
   if (!session?.user?.storeId) throw new Error("Unauthorized");
+  if (session.user.role !== "admin" && session.user.role !== "super_admin") throw new Error("Forbidden");
   const storeId = session.user.storeId;
+
+  // Bound the offset: huge values would make getPayrollRange loop forever
+  const rawOffset = Math.trunc(Number(periodOffset));
+  periodOffset = Number.isFinite(rawOffset) ? Math.max(-MAX_PERIOD_OFFSET, Math.min(MAX_PERIOD_OFFSET, rawOffset)) : 0;
 
   const store = await prisma.store.findUnique({
     where: { id: storeId }

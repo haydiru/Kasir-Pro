@@ -48,16 +48,21 @@ import { type Role } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { createStoreUser, updateStoreUser, resetUserPin } from "@/app/actions/admin";
 
+// The PIN hash is never sent to the browser
+type SafeUser = Omit<User, "pin">;
+
 interface UsersClientProps {
-  initialUsers: User[];
+  initialUsers: SafeUser[];
+  /** Role of the logged-in admin; only super_admin may manage super_admin accounts. */
+  currentUserRole: string;
   storeName: string;
 }
 
-export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
+export function UsersClient({ initialUsers, storeName, currentUserRole }: UsersClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editUser, setEditUser] = useState<SafeUser | null>(null);
 
   // Form states
   const [createState, createAction, isCreating] = useActionState(createStoreUser, undefined);
@@ -91,7 +96,7 @@ export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
     return matchesSearch && matchesRole;
   });
 
-  const handleResetPin = async (user: User) => {
+  const handleResetPin = async (user: SafeUser) => {
     const res = await resetUserPin(user.id);
     if (res.success) {
       toast.success("PIN berhasil direset", {
@@ -103,6 +108,10 @@ export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
   };
 
   const roleOptions: Role[] = ["super_admin", "admin", "cashier", "pramuniaga"];
+  const canManageSuperAdmin = currentUserRole === "super_admin";
+  // Roles the current admin may assign (mirrors the server-side rule in app/actions/admin.ts)
+  const assignableRoles = canManageSuperAdmin ? roleOptions : roleOptions.filter((r) => r !== "super_admin");
+  const canManageUser = (user: SafeUser) => canManageSuperAdmin || user.role !== "super_admin";
 
   return (
     <div className="space-y-6">
@@ -200,11 +209,11 @@ export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditUser(user)}>
+                          <DropdownMenuItem disabled={!canManageUser(user)} onClick={() => setEditUser(user)}>
                             <Pencil className="mr-2 h-3.5 w-3.5" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleResetPin(user)}>
+                          <DropdownMenuItem disabled={!canManageUser(user)} onClick={() => handleResetPin(user)}>
                             <KeyRound className="mr-2 h-3.5 w-3.5" />
                             Reset PIN
                           </DropdownMenuItem>
@@ -246,7 +255,7 @@ export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
                 <Select name="role" defaultValue="cashier">
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {roleOptions.map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role} value={role}>{getRoleLabel(role)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -310,7 +319,7 @@ export function UsersClient({ initialUsers, storeName }: UsersClientProps) {
                 <Select name="role" defaultValue={editUser?.role || "cashier"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {roleOptions.map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role} value={role}>{getRoleLabel(role)}</SelectItem>
                     ))}
                   </SelectContent>

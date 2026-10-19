@@ -15,6 +15,37 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
   - Verifikasi login akun beda toko dijamin 100% bersih tanpa ada kebocoran session lama.
 - **File Referensi**: [app/actions/auth.ts](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/app/actions/auth.ts), [components/sidebar.tsx](file:///d:/Website/casir%20minimarket%20shift%20report/kasir-app/components/sidebar.tsx)
 
+### 🛡️ [DONE-SEC-01] Security Hardening Hasil Audit Keamanan (19 Oktober 2026)
+- **Masalah Yang Diatasi** (hasil audit, terverifikasi di kode):
+  - Kritis: kasir/pramuniaga bisa menaikkan role-nya menjadi `super_admin` lewat `POST /api/auth/session` (JWT callback menerima `session.role` dari client).
+  - Kritis: laporan shift dan entri transaksi/pengeluaran bisa diubah/dihapus oleh siapa saja (tanpa cek toko, pemilik, maupun status), termasuk laporan toko lain.
+  - Kritis: `uploadReceipt` dan `addShiftSetting` bisa dipanggil tanpa login; upload menerima file apa pun (mis. `.html`).
+  - Kritis: hash PIN seluruh pegawai (termasuk admin) ikut terkirim ke browser lewat `include: { user: true }`.
+  - Kritis: `clockOut(id)` tanpa cek pemilik sehingga jam kerja & gaji bisa dimanipulasi.
+  - High: admin bisa mengambil alih akun super_admin (ubah email/reset PIN); ubah/hapus data lintas toko (shift, presensi, laporan, item nota); kasir mengubah harga & stok; manipulasi nominal tagihan; `getPayrollRecap(1e300)` membekukan server; CSRF Google OAuth (`state` = storeId); endpoint publik barang kosong lintas toko; cron terbuka tanpa `CRON_SECRET`; token Google terkirim ke browser.
+- **Fitur & Solusi Terimplementasi**:
+  - Helper baru `lib/auth-guard.ts`: `requireUser`, `requireAdmin`, `assertSameStore`, `safeErrorMessage`, `SAFE_USER_SELECT`. Role & `storeId` dibaca ulang dari DB; JWT di-refresh dari DB tiap 5 menit; perubahan role dari client diabaikan.
+  - Cek toko/pemilik/status di laporan shift, entri, presensi, shift, tagihan, scan nota AI, produk. Laporan `Submitted` tidak bisa kembali ke Draft; `Verified` terkunci.
+  - Upload: wajib login, maks. 10 MB, deteksi tipe dari magic bytes (JPG/PNG/WEBP/HEIC).
+  - Produk & import Excel khusus admin (UI ikut menyembunyikan tombol); import dibatasi 5 MB / 10.000 baris dan semua perubahan harga dicatat.
+  - Tagihan: status di-allowlist, alokasi = nominal tagihan, tidak bisa batal lunas bila sudah di laporan Verified, hapus hanya admin/pembuat (selama belum lunas).
+  - User management: allowlist role, hanya super_admin yang mengelola super_admin, minimal satu super_admin per toko.
+  - Google OAuth `state` acak + cookie; sync Gmail dipindah ke `lib/flip-gmail-sync.ts`; cron fail-closed; endpoint publik wajib `storeId` cocok; `periodOffset` dibatasi ±120.
+  - Pesan error mentah (`error.message`) tidak lagi dikirim ke client.
+- **Verifikasi**: `tsc --noEmit` & `next build` lulus; uji end-to-end di DB dev lokal (login, presensi, laporan, verifikasi, produk) + uji eksploit (eskalasi role ditolak, tidak ada hash PIN/token di halaman, endpoint publik/cron/OAuth tanpa izin ditolak). PR [haydiru/Kasir-Pro#1](https://github.com/haydiru/Kasir-Pro/pull/1).
+- **File Referensi**: [lib/auth-guard.ts](lib/auth-guard.ts), [auth.ts](auth.ts), [auth.config.ts](auth.config.ts), [app/actions/report.ts](app/actions/report.ts), [app/actions/bill.ts](app/actions/bill.ts), [app/actions/admin.ts](app/actions/admin.ts), [app/actions/upload.ts](app/actions/upload.ts), [lib/google-oauth-state.ts](lib/google-oauth-state.ts), [lib/flip-gmail-sync.ts](lib/flip-gmail-sync.ts)
+
+### 📜 [DONE-AUDIT-01] Log Aktivitas Append-Only & Halaman Audit Trail (`/admin/audit-log`)
+- **Masalah Yang Diatasi**: Tidak ada jejak siapa yang mengubah data. Model `AuditLog` lama hanya untuk laporan shift dan tidak pernah ditulis oleh kode; penghapusan data bersifat permanen tanpa bekas.
+- **Fitur & Solusi Terimplementasi**:
+  - Model baru `ActivityLog` (actor, role, aksi, entitas, ringkasan, nilai sebelum/sesudah, alasan) tanpa foreign key agar log tetap ada walau data dihapus.
+  - `prisma/sql/20261019_activity_log.sql`: tabel + index + trigger yang menolak `UPDATE`/`DELETE`/`TRUNCATE`, `search_path` fungsi dikunci, dan RLS aktif (lolos Supabase Security Advisor).
+  - Helper `lib/activity-log.ts`: `logActivity` (dalam transaksi yang sama dengan perubahan data), `logActivitySafe`, `pickChanges`, `sanitizeForLog` (membuang PIN/hash/token).
+  - Log terpasang di login/logout/gagal login, user/role/PIN, laporan shift (buat/simpan/kirim/revisi + diff entri, hapus dengan snapshot penuh), verifikasi, tagihan, buku kas, kas kecil, produk & import, scan nota AI, presensi, pengaturan toko/shift, Google & Flip, supplier.
+  - Halaman admin `/admin/audit-log` dengan filter tanggal, pengguna, entitas, aksi, ID data, serta detail sebelum/sesudah; menu "Log Aktivitas" di sidebar admin.
+- **Catatan Deploy**: SQL wajib dijalankan sekali di database sebelum deploy (sudah dijalankan di Supabase production, 19 Okt 2026).
+- **File Referensi**: [lib/activity-log.ts](lib/activity-log.ts), [app/actions/audit-log.ts](app/actions/audit-log.ts), [app/(dashboard)/admin/audit-log/page.tsx](app/(dashboard)/admin/audit-log/page.tsx), [prisma/sql/20261019_activity_log.sql](prisma/sql/20261019_activity_log.sql)
+
 ---
 
 ## 📦 Phase 2: Master Data Barang, AI Receipt Scanning & Price History Tracking

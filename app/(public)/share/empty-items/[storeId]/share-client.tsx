@@ -192,6 +192,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              storeId,
               itemId: pendingAction.itemId,
               status: pendingAction.status,
               workerName: currentWorkerName,
@@ -214,7 +215,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
               fetch("/api/share/empty-items", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ itemId, status: pendingAction.status, workerName: currentWorkerName }),
+                body: JSON.stringify({ storeId, itemId, status: pendingAction.status, workerName: currentWorkerName }),
               })
             )
           );
@@ -267,7 +268,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
       const res = await fetch("/api/share/empty-items", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, status, workerName }),
+        body: JSON.stringify({ storeId, itemId, status, workerName }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -306,7 +307,7 @@ export default function ShareClient({ storeId, storeName, timezone }: Props) {
           fetch("/api/share/empty-items", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ itemId, status, workerName }),
+            body: JSON.stringify({ storeId, itemId, status, workerName }),
           })
         )
       );

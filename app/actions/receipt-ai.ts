@@ -5,6 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { extractReceiptWithOpenRouter } from "@/lib/openrouter";
 import { serialize, ActionResponse } from "@/lib/serialize";
+import { safeErrorMessage } from "@/lib/auth-guard";
+import { logActivity } from "@/lib/activity-log";
+
+/** Loads a scanned receipt item only if its scan belongs to the given store. */
+function findScannedItemInStore(scannedItemId: string, storeId: string) {
+  return prisma.receiptScannedItem.findFirst({
+    where: { id: scannedItemId, scan: { storeId } },
+    include: { scan: true },
+  });
+}
 
 /**
  * Fuzzy similarity helper
@@ -190,6 +200,26 @@ export async function scanReceiptWithAi(
       });
     }
 
+    await logActivity(prisma, {
+      actor: session.user,
+      action: "CREATE",
+      entityType: "ReceiptAiScan",
+      entityId: scan.id,
+      summary: `Scan nota AI ${supplierName || "supplier"}: ${scannedItemsToCreate.length} item, ${priceHikesDetected} kenaikan modal`,
+      after: {
+        receiptUrl,
+        supplierName,
+        totalAmount,
+        expenditureId: options?.expenditureId || null,
+        shoppingExpenseId: options?.shoppingExpenseId || null,
+        bypassToggle: !!options?.bypassToggle,
+        items: scannedItemsToCreate.map((s) => ({
+          rawName: s.rawName, qty: s.qty, unitPrice: s.unitPrice, matchStatus: s.matchStatus,
+          matchedProductId: s.matchedProductId, priceIncreased: s.priceIncreased, oldCostPrice: s.oldCostPrice,
+        })),
+      },
+    });
+
     // Jika ada kenaikan harga, buat notifikasi alert untuk admin
     if (priceHikesDetected > 0) {
       try {
@@ -234,7 +264,7 @@ export async function scanReceiptWithAi(
     };
   } catch (error: any) {
     console.error("scanReceiptWithAi error:", error);
-    return { success: false, error: error.message || "Gagal memproses nota belanja dengan AI." };
+    return { success: false, error: safeErrorMessage(error, "Gagal memproses nota belanja dengan AI.") };
   }
 }
 
@@ -244,16 +274,13 @@ export async function manualMapReceiptItem(
 ): Promise<ActionResponse> {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+    if (!session?.user?.id || !session.user.storeId) return { success: false, error: "Unauthorized" };
 
-    const item = await prisma.receiptScannedItem.findUnique({
-      where: { id: scannedItemId },
-      include: { scan: true },
-    });
+    const item = await findScannedItemInStore(scannedItemId, session.user.storeId);
     if (!item) return { success: false, error: "Item nota tidak ditemukan" };
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
+    const product = await prisma.product.findFirst({
+      where: { id: productId, storeId: session.user.storeId },
     });
     if (!product) return { success: false, error: "Produk database tidak ditemukan" };
 
@@ -261,14 +288,26 @@ export async function manualMapReceiptItem(
     const diff = item.unitPrice - product.costPrice;
     const pct = product.costPrice > 0 ? (diff / product.costPrice) * 100 : 0;
 
-    const updated = await prisma.receiptScannedItem.update({
-      where: { id: scannedItemId },
-      data: {
-        matchedProductId: productId,
-        matchStatus: "CONFIRMED",
-        priceIncreased: isPriceHiked,
-        oldCostPrice: product.costPrice,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.receiptScannedItem.update({
+        where: { id: scannedItemId },
+        data: {
+          matchedProductId: productId,
+          matchStatus: "CONFIRMED",
+          priceIncreased: isPriceHiked,
+          oldCostPrice: product.costPrice,
+        },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "UPDATE",
+        entityType: "ReceiptScannedItem",
+        entityId: scannedItemId,
+        summary: `Menghubungkan item nota "${item.rawName}" ke barang ${product.name}`,
+        before: { matchedProductId: item.matchedProductId, matchStatus: item.matchStatus },
+        after: { matchedProductId: productId, matchStatus: "CONFIRMED", priceIncreased: isPriceHiked, unitPrice: item.unitPrice, oldCostPrice: product.costPrice },
+      });
+      return u;
     });
 
     if (isPriceHiked) {
@@ -301,14 +340,29 @@ export async function manualMapReceiptItem(
 export async function markItemNotInKasir(scannedItemId: string): Promise<ActionResponse> {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+    if (!session?.user?.id || !session.user.storeId) return { success: false, error: "Unauthorized" };
 
-    const updated = await prisma.receiptScannedItem.update({
-      where: { id: scannedItemId },
-      data: {
-        isMarkedNotInKasir: true,
-        matchStatus: "CONFIRMED",
-      },
+    const item = await findScannedItemInStore(scannedItemId, session.user.storeId);
+    if (!item) return { success: false, error: "Item nota tidak ditemukan" };
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.receiptScannedItem.update({
+        where: { id: scannedItemId },
+        data: {
+          isMarkedNotInKasir: true,
+          matchStatus: "CONFIRMED",
+        },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "STATUS_CHANGE",
+        entityType: "ReceiptScannedItem",
+        entityId: scannedItemId,
+        summary: `Menandai item nota "${item.rawName}" tidak ada di kasir`,
+        before: { isMarkedNotInKasir: item.isMarkedNotInKasir, matchStatus: item.matchStatus },
+        after: { isMarkedNotInKasir: true, matchStatus: "CONFIRMED" },
+      });
+      return u;
     });
 
     return { success: true, data: serialize(updated) };
@@ -321,15 +375,30 @@ export async function markItemNotInKasir(scannedItemId: string): Promise<ActionR
 export async function confirmItemAdjusted(scannedItemId: string): Promise<ActionResponse> {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+    if (!session?.user?.id || !session.user.storeId) return { success: false, error: "Unauthorized" };
 
-    const updated = await prisma.receiptScannedItem.update({
-      where: { id: scannedItemId },
-      data: {
-        isAdjustedInKasir: true,
-        adjustedById: session.user.id,
-        adjustedAt: new Date(),
-      },
+    const item = await findScannedItemInStore(scannedItemId, session.user.storeId);
+    if (!item) return { success: false, error: "Item nota tidak ditemukan" };
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.receiptScannedItem.update({
+        where: { id: scannedItemId },
+        data: {
+          isAdjustedInKasir: true,
+          adjustedById: session.user.id,
+          adjustedAt: new Date(),
+        },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "STATUS_CHANGE",
+        entityType: "ReceiptScannedItem",
+        entityId: scannedItemId,
+        summary: `Konfirmasi harga item nota "${item.rawName}" sudah disesuaikan di kasir`,
+        before: { isAdjustedInKasir: item.isAdjustedInKasir },
+        after: { isAdjustedInKasir: true },
+      });
+      return u;
     });
 
     return { success: true, data: serialize(updated) };
@@ -349,12 +418,12 @@ export async function quickAddProductFromScannedItem(
     if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
 
     const storeId = session.user.storeId;
-    const item = await prisma.receiptScannedItem.findUnique({
-      where: { id: scannedItemId },
-      include: { scan: true },
-    });
+    const item = await findScannedItemInStore(scannedItemId, storeId);
 
     if (!item) return { success: false, error: "Item nota tidak ditemukan" };
+
+    const safeSellingPrice = Math.max(0, Number(sellingPrice) || 0);
+    const safeStock = Math.max(0, Math.trunc(Number(stock)) || 0);
 
     const newProduct = await prisma.product.create({
       data: {
@@ -362,15 +431,15 @@ export async function quickAddProductFromScannedItem(
         name: item.rawName,
         barcode: item.barcodeOrCode || null,
         costPrice: item.unitPrice,
-        sellingPrice: Math.max(0, sellingPrice),
-        stock: Math.max(0, stock),
+        sellingPrice: safeSellingPrice,
+        stock: safeStock,
         unit: "PCS",
         priceHistory: {
           create: {
             oldCostPrice: item.unitPrice,
             newCostPrice: item.unitPrice,
-            oldSellingPrice: Math.max(0, sellingPrice),
-            newSellingPrice: Math.max(0, sellingPrice),
+            oldSellingPrice: safeSellingPrice,
+            newSellingPrice: safeSellingPrice,
             difference: 0,
             percentage: 0,
             sourceType: "RECEIPT_AI_SCAN",
@@ -395,11 +464,23 @@ export async function quickAddProductFromScannedItem(
       },
     });
 
+    await logActivity(prisma, {
+      actor: session.user,
+      action: "CREATE",
+      entityType: "Product",
+      entityId: newProduct.id,
+      summary: `Menambah barang ${newProduct.name} dari item nota ${item.scan.supplierName || ""}`.trim(),
+      after: {
+        name: newProduct.name, barcode: newProduct.barcode, costPrice: newProduct.costPrice,
+        sellingPrice: newProduct.sellingPrice, stock: newProduct.stock, scannedItemId,
+      },
+    });
+
     revalidatePath("/products");
     return { success: true, data: serialize(newProduct) };
   } catch (error: any) {
     console.error("quickAddProductFromScannedItem error:", error);
-    return { success: false, error: error.message || "Gagal membuat produk baru dari item nota." };
+    return { success: false, error: safeErrorMessage(error, "Gagal membuat produk baru dari item nota.") };
   }
 }
 

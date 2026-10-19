@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import * as xlsx from "xlsx";
+import { logActivity, pickChanges } from "@/lib/activity-log";
 
+const SUPPLIER_FIELDS = ["nama", "alamat", "kota", "provinsi", "negara", "kodePos", "telepon", "fax", "bank", "acc", "atasNama", "kontak", "email", "keterangan"];
+const LOG_CHUNK_SIZE = 200;
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -64,6 +67,7 @@ export async function POST(req: NextRequest) {
     };
 
     let inserted = 0;
+    const auditChanges: Array<Record<string, unknown>> = [];
     let updated = 0;
     let skipped = 0;
 
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
       });
 
       if (existing) {
-        await prisma.supplier.update({
+        const updatedSupplier = await prisma.supplier.update({
           where: { id: existing.id },
           data: {
             nama,
@@ -134,9 +138,13 @@ export async function POST(req: NextRequest) {
             keterangan,
           },
         });
+        const rowChanges = pickChanges(existing, updatedSupplier, SUPPLIER_FIELDS);
+        if (rowChanges.changed.length > 0) {
+          auditChanges.push({ op: "UPDATE", id: existing.id, kode, before: rowChanges.before, after: rowChanges.after });
+        }
         updated++;
       } else {
-        await prisma.supplier.create({
+        const createdSupplier = await prisma.supplier.create({
           data: {
             storeId,
             kode,
@@ -156,10 +164,27 @@ export async function POST(req: NextRequest) {
             keterangan,
           },
         });
+        auditChanges.push({ op: "CREATE", id: createdSupplier.id, kode, after: { nama, bank, acc, atasNama } });
         inserted++;
       }
     }
 
+    // Catat import ke log aktivitas (dipecah per 200 perubahan)
+    const bankChanges = auditChanges.filter((c: any) =>
+      c.op === "UPDATE" && ["bank", "acc", "atasNama"].some((f) => f in (c.after as object))
+    ).length;
+    const totalChunks = Math.max(1, Math.ceil(auditChanges.length / LOG_CHUNK_SIZE));
+    for (let c = 0; c < totalChunks; c++) {
+      await logActivity(prisma, {
+        actor: session.user,
+        action: "IMPORT",
+        entityType: "Supplier",
+        summary: `Import Excel supplier "${(file.name || "").slice(0, 200)}": ${inserted} baru, ${updated} diperbarui` +
+          (bankChanges > 0 ? `, ${bankChanges} REKENING BANK BERUBAH` : "") +
+          (totalChunks > 1 ? ` (bagian ${c + 1}/${totalChunks})` : ""),
+        after: { changes: auditChanges.slice(c * LOG_CHUNK_SIZE, (c + 1) * LOG_CHUNK_SIZE) },
+      });
+    }
     return NextResponse.json({
       success: true,
       message: "Data supplier berhasil diimport",
@@ -168,7 +193,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("POST /api/suppliers/import error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: "Gagal memproses file Excel supplier" },
       { status: 500 }
     );
   }

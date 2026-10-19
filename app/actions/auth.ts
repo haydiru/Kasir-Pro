@@ -5,6 +5,7 @@ import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logActivity, logActivitySafe } from "@/lib/activity-log";
 
 export async function authenticate(
   prevState: string | undefined,
@@ -62,6 +63,18 @@ export async function authenticate(
 }
 
 export async function logOut() {
+  const { auth } = await import("@/auth");
+  const session = await auth();
+  if (session?.user?.id) {
+    const { prisma } = await import("@/lib/prisma");
+    await logActivitySafe(prisma, {
+      actor: session.user,
+      action: "LOGOUT",
+      entityType: "User",
+      entityId: session.user.id,
+      summary: `${session.user.name} logout`,
+    });
+  }
   revalidatePath("/", "layout");
   await signOut({ redirectTo: "/login" });
 }
@@ -90,13 +103,33 @@ export async function changePin(prevState: string | undefined, formData: FormDat
   const user = await prisma.user.findUnique({ where: { email: session.user.email } });
   if (!user) return "User tidak ditemukan.";
 
+  const actor = { id: user.id, name: user.name, role: user.role, storeId: user.storeId };
+
   const isValid = await bcrypt.compare(oldPin, user.pin);
-  if (!isValid) return "PIN Lama salah.";
+  if (!isValid) {
+    await logActivitySafe(prisma, {
+      actor,
+      action: "PIN_CHANGE",
+      entityType: "User",
+      entityId: user.id,
+      summary: `Percobaan ganti PIN gagal: PIN lama salah`,
+    });
+    return "PIN Lama salah.";
+  }
 
   const hashedNewPin = await bcrypt.hash(newPin, 10);
-  await prisma.user.update({
-    where: { email: session.user.email },
-    data: { pin: hashedNewPin },
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { email: session.user.email! },
+      data: { pin: hashedNewPin },
+    });
+    await logActivity(tx, {
+      actor,
+      action: "PIN_CHANGE",
+      entityType: "User",
+      entityId: user.id,
+      summary: `${user.name} mengganti PIN sendiri`,
+    });
   });
 
   return "SUCCESS";
@@ -141,7 +174,7 @@ export async function registerStore(prevState: string | undefined, formData: For
       });
 
       // Create Admin User
-      await tx.user.create({
+      const admin = await tx.user.create({
         data: {
           storeId: store.id,
           name: adminName,
@@ -152,11 +185,20 @@ export async function registerStore(prevState: string | undefined, formData: For
           payrollCycleEnd: 24,
         },
       });
+
+      await logActivity(tx, {
+        actor: { id: admin.id, name: admin.name, role: admin.role, storeId: store.id },
+        action: "CREATE",
+        entityType: "Store",
+        entityId: store.id,
+        summary: `Pendaftaran toko baru "${store.name}" dengan super admin ${admin.email}`,
+        after: { store: { name: store.name, address: store.address }, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } },
+      });
     });
 
     return "SUCCESS";
   } catch (error: any) {
     console.error("Register Error:", error);
-    return `Gagal mendaftar: ${error.message || "Kesalahan koneksi database."}`;
+    return "Gagal mendaftar: Kesalahan koneksi database.";
   }
 }

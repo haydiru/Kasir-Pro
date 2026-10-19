@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { HistoryClient } from "./history-client";
+import { SAFE_USER_SELECT, SAFE_STORE_SELECT } from "@/lib/auth-guard";
 
 export default async function CashierHistoryPage() {
   const session = await auth();
@@ -25,8 +26,8 @@ export default async function CashierHistoryPage() {
   const reports = await prisma.shiftReport.findMany({
     where: whereCondition,
     include: {
-      user: true,
-      store: true,
+      user: { select: SAFE_USER_SELECT },
+      store: { select: SAFE_STORE_SELECT },
       digitalTransactions: true,
       expenditures: true,
     },

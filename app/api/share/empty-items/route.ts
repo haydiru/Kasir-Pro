@@ -31,18 +31,23 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { itemId, status, workerName } = body;
+    const { storeId, itemId, status, workerName } = body;
 
-    if (!itemId || !status) {
-      return NextResponse.json({ error: "Item ID and status are required" }, { status: 400 });
+    if (!storeId || !itemId || !status) {
+      return NextResponse.json({ error: "Store ID, Item ID and status are required" }, { status: 400 });
     }
 
-    const item = await prisma.emptyItem.findUnique({
-      where: { id: itemId },
+    // The item must belong to the store whose share link is being used
+    const item = await prisma.emptyItem.findFirst({
+      where: { id: itemId, storeId },
     });
 
     if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    if (workerName !== undefined && workerName !== null && (typeof workerName !== "string" || workerName.length > 100)) {
+      return NextResponse.json({ error: "Invalid worker name" }, { status: 400 });
     }
 
     const validStatuses = ["BUTUH", "PROSES", "SELESAI"];
