@@ -24,6 +24,7 @@ import {
   Undo,
   Bell,
   Package,
+  ScrollText,
 } from "lucide-react";
 import { logOut } from "@/app/actions/auth";
 
@@ -36,6 +37,7 @@ const adminNav = [
   { label: "Pengguna", href: "/admin/users", icon: Users },
   { label: "Master Supplier", href: "/admin/suppliers", icon: Users },
   { label: "Pengaturan Toko", href: "/admin/store-settings", icon: Settings },
+  { label: "Log Aktivitas", href: "/admin/audit-log", icon: ScrollText },
 ];
 
 const cashierNav = [

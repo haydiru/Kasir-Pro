@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-log";
 
 type ActionResponse = { success: boolean; data?: any; error?: string };
 
@@ -115,7 +116,7 @@ export async function getShoppingFundsData(): Promise<ActionResponse> {
     };
   } catch (error: any) {
     console.error("getShoppingFundsData error:", error);
-    return { success: false, error: error.message || "Gagal memuat data keuangan" };
+    return { success: false, error: "Gagal memuat data keuangan" };
   }
 }
 
@@ -149,22 +150,34 @@ export async function allocateShoppingFund(data: {
       return { success: false, error: "Pegawai penerima tidak valid atau tidak terdaftar di toko ini" };
     }
 
-    await prisma.employeeShoppingFund.create({
-      data: {
-        storeId,
-        userId,
-        amount,
-        paymentMethod,
-        evidenceUrl,
-        notes
-      }
+    // EmployeeShoppingFund tidak punya kolom pemberi dana, jadi log ini
+    // satu-satunya catatan siapa yang mengalokasikan.
+    await prisma.$transaction(async (tx) => {
+      const fund = await tx.employeeShoppingFund.create({
+        data: {
+          storeId,
+          userId,
+          amount,
+          paymentMethod,
+          evidenceUrl,
+          notes
+        }
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "CREATE",
+        entityType: "EmployeeShoppingFund",
+        entityId: fund.id,
+        summary: `Memberikan dana belanja Rp${amount} (${paymentMethod}) ke ${recipient.name}`,
+        after: { userId, recipientName: recipient.name, amount, paymentMethod, evidenceUrl, notes },
+      });
     });
 
     revalidatePath("/shopping-funds");
     return { success: true };
   } catch (error: any) {
     console.error("allocateShoppingFund error:", error);
-    return { success: false, error: error.message || "Gagal mengalokasikan dana" };
+    return { success: false, error: "Gagal mengalokasikan dana" };
   }
 }
 
@@ -190,22 +203,32 @@ export async function createShoppingExpense(data: {
     if (!totalPrice || totalPrice <= 0) return { success: false, error: "Total pengeluaran tidak valid!" };
     if (!receiptUrl) return { success: false, error: "Bukti foto nota belanja wajib diunggah!" };
 
-    await prisma.employeeShoppingExpense.create({
-      data: {
-        storeId,
-        userId,
-        companyName: companyName.trim(),
-        totalPrice,
-        receiptUrl,
-        notes
-      }
+    await prisma.$transaction(async (tx) => {
+      const expense = await tx.employeeShoppingExpense.create({
+        data: {
+          storeId,
+          userId,
+          companyName: companyName.trim(),
+          totalPrice,
+          receiptUrl,
+          notes
+        }
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "CREATE",
+        entityType: "EmployeeShoppingExpense",
+        entityId: expense.id,
+        summary: `Mencatat belanja di ${expense.companyName} Rp${totalPrice}`,
+        after: { companyName: expense.companyName, totalPrice, receiptUrl, notes },
+      });
     });
 
     revalidatePath("/shopping-funds");
     return { success: true };
   } catch (error: any) {
     console.error("createShoppingExpense error:", error);
-    return { success: false, error: error.message || "Gagal menyimpan laporan belanja" };
+    return { success: false, error: "Gagal menyimpan laporan belanja" };
   }
 }
 
@@ -231,15 +254,25 @@ export async function deleteShoppingFund(id: string): Promise<ActionResponse> {
       return { success: false, error: "Data transaksi pemberian dana tidak ditemukan" };
     }
 
-    await prisma.employeeShoppingFund.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      await tx.employeeShoppingFund.delete({
+        where: { id }
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "DELETE",
+        entityType: "EmployeeShoppingFund",
+        entityId: id,
+        summary: `Menghapus pemberian dana belanja Rp${fund.amount} (${fund.paymentMethod})`,
+        before: fund,
+      });
     });
 
     revalidatePath("/shopping-funds");
     return { success: true };
   } catch (error: any) {
     console.error("deleteShoppingFund error:", error);
-    return { success: false, error: error.message || "Gagal menghapus pemberian dana" };
+    return { success: false, error: "Gagal menghapus pemberian dana" };
   }
 }
 
@@ -271,14 +304,24 @@ export async function deleteShoppingExpense(id: string): Promise<ActionResponse>
       return { success: false, error: "Anda tidak berhak menghapus laporan belanja ini!" };
     }
 
-    await prisma.employeeShoppingExpense.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      await tx.employeeShoppingExpense.delete({
+        where: { id }
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "DELETE",
+        entityType: "EmployeeShoppingExpense",
+        entityId: id,
+        summary: `Menghapus laporan belanja ${expense.companyName} Rp${expense.totalPrice}`,
+        before: expense,
+      });
     });
 
     revalidatePath("/shopping-funds");
     return { success: true };
   } catch (error: any) {
     console.error("deleteShoppingExpense error:", error);
-    return { success: false, error: error.message || "Gagal menghapus laporan belanja" };
+    return { success: false, error: "Gagal menghapus laporan belanja" };
   }
 }

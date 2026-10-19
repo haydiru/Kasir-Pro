@@ -42,6 +42,8 @@ interface Props {
   totalCount: number;
   unconfirmedHikesCount: number;
   isAiScanEnabled: boolean;
+  /** Only admins may create/edit/delete/import products (enforced server-side too). */
+  canManage: boolean;
 }
 
 export default function ProductsClient({
@@ -49,6 +51,7 @@ export default function ProductsClient({
   totalCount: initTotal,
   unconfirmedHikesCount: initHikes,
   isAiScanEnabled,
+  canManage,
 }: Props) {
   const [products, setProducts] = useState<any[]>(initialProducts);
   const [totalCount, setTotalCount] = useState(initTotal);
@@ -134,6 +137,7 @@ export default function ProductsClient({
             Scan Nota AI
           </Button>
 
+          {canManage && (
           <Button
             onClick={() => {
               setEditingProduct(null);
@@ -144,6 +148,7 @@ export default function ProductsClient({
             <Plus className="h-4 w-4" />
             Tambah Barang
           </Button>
+          )}
         </div>
       </div>
 
@@ -240,6 +245,7 @@ export default function ProductsClient({
         </form>
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {canManage && (
           <Button
             variant="outline"
             onClick={() => setIsImportOpen(true)}
@@ -248,6 +254,7 @@ export default function ProductsClient({
             <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
             Import Excel
           </Button>
+          )}
 
           <a
             href="/api/products/export"
@@ -282,7 +289,7 @@ export default function ProductsClient({
                   : "Mulai isi data barang toko Anda dengan menambahkan produk satuan atau import massal dari file Excel."}
               </p>
             </div>
-            {!search && (
+            {!search && canManage && (
               <div className="flex items-center gap-2 pt-2">
                 <Button
                   variant="outline"
@@ -430,27 +437,31 @@ export default function ProductsClient({
                           >
                             <History className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingProduct(p);
-                              setIsFormOpen(true);
-                            }}
-                            className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                            title="Edit Barang"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(p.id, p.name)}
-                            className="h-8 w-8 p-0 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
-                            title="Hapus Barang"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canManage && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingProduct(p);
+                                  setIsFormOpen(true);
+                                }}
+                                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                                title="Edit Barang"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(p.id, p.name)}
+                                className="h-8 w-8 p-0 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+                                title="Hapus Barang"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

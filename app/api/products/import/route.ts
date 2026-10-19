@@ -1,22 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import * as xlsx from "xlsx";
 import { revalidatePath } from "next/cache";
+import { getCurrentUser, isAdminRole } from "@/lib/auth-guard";
+import { logActivity, pickChanges } from "@/lib/activity-log";
+
+const PRODUCT_FIELDS = ["name", "itemCode", "barcode", "stock", "costPrice", "sellingPrice", "unit", "category"];
+const LOG_CHUNK_SIZE = 200;
+
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_IMPORT_ROWS = 10000;
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.storeId) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    // Mass price/stock overwrite is restricted to admins
+    if (!isAdminRole(currentUser.role)) {
+      return NextResponse.json({ error: "Hanya Admin yang dapat mengimport data barang" }, { status: 403 });
+    }
 
-    const storeId = session.user.storeId;
+    const storeId = currentUser.storeId;
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "File Excel tidak ditemukan" }, { status: 400 });
+    }
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      return NextResponse.json({ error: "Ukuran file Excel maksimal 5 MB" }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -26,6 +40,13 @@ export async function POST(req: NextRequest) {
 
     // Baca baris mentah sebagai array of arrays
     const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
+
+    if (rows && rows.length > MAX_IMPORT_ROWS + 1) {
+      return NextResponse.json(
+        { error: `Maksimal ${MAX_IMPORT_ROWS} baris per file import` },
+        { status: 400 }
+      );
+    }
 
     if (!rows || rows.length <= 1) {
       return NextResponse.json(
@@ -63,6 +84,8 @@ export async function POST(req: NextRequest) {
     let priceHikes = 0;
     let skipped = 0;
     const priceHikeDetails: Array<{ name: string; oldCost: number; newCost: number; selling: number }> = [];
+    // Jejak audit per baris yang benar-benar berubah
+    const auditChanges: Array<Record<string, unknown>> = [];
 
     // Proses setiap baris data
     for (let i = 1; i < rows.length; i++) {
@@ -105,10 +128,12 @@ export async function POST(req: NextRequest) {
       if (existing) {
         // Cek kenaikan harga modal
         const isCostHiked = costPrice > existing.costPrice;
+        const newSellingPrice = sellingPrice > 0 ? sellingPrice : existing.sellingPrice;
+        const isPriceChanged = costPrice !== existing.costPrice || newSellingPrice !== existing.sellingPrice;
         const diff = costPrice - existing.costPrice;
         const pct = existing.costPrice > 0 ? (diff / existing.costPrice) * 100 : 0;
 
-        await prisma.product.update({
+        const updatedProduct = await prisma.product.update({
           where: { id: existing.id },
           data: {
             name,
@@ -121,6 +146,10 @@ export async function POST(req: NextRequest) {
             category: category || existing.category,
           },
         });
+        const rowChanges = pickChanges(existing, updatedProduct, PRODUCT_FIELDS);
+        if (rowChanges.changed.length > 0) {
+          auditChanges.push({ op: "UPDATE", id: existing.id, row: i + 1, before: rowChanges.before, after: rowChanges.after });
+        }
 
         if (isCostHiked) {
           priceHikes++;
@@ -142,8 +171,27 @@ export async function POST(req: NextRequest) {
               percentage: Number(pct.toFixed(2)),
               sourceType: "EXCEL_IMPORT",
               reason: `Import Excel: Modal naik +Rp ${diff.toLocaleString("id-ID")}`,
-              changedById: session.user.id,
+              changedById: currentUser.id,
               isConfirmed: false,
+            },
+          });
+        } else if (isPriceChanged) {
+          // Record every other price change too (cost decrease / selling price change)
+          await prisma.productPriceHistory.create({
+            data: {
+              productId: existing.id,
+              oldCostPrice: existing.costPrice,
+              newCostPrice: costPrice,
+              oldSellingPrice: existing.sellingPrice,
+              newSellingPrice,
+              difference: diff,
+              percentage: Number(pct.toFixed(2)),
+              sourceType: "EXCEL_IMPORT",
+              reason: "Import Excel: Perubahan Harga",
+              changedById: currentUser.id,
+              isConfirmed: true,
+              confirmedAt: new Date(),
+              confirmedById: currentUser.id,
             },
           });
         }
@@ -151,7 +199,7 @@ export async function POST(req: NextRequest) {
         updated++;
       } else {
         // Buat produk baru
-        await prisma.product.create({
+        const createdProduct = await prisma.product.create({
           data: {
             storeId,
             itemCode,
@@ -172,17 +220,38 @@ export async function POST(req: NextRequest) {
                 percentage: 0,
                 sourceType: "EXCEL_IMPORT",
                 reason: "Import Excel Produk Baru",
-                changedById: session.user.id,
+                changedById: currentUser.id,
                 isConfirmed: true,
                 confirmedAt: new Date(),
-                confirmedById: session.user.id,
+                confirmedById: currentUser.id,
               },
             },
           },
         });
 
+        auditChanges.push({
+          op: "CREATE",
+          id: createdProduct.id,
+          row: i + 1,
+          after: { name, itemCode, barcode, stock, costPrice, sellingPrice, unit, category },
+        });
         inserted++;
       }
+    }
+
+    // Catat import ke log aktivitas (dipecah per 200 perubahan agar detail tidak terpotong)
+    const fileName = file.name.slice(0, 200);
+    const totalChunks = Math.max(1, Math.ceil(auditChanges.length / LOG_CHUNK_SIZE));
+    for (let c = 0; c < totalChunks; c++) {
+      const chunk = auditChanges.slice(c * LOG_CHUNK_SIZE, (c + 1) * LOG_CHUNK_SIZE);
+      await logActivity(prisma, {
+        actor: currentUser,
+        action: "IMPORT",
+        entityType: "Product",
+        summary: `Import Excel "${fileName}": ${inserted} baru, ${updated} diperbarui, ${priceHikes} harga modal naik, ${skipped} dilewati` +
+          (totalChunks > 1 ? ` (bagian ${c + 1}/${totalChunks})` : ""),
+        after: { changes: chunk },
+      });
     }
 
     // Jika ada kenaikan harga modal terdeteksi, buat notifikasi lonceng sistem untuk Admin
@@ -226,7 +295,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("Import Products Excel error:", error);
     return NextResponse.json(
-      { error: error.message || "Gagal memproses file Excel data barang" },
+      { error: "Gagal memproses file Excel data barang" },
       { status: 500 }
     );
   }

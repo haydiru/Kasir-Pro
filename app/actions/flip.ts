@@ -6,7 +6,7 @@ import { serialize, ActionResponse } from "@/lib/serialize";
 import { revalidatePath } from "next/cache";
 import { getTZMonthRange, getTZDateRange, getTZShiftRange } from "@/lib/utils";
 import crypto from "crypto";
-
+import { logActivity } from "@/lib/activity-log";
 /**
  * Get all Flip transactions for the store in a given month/year.
  */
@@ -94,11 +94,22 @@ export async function toggleFlipExcluded(id: string): Promise<ActionResponse> {
       return { success: false, error: "Not found" };
     }
 
-    const updated = await prisma.flipWebhook.update({
-      where: { id },
-      data: { excluded: !record.excluded },
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.flipWebhook.update({
+        where: { id },
+        data: { excluded: !record.excluded },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "STATUS_CHANGE",
+        entityType: "FlipWebhook",
+        entityId: id,
+        summary: `${u.excluded ? "Mengecualikan" : "Menyertakan kembali"} transaksi Flip ${record.flipId} Rp${record.nominal}`,
+        before: { excluded: record.excluded },
+        after: { excluded: u.excluded },
+      });
+      return u;
     });
-
     revalidatePath("/admin/flip-transactions");
     return { success: true, data: serialize(updated) };
   } catch (error) {
@@ -232,12 +243,24 @@ export async function generateFlipApiKey(): Promise<ActionResponse> {
     }
 
     const newKey = "flip_" + crypto.randomBytes(24).toString("hex");
-
-    await prisma.store.update({
-      where: { id: session.user.storeId },
-      data: { flipApiKey: newKey },
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.store.findUnique({
+        where: { id: session.user.storeId },
+        select: { flipApiKey: true },
+      });
+      await tx.store.update({
+        where: { id: session.user.storeId },
+        data: { flipApiKey: newKey },
+      });
+      // Nilai API key tidak pernah dicatat, hanya fakta bahwa key dibuat/diganti
+      await logActivity(tx, {
+        actor: session.user,
+        action: "SETTING_CHANGE",
+        entityType: "Store",
+        entityId: session.user.storeId,
+        summary: before?.flipApiKey ? "Mengganti (regenerate) Flip API key" : "Membuat Flip API key",
+      });
     });
-
     revalidatePath("/admin/store-settings");
     return { success: true, data: { apiKey: newKey } };
   } catch (error) {
@@ -287,13 +310,26 @@ export async function deleteFlipTransaction(id: string): Promise<ActionResponse>
       return { success: false, error: "Hanya Super Admin yang berhak menghapus transaksi Flip." };
     }
 
-    const res = await prisma.flipWebhook.deleteMany({
-      where: {
-        id,
-        storeId: session.user.storeId,
-      },
+    const res = await prisma.$transaction(async (tx) => {
+      const record = await tx.flipWebhook.findFirst({ where: { id, storeId: session.user.storeId } });
+      const r = await tx.flipWebhook.deleteMany({
+        where: {
+          id,
+          storeId: session.user.storeId,
+        },
+      });
+      if (record && r.count > 0) {
+        await logActivity(tx, {
+          actor: session.user,
+          action: "DELETE",
+          entityType: "FlipWebhook",
+          entityId: id,
+          summary: `Menghapus transaksi Flip ${record.flipId} Rp${record.nominal}`,
+          before: record,
+        });
+      }
+      return r;
     });
-
     if (res.count === 0) {
       return { success: false, error: "Transaksi tidak ditemukan." };
     }
@@ -322,13 +358,24 @@ export async function bulkDeleteFlipTransactions(ids: string[]): Promise<ActionR
       return { success: false, error: "Tidak ada transaksi yang dipilih." };
     }
 
-    const result = await prisma.flipWebhook.deleteMany({
-      where: {
-        id: { in: ids },
-        storeId: session.user.storeId,
-      },
+    const where = {
+      id: { in: ids },
+      storeId: session.user.storeId,
+    };
+    const result = await prisma.$transaction(async (tx) => {
+      const records = await tx.flipWebhook.findMany({ where });
+      const r = await tx.flipWebhook.deleteMany({ where });
+      if (records.length > 0) {
+        await logActivity(tx, {
+          actor: session.user,
+          action: "DELETE",
+          entityType: "FlipWebhook",
+          summary: `Menghapus massal ${records.length} transaksi Flip`,
+          before: records,
+        });
+      }
+      return r;
     });
-
     return { success: true, data: { count: result.count } };
   } catch (error) {
     console.error("bulkDeleteFlipTransactions error:", error);

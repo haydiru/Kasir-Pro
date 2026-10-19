@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
+import { requireAdmin, isValidRole, safeErrorMessage, UserFacingError, SAFE_USER_SELECT } from "@/lib/auth-guard";
+import { logActivity, pickChanges } from "@/lib/activity-log";
 
 type AdminActionState = {
   status: "SUCCESS" | "ERROR";
@@ -11,17 +12,19 @@ type AdminActionState = {
   timestamp: number;
 };
 
-// Middleware-like function to check admin access
+// Middleware-like function to check admin access (role is re-read from the database)
 async function checkAdminAccess() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  
-  const role = session.user.role;
-  if (role !== "admin" && role !== "super_admin") {
-    throw new Error("Forbidden: Requires Admin privileges");
+  return requireAdmin();
+}
+
+/**
+ * Only a super_admin may create, edit, promote to, or reset the PIN of a super_admin.
+ * Prevents a regular admin from taking over the owner account.
+ */
+function assertCanManageRole(actorRole: string, targetRole: string) {
+  if (targetRole === "super_admin" && actorRole !== "super_admin") {
+    throw new UserFacingError("Hanya Super Admin yang dapat mengelola akun Super Admin.");
   }
-  
-  return session.user;
 }
 
 export async function createStoreUser(prevState: string | undefined, formData: FormData) {
@@ -43,6 +46,11 @@ export async function createStoreUser(prevState: string | undefined, formData: F
       return "Mohon lengkapi semua bidang.";
     }
 
+    if (!isValidRole(role)) {
+      return "Role pengguna tidak valid.";
+    }
+    assertCanManageRole(admin.role, role);
+
     const payrollCycleStart = parseInt(cycleStartStr);
     const payrollCycleEnd = parseInt(cycleEndStr);
 
@@ -56,23 +64,33 @@ export async function createStoreUser(prevState: string | undefined, formData: F
       return "Email sudah terdaftar di sistem.";
     }
 
-    await prisma.user.create({
-      data: {
-        storeId: admin.storeId,
-        name,
-        email,
-        role,
-        pin: hashedPin,
-        payrollCycleStart,
-        payrollCycleEnd,
-      }
+    await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          storeId: admin.storeId,
+          name,
+          email,
+          role,
+          pin: hashedPin,
+          payrollCycleStart,
+          payrollCycleEnd,
+        }
+      });
+      await logActivity(tx, {
+        actor: admin,
+        action: "CREATE",
+        entityType: "User",
+        entityId: created.id,
+        summary: `Menambah pengguna ${name} (${role})`,
+        after: { name, email, role, payrollCycleStart, payrollCycleEnd },
+      });
     });
 
     revalidatePath("/admin/users");
     return "SUCCESS";
   } catch (error: any) {
     console.error("Create User Error:", error);
-    return `Gagal membuat pengguna: ${error.message}`;
+    return `Gagal membuat pengguna: ${safeErrorMessage(error, "Terjadi kesalahan sistem.")}`;
   }
 }
 
@@ -91,27 +109,69 @@ export async function updateStoreUser(prevState: string | undefined, formData: F
       return "Mohon lengkapi semua bidang.";
     }
 
+    if (!isValidRole(role)) {
+      return "Role pengguna tidak valid.";
+    }
+
     // Verify user belongs to the same store
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user || user.storeId !== admin.storeId) {
       return "Pengguna tidak ditemukan atau Anda tidak memiliki akses.";
     }
 
-    await prisma.user.update({
-      where: { id },
-      data: {
-        name,
-        email,
-        role,
-        payrollCycleStart: parseInt(cycleStartStr),
-        payrollCycleEnd: parseInt(cycleEndStr),
+    // Admins cannot edit a super_admin account nor promote anyone to super_admin
+    assertCanManageRole(admin.role, user.role);
+    assertCanManageRole(admin.role, role);
+
+    // Never leave a store without a super_admin
+    if (user.role === "super_admin" && role !== "super_admin") {
+      const otherSuperAdmins = await prisma.user.count({
+        where: { storeId: admin.storeId, role: "super_admin", id: { not: id } },
+      });
+      if (otherSuperAdmins === 0) {
+        return "Toko harus memiliki minimal satu Super Admin.";
+      }
+    }
+
+    // Email change must not collide with another account
+    if (email !== user.email) {
+      const emailOwner = await prisma.user.findUnique({ where: { email } });
+      if (emailOwner) return "Email sudah terdaftar di sistem.";
+    }
+
+    const updateData = {
+      name,
+      email,
+      role,
+      payrollCycleStart: parseInt(cycleStartStr),
+      payrollCycleEnd: parseInt(cycleEndStr),
+    };
+    const diff = pickChanges(user, updateData);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: updateData,
+      });
+      if (diff.changed.length > 0) {
+        await logActivity(tx, {
+          actor: admin,
+          action: user.role !== role ? "ROLE_CHANGE" : "UPDATE",
+          entityType: "User",
+          entityId: id,
+          summary: user.role !== role
+            ? `Mengubah role ${user.name}: ${user.role} → ${role}`
+            : `Mengubah data pengguna ${user.name} (${diff.changed.join(", ")})`,
+          before: diff.before,
+          after: diff.after,
+        });
       }
     });
 
     revalidatePath("/admin/users");
     return "SUCCESS";
   } catch (error: any) {
-    return `Gagal mengedit pengguna: ${error.message}`;
+    return `Gagal mengedit pengguna: ${safeErrorMessage(error, "Terjadi kesalahan sistem.")}`;
   }
 }
 
@@ -136,7 +196,7 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
     const report = await prisma.shiftReport.findUnique({
       where: { id: reportId },
       include: {
-        user: true,
+        user: { select: SAFE_USER_SELECT },
         digitalTransactions: true,
         expenditures: true,
       }
@@ -151,15 +211,37 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
     }
 
     await prisma.$transaction(async (tx) => {
+      const verifiedData = {
+        status: "Verified",
+        verifiedById: admin.id,
+        finalAdminVariance: isNaN(variance) ? 0 : variance,
+        adminNotes,
+        verifiedAt: new Date(),
+      };
       await tx.shiftReport.update({
         where: { id: reportId },
-        data: {
-          status: "Verified",
-          verifiedById: admin.id,
-          finalAdminVariance: isNaN(variance) ? 0 : variance,
-          adminNotes,
-          verifiedAt: new Date(),
-        }
+        data: verifiedData,
+      });
+
+      await logActivity(tx, {
+        actor: admin,
+        action: "VERIFY",
+        entityType: "ShiftReport",
+        entityId: reportId,
+        summary: `Verifikasi laporan ${report.shiftType} ${report.date.toISOString().split("T")[0]} milik ${report.user.name}`,
+        before: {
+          status: report.status,
+          verifiedById: report.verifiedById,
+          finalAdminVariance: report.finalAdminVariance,
+          adminNotes: report.adminNotes,
+        },
+        after: {
+          ...verifiedData,
+          posCash: report.posCash,
+          posDebit: report.posDebit,
+          manualCashCount: report.manualCashCount,
+          startingCash: report.startingCash,
+        },
       });
 
       // 1. Akun Kas Pegangan Admin (CASH_ADMIN) - hanya memegang uang cash fisik
@@ -168,7 +250,7 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
       });
 
       if (!adminAccount) {
-        if (!admin.name || !admin.id) throw new Error("Info admin tidak lengkap.");
+        if (!admin.name || !admin.id) throw new UserFacingError("Info admin tidak lengkap.");
         adminAccount = await tx.financialAccount.create({
           data: {
             storeId: admin.storeId,
@@ -346,7 +428,7 @@ export async function verifyShiftReport(prevState: AdminActionState | undefined,
   } catch (error: any) {
     return {
       status: "ERROR",
-      message: `Gagal memverifikasi: ${error.message}`,
+      message: `Gagal memverifikasi: ${safeErrorMessage(error, "Terjadi kesalahan sistem.")}`,
       timestamp: Date.now(),
     };
   }
@@ -407,6 +489,25 @@ export async function unverifyShiftReport(prevState: AdminActionState | undefine
           adminNotes: null,
         }
       });
+
+      // Simpan siapa verifikator sebelumnya & transaksi kas yang dibatalkan,
+      // karena kolom-kolom itu dikosongkan di ShiftReport.
+      await logActivity(tx, {
+        actor: admin,
+        action: "UNVERIFY",
+        entityType: "ShiftReport",
+        entityId: reportId,
+        summary: `Membatalkan verifikasi laporan ${report.shiftType} ${report.date.toISOString().split("T")[0]}`,
+        before: {
+          status: report.status,
+          verifiedById: report.verifiedById,
+          verifiedAt: report.verifiedAt,
+          finalAdminVariance: report.finalAdminVariance,
+          adminNotes: report.adminNotes,
+          financialTransactions: existingTxs,
+        },
+        after: { status: "Submitted" },
+      });
     });
 
     revalidatePath("/admin/verifications");
@@ -420,7 +521,7 @@ export async function unverifyShiftReport(prevState: AdminActionState | undefine
   } catch (error: any) {
     return {
       status: "ERROR",
-      message: `Gagal membatalkan verifikasi: ${error.message}`,
+      message: `Gagal membatalkan verifikasi: ${safeErrorMessage(error, "Terjadi kesalahan sistem.")}`,
       timestamp: Date.now(),
     };
   }
@@ -435,16 +536,26 @@ export async function resetUserPin(userId: string) {
     if (!user || user.storeId !== admin.storeId) {
       return { success: false, message: "Akses ditolak." };
     }
+    assertCanManageRole(admin.role, user.role);
 
     const hashedPin = await bcrypt.hash("123456", 10);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { pin: hashedPin }
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { pin: hashedPin }
+      });
+      await logActivity(tx, {
+        actor: admin,
+        action: "PIN_RESET",
+        entityType: "User",
+        entityId: userId,
+        summary: `Reset PIN ${user.name} ke PIN default`,
+      });
     });
 
     return { success: true, message: "PIN berhasil direset ke 123456." };
   } catch (error: any) {
-    return { success: false, message: error.message };
+    return { success: false, message: safeErrorMessage(error, "Gagal mereset PIN.") };
   }
 }
 

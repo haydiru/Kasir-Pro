@@ -61,16 +61,14 @@ export const authConfig = {
       }
       return session;
     },
-    jwt({ token, user, trigger, session }) {
+    jwt({ token, user }) {
       if (user) {
         token.role = user.role;
         token.storeId = user.storeId;
         token.storeName = user.storeName;
       }
-      // If we update session later (e.g., override role to act as cashier)
-      if (trigger === "update" && session?.role) {
-        token.role = session.role;
-      }
+      // Role/storeId must never be taken from client-supplied session updates
+      // (POST /api/auth/session). They are only refreshed from the database in auth.ts.
       return token;
     },
   },

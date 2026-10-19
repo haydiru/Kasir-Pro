@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
 import { getTZDateRange, getTZMonthRange, formatLocalDate } from "@/lib/utils";
+import { SAFE_USER_SELECT } from "@/lib/auth-guard";
+import { logActivity } from "@/lib/activity-log";
 
 export async function getActiveAttendance(): Promise<ActionResponse> {
   try {
@@ -25,7 +27,7 @@ export async function getActiveAttendance(): Promise<ActionResponse> {
     };
   } catch (error: any) {
     console.error("getActiveAttendance error:", error);
-    return { success: false, error: error.message || "Gagal mengambil data presensi aktif" };
+    return { success: false, error: "Gagal mengambil data presensi aktif" };
   }
 }
 
@@ -39,14 +41,25 @@ export async function checkIn(data: { shiftType: string; actingAsCashier: boolea
       return { success: false, error: "Sudah ada presensi aktif" };
     }
 
-    const attendance = await prisma.attendance.create({
-      data: {
-        userId: session.user.id,
-        storeId: session.user.storeId,
-        shiftType: data.shiftType,
-        actingAsCashier: data.actingAsCashier,
-        clockIn: new Date(),
-      },
+    const attendance = await prisma.$transaction(async (tx) => {
+      const created = await tx.attendance.create({
+        data: {
+          userId: session.user.id,
+          storeId: session.user.storeId,
+          shiftType: data.shiftType,
+          actingAsCashier: data.actingAsCashier,
+          clockIn: new Date(),
+        },
+      });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "CREATE",
+        entityType: "Attendance",
+        entityId: created.id,
+        summary: `Clock-in shift ${created.shiftType}${created.actingAsCashier ? " (sebagai kasir)" : ""}`,
+        after: { shiftType: created.shiftType, actingAsCashier: created.actingAsCashier, clockIn: created.clockIn },
+      });
+      return created;
     });
 
     revalidatePath("/attendance");
@@ -56,7 +69,7 @@ export async function checkIn(data: { shiftType: string; actingAsCashier: boolea
     };
   } catch (error: any) {
     console.error("checkIn error:", error);
-    return { success: false, error: error.message || "Gagal melakukan clock-in" };
+    return { success: false, error: "Gagal melakukan clock-in" };
   }
 }
 
@@ -65,12 +78,34 @@ export async function clockOut(id: string): Promise<ActionResponse> {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Unauthorized" };
 
-    const updated = await prisma.attendance.update({
-      where: { id },
-      data: {
-        clockOut: new Date(),
-      },
+    // Only the owner can clock out, and only an attendance that is still open
+    const clockOutAt = new Date();
+    const result = await prisma.$transaction(async (tx) => {
+      const r = await tx.attendance.updateMany({
+        where: { id, userId: session.user.id, clockOut: null },
+        data: {
+          clockOut: clockOutAt,
+        },
+      });
+      if (r.count > 0) {
+        await logActivity(tx, {
+          actor: session.user,
+          action: "UPDATE",
+          entityType: "Attendance",
+          entityId: id,
+          summary: "Clock-out",
+          before: { clockOut: null },
+          after: { clockOut: clockOutAt },
+        });
+      }
+      return r;
     });
+
+    if (result.count === 0) {
+      return { success: false, error: "Presensi aktif tidak ditemukan" };
+    }
+
+    const updated = await prisma.attendance.findUnique({ where: { id } });
 
     revalidatePath("/attendance");
     return { success: true, data: serialize(updated) };
@@ -100,7 +135,7 @@ export async function getTodayAttendanceLog(): Promise<ActionResponse> {
         },
       },
       include: {
-        user: true,
+        user: { select: SAFE_USER_SELECT },
       },
       orderBy: { clockIn: "asc" },
     });
@@ -150,14 +185,26 @@ export async function deleteAttendanceLogs(userId: string, dateStr: string): Pro
     const date = new Date(dateStr);
     const { start, end } = getTZDateRange(date, timezone);
 
-    await prisma.attendance.deleteMany({
-      where: {
-        userId,
-        clockIn: {
-          gte: start,
-          lte: end,
-        },
+    const where = {
+      userId,
+      storeId: session.user.storeId,
+      clockIn: {
+        gte: start,
+        lte: end,
       },
+    };
+    await prisma.$transaction(async (tx) => {
+      const removed = await tx.attendance.findMany({ where, include: { user: { select: SAFE_USER_SELECT } } });
+      if (removed.length === 0) return;
+      await tx.attendance.deleteMany({ where });
+      await logActivity(tx, {
+        actor: session.user,
+        action: "DELETE",
+        entityType: "Attendance",
+        entityId: userId,
+        summary: `Menghapus ${removed.length} presensi ${removed[0].user.name} tanggal ${dateStr}`,
+        before: removed,
+      });
     });
 
     revalidatePath("/attendance");
@@ -316,7 +363,21 @@ export async function deleteAttendanceByUserDay(
       whereClause.shiftType = shiftType;
     }
 
-    const result = await prisma.attendance.deleteMany({ where: whereClause });
+    const result = await prisma.$transaction(async (tx) => {
+      const removed = await tx.attendance.findMany({ where: whereClause, include: { user: { select: SAFE_USER_SELECT } } });
+      const r = await tx.attendance.deleteMany({ where: whereClause });
+      if (removed.length > 0) {
+        await logActivity(tx, {
+          actor: session.user,
+          action: "DELETE",
+          entityType: "Attendance",
+          entityId: userId,
+          summary: `Menghapus ${removed.length} presensi ${removed[0].user.name} tanggal ${localDay}${shiftType ? ` shift ${shiftType}` : ""}`,
+          before: removed,
+        });
+      }
+      return r;
+    });
 
     revalidatePath("/admin/attendance");
     revalidatePath("/attendance");
@@ -377,9 +438,20 @@ export async function autoFixMissedCheckouts(): Promise<ActionResponse> {
 
       // If current time is past the auto checkout time, perform auto checkout
       if (nowUTC >= autoCheckoutUTC) {
-        await prisma.attendance.update({
-          where: { id: log.id },
-          data: { clockOut: autoCheckoutUTC }
+        await prisma.$transaction(async (tx) => {
+          await tx.attendance.update({
+            where: { id: log.id },
+            data: { clockOut: autoCheckoutUTC }
+          });
+          await logActivity(tx, {
+            actor: { name: "Sistem (auto-checkout)", storeId },
+            action: "UPDATE",
+            entityType: "Attendance",
+            entityId: log.id,
+            summary: `Auto clock-out shift ${log.shiftType} (dipicu oleh ${session.user.name})`,
+            before: { userId: log.userId, clockIn: log.clockIn, clockOut: null },
+            after: { clockOut: autoCheckoutUTC },
+          });
         });
         fixedCount++;
       }

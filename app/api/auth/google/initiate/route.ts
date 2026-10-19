@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getCurrentUser, isAdminRole } from "@/lib/auth-guard";
+import {
+  GOOGLE_OAUTH_STATE_COOKIE,
+  GOOGLE_OAUTH_STATE_MAX_AGE,
+  createOAuthNonce,
+  parseGoogleAuthType,
+} from "@/lib/google-oauth-state";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
+      );
+    }
+
+    // Connecting store-wide Google accounts is an admin-only operation
+    if (!isAdminRole(user.role)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
       );
     }
 
@@ -21,12 +35,11 @@ export async function GET(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     const redirectUri = `${appUrl}/api/auth/google/callback`;
-    const storeId = session.user.storeId;
-    const type = req.nextUrl.searchParams.get("type") || "CALENDAR";
+    const type = parseGoogleAuthType(req.nextUrl.searchParams.get("type") || "CALENDAR");
 
-    if (!storeId) {
+    if (!type) {
       return NextResponse.json(
-        { success: false, error: "User tidak diasosiasikan dengan toko mana pun" },
+        { success: false, error: "Tipe integrasi Google tidak valid" },
         { status: 400 }
       );
     }
@@ -36,7 +49,11 @@ export async function GET(req: NextRequest) {
       ? "https://www.googleapis.com/auth/gmail.readonly"
       : "https://www.googleapis.com/auth/calendar.events";
 
-    // Bangun URL OAuth Consent Google (state menyimpan storeId:type)
+    // `state` carries a random nonce (also stored in an httpOnly cookie) plus the type.
+    // The store is NOT taken from `state`; the callback uses the logged-in admin's store.
+    const nonce = createOAuthNonce();
+
+    // Bangun URL OAuth Consent Google
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -44,9 +61,17 @@ export async function GET(req: NextRequest) {
       `&scope=${encodeURIComponent(scope)}` +
       `&access_type=offline` +
       `&prompt=consent` +
-      `&state=${encodeURIComponent(`${storeId}:${type}`)}`;
+      `&state=${encodeURIComponent(`${nonce}:${type}`)}`;
 
-    return NextResponse.redirect(googleAuthUrl);
+    const response = NextResponse.redirect(googleAuthUrl);
+    response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, nonce, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/api/auth/google",
+      maxAge: GOOGLE_OAUTH_STATE_MAX_AGE,
+    });
+    return response;
   } catch (error: any) {
     console.error("Error initiating Google OAuth:", error);
     return NextResponse.json(

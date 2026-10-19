@@ -536,3 +536,27 @@ model ReceiptScannedItem {
   @@index([matchedProductId])
 }
 
+// Jejak aktivitas umum (append-only). Sengaja TANPA relasi/foreign key agar
+// log tidak ikut terhapus (cascade) ketika data, user, atau toko dihapus.
+// Jangan pernah meng-update / menghapus baris di tabel ini dari kode aplikasi.
+model ActivityLog {
+  id         String   @id @default(uuid())
+  storeId    String? // null untuk login gagal dengan email tak dikenal
+  actorId    String? // null untuk aksi anonim (login gagal, link publik)
+  actorName  String? // snapshot nama saat aksi terjadi
+  actorRole  String? // snapshot role saat aksi terjadi
+  action     String // CREATE, UPDATE, DELETE, LOGIN, LOGIN_FAILED, LOGOUT, VERIFY, UNVERIFY, PIN_RESET, PIN_CHANGE, ROLE_CHANGE, SETTING_CHANGE, IMPORT, STATUS_CHANGE
+  entityType String // 'User', 'ShiftReport', 'DigitalTransaction', 'Expenditure', 'Product', 'Bill', ...
+  entityId   String?
+  summary    String? // ringkasan yang bisa dibaca manusia
+  before     Json? // snapshot sebelum perubahan (tanpa PIN/hash/token)
+  after      Json? // snapshot sesudah perubahan (tanpa PIN/hash/token)
+  reason     String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([entityType, entityId])
+  @@index([actorId])
+}

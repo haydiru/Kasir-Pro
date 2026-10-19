@@ -4,6 +4,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
+import { requireAdmin, requireUser, safeErrorMessage } from "@/lib/auth-guard";
+import { logActivity, pickChanges } from "@/lib/activity-log";
+
+const PRODUCT_FIELDS = ["name", "itemCode", "barcode", "stock", "costPrice", "sellingPrice", "unit", "category", "isActive"];
 
 export async function getProducts(params?: {
   search?: string;
@@ -106,16 +110,16 @@ export async function createProduct(input: {
   category?: string;
 }): Promise<ActionResponse> {
   try {
-    const session = await auth();
-    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+    // Only admins may change master data (prices & stock)
+    const admin = await requireAdmin();
 
-    const storeId = session.user.storeId;
+    const storeId = admin.storeId;
     const name = input.name?.trim();
     if (!name) return { success: false, error: "Nama barang wajib diisi" };
 
     const costPrice = Math.max(0, Number(input.costPrice) || 0);
     const sellingPrice = Math.max(0, Number(input.sellingPrice) || 0);
-    const stock = Number(input.stock) || 0;
+    const stock = Math.trunc(Number(input.stock)) || 0;
     const barcode = input.barcode?.trim() || null;
     const itemCode = input.itemCode?.trim() || null;
     const unit = input.unit?.trim() || "PCS";
@@ -131,7 +135,8 @@ export async function createProduct(input: {
       }
     }
 
-    const product = await prisma.product.create({
+    const product = await prisma.$transaction(async (tx) => {
+     const created = await tx.product.create({
       data: {
         storeId,
         itemCode,
@@ -152,20 +157,30 @@ export async function createProduct(input: {
             percentage: 0,
             sourceType: "MANUAL_EDIT",
             reason: "Input Barang Awal",
-            changedById: session.user.id,
+            changedById: admin.id,
             isConfirmed: true,
             confirmedAt: new Date(),
-            confirmedById: session.user.id,
+            confirmedById: admin.id,
           },
         },
       },
+     });
+     await logActivity(tx, {
+       actor: admin,
+       action: "CREATE",
+       entityType: "Product",
+       entityId: created.id,
+       summary: `Menambah barang ${created.name}`,
+       after: Object.fromEntries(PRODUCT_FIELDS.map((f) => [f, (created as any)[f]])),
+     });
+     return created;
     });
 
     revalidatePath("/products");
     return { success: true, data: serialize(product) };
   } catch (error: any) {
     console.error("createProduct error:", error);
-    return { success: false, error: error.message || "Gagal menambahkan barang baru" };
+    return { success: false, error: safeErrorMessage(error, "Gagal menambahkan barang baru") };
   }
 }
 
@@ -184,10 +199,10 @@ export async function updateProduct(
   }
 ): Promise<ActionResponse> {
   try {
-    const session = await auth();
-    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+    // Only admins may change master data (prices & stock)
+    const admin = await requireAdmin();
 
-    const storeId = session.user.storeId;
+    const storeId = admin.storeId;
     const existing = await prisma.product.findFirst({
       where: { id, storeId },
     });
@@ -195,9 +210,9 @@ export async function updateProduct(
     if (!existing) return { success: false, error: "Barang tidak ditemukan" };
 
     const name = input.name?.trim() || existing.name;
-    const costPrice = Math.max(0, Number(input.costPrice) || 0);
-    const sellingPrice = Math.max(0, Number(input.sellingPrice) || 0);
-    const stock = input.stock !== undefined ? Number(input.stock) : existing.stock;
+    const costPrice = input.costPrice !== undefined ? Math.max(0, Number(input.costPrice) || 0) : existing.costPrice;
+    const sellingPrice = input.sellingPrice !== undefined ? Math.max(0, Number(input.sellingPrice) || 0) : existing.sellingPrice;
+    const stock = input.stock !== undefined ? Math.trunc(Number(input.stock)) || 0 : existing.stock;
     const barcode = input.barcode !== undefined ? (input.barcode?.trim() || null) : existing.barcode;
     const itemCode = input.itemCode !== undefined ? (input.itemCode?.trim() || null) : existing.itemCode;
     const unit = input.unit?.trim() || existing.unit;
@@ -239,11 +254,25 @@ export async function updateProduct(
             percentage: Number(pct.toFixed(2)),
             sourceType: "MANUAL_EDIT",
             reason: input.reason || (isPriceHike ? "Penyesuaian Kenaikan Harga Modal" : "Perubahan Harga"),
-            changedById: session.user.id,
+            changedById: admin.id,
             isConfirmed: true,
             confirmedAt: new Date(),
-            confirmedById: session.user.id,
+            confirmedById: admin.id,
           },
+        });
+      }
+
+      const changes = pickChanges(existing, p, PRODUCT_FIELDS);
+      if (changes.changed.length > 0) {
+        await logActivity(tx, {
+          actor: admin,
+          action: "UPDATE",
+          entityType: "Product",
+          entityId: id,
+          summary: `Mengubah barang ${existing.name} (${changes.changed.join(", ")})`,
+          before: changes.before,
+          after: changes.after,
+          reason: input.reason || null,
         });
       }
 
@@ -254,41 +283,71 @@ export async function updateProduct(
     return { success: true, data: serialize(updated) };
   } catch (error: any) {
     console.error("updateProduct error:", error);
-    return { success: false, error: error.message || "Gagal memperbarui barang" };
+    return { success: false, error: safeErrorMessage(error, "Gagal memperbarui barang") };
   }
 }
 
 export async function deleteProduct(id: string): Promise<ActionResponse> {
   try {
-    const session = await auth();
-    if (!session?.user?.storeId) return { success: false, error: "Unauthorized" };
+    const admin = await requireAdmin();
 
-    const storeId = session.user.storeId;
-    await prisma.product.updateMany({
-      where: { id, storeId },
-      data: { isActive: false },
+    const storeId = admin.storeId;
+    await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({ where: { id, storeId } });
+      if (!product || !product.isActive) return;
+      await tx.product.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      await logActivity(tx, {
+        actor: admin,
+        action: "DELETE",
+        entityType: "Product",
+        entityId: id,
+        summary: `Menonaktifkan (hapus) barang ${product.name}`,
+        before: Object.fromEntries(PRODUCT_FIELDS.map((f) => [f, (product as any)[f]])),
+        after: { isActive: false },
+      });
     });
 
     revalidatePath("/products");
     return { success: true };
   } catch (error: any) {
     console.error("deleteProduct error:", error);
-    return { success: false, error: "Gagal menghapus barang" };
+    return { success: false, error: safeErrorMessage(error, "Gagal menghapus barang") };
   }
 }
 
 export async function confirmPriceAdjustment(historyId: string): Promise<ActionResponse> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+    const user = await requireUser();
 
-    const updated = await prisma.productPriceHistory.update({
-      where: { id: historyId },
-      data: {
-        isConfirmed: true,
-        confirmedAt: new Date(),
-        confirmedById: session.user.id,
-      },
+    // The price history entry must belong to a product of the user's own store
+    const history = await prisma.productPriceHistory.findFirst({
+      where: { id: historyId, product: { storeId: user.storeId } },
+      include: { product: { select: { name: true } } },
+    });
+    if (!history) return { success: false, error: "Riwayat harga tidak ditemukan" };
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const h = await tx.productPriceHistory.update({
+        where: { id: historyId },
+        data: {
+          isConfirmed: true,
+          confirmedAt: new Date(),
+          confirmedById: user.id,
+        },
+      });
+      await logActivity(tx, {
+        actor: user,
+        action: "STATUS_CHANGE",
+        entityType: "ProductPriceHistory",
+        entityId: historyId,
+        summary: `Konfirmasi penyesuaian harga ${history.product.name}: modal ${history.oldCostPrice} → ${history.newCostPrice}`,
+        before: { isConfirmed: history.isConfirmed },
+        after: { isConfirmed: true },
+      });
+      return h;
     });
 
     revalidatePath("/products");
@@ -315,7 +374,7 @@ export async function getPriceHikeAlerts(limit = 10): Promise<ActionResponse> {
         product: true,
       },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      take: Math.min(Math.max(1, Math.trunc(Number(limit)) || 10), 100),
     });
 
     return { success: true, data: serialize(unconfirmedHikes) };

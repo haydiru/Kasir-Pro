@@ -49,6 +49,7 @@ export default async function ProductsPage() {
       totalCount={totalCount}
       unconfirmedHikesCount={unconfirmedHikes}
       isAiScanEnabled={store?.enableAiReceiptScan ?? false}
+      canManage={session.user.role === "admin" || session.user.role === "super_admin"}
     />
   );
 }

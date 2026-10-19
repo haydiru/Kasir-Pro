@@ -20,8 +20,42 @@ declare module "next-auth" {
   }
 }
 
+// How often the JWT's role/storeId is re-validated against the database
+const TOKEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+        token.storeId = user.storeId;
+        token.storeName = user.storeName;
+        token.refreshedAt = Date.now();
+        return token;
+      }
+
+      const refreshedAt = typeof token.refreshedAt === "number" ? token.refreshedAt : 0;
+      if (token.sub && Date.now() - refreshedAt > TOKEN_REFRESH_INTERVAL_MS) {
+        const { prisma } = await import("@/lib/prisma");
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true, storeId: true, store: { select: { name: true } } },
+        });
+
+        // User was removed: invalidate the session
+        if (!dbUser) return null;
+
+        token.role = dbUser.role;
+        token.storeId = dbUser.storeId;
+        token.storeName = dbUser.store?.name || "KasirPro Store";
+        token.refreshedAt = Date.now();
+      }
+
+      return token;
+    },
+  },
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -35,6 +69,7 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
           try {
             const { prisma } = await import("@/lib/prisma");
             const bcrypt = await import("bcryptjs");
+            const { logActivitySafe } = await import("@/lib/activity-log");
 
             const user = await prisma.user.findUnique({
               where: { email },
@@ -43,12 +78,36 @@ export const { auth, signIn, signOut, handlers: { GET, POST } } = NextAuth({
 
             if (!user) {
               console.log("Authorize: User not found", email);
+              await logActivitySafe(prisma, {
+                action: "LOGIN_FAILED",
+                entityType: "User",
+                summary: `Login gagal: email tidak terdaftar (${email})`,
+              });
               return null;
             }
 
             const passwordsMatch = await bcrypt.compare(pin, user.pin);
+            const actor = { id: user.id, name: user.name, role: user.role, storeId: user.storeId };
+
+            if (!passwordsMatch) {
+              // Pelaku belum terbukti pemilik akun, jadi tidak dicatat sebagai actor
+              await logActivitySafe(prisma, {
+                storeId: user.storeId,
+                action: "LOGIN_FAILED",
+                entityType: "User",
+                entityId: user.id,
+                summary: `Login gagal: PIN salah untuk ${user.email}`,
+              });
+            }
 
             if (passwordsMatch) {
+              await logActivitySafe(prisma, {
+                actor,
+                action: "LOGIN",
+                entityType: "User",
+                entityId: user.id,
+                summary: `${user.name} login`,
+              });
               return {
                 id: user.id,
                 name: user.name,

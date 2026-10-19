@@ -22,8 +22,20 @@ export default async function AdminUsersPage() {
   // Fetch only users that belong to this exact store
   const users = await prisma.user.findMany({
     where: { storeId: session.user.storeId },
+    // Never send the PIN hash to the browser
+    select: {
+      id: true,
+      storeId: true,
+      name: true,
+      email: true,
+      role: true,
+      payrollCycleStart: true,
+      payrollCycleEnd: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     orderBy: { createdAt: 'desc' }
   });
 
-  return <UsersClient initialUsers={users} storeName={store.name} />;
+  return <UsersClient initialUsers={users} storeName={store.name} currentUserRole={session.user.role} />;
 }

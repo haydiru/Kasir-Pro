@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
+import { logActivity } from "@/lib/activity-log";
 // GET /api/suppliers?q=search_query
 export async function GET(req: NextRequest) {
   try {
@@ -91,7 +91,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supplier = await prisma.supplier.create({
+    const supplier = await prisma.$transaction(async (tx) => {
+     const created = await tx.supplier.create({
       data: {
         storeId,
         kode: kode.trim(),
@@ -110,8 +111,17 @@ export async function POST(req: NextRequest) {
         email: email?.trim() || null,
         keterangan: keterangan?.trim() || null,
       },
+     });
+     await logActivity(tx, {
+       actor: session.user,
+       action: "CREATE",
+       entityType: "Supplier",
+       entityId: created.id,
+       summary: `Menambah supplier ${created.nama} (${created.kode})`,
+       after: created,
+     });
+     return created;
     });
-
     return NextResponse.json(supplier, { status: 201 });
   } catch (error) {
     console.error("POST /api/suppliers error:", error);

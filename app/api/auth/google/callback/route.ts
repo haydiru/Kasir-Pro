@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser, isAdminRole } from "@/lib/auth-guard";
+import { logActivity } from "@/lib/activity-log";
+import {
+  GOOGLE_OAUTH_STATE_COOKIE,
+  nonceMatches,
+  parseGoogleAuthType,
+} from "@/lib/google-oauth-state";
+
+function redirectWithClearedState(url: string) {
+  const response = NextResponse.redirect(url);
+  response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api/auth/google",
+    maxAge: 0,
+  });
+  return response;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,18 +26,33 @@ export async function GET(req: NextRequest) {
     const code = searchParams.get("code");
     const errorParam = searchParams.get("error");
     const stateParam = searchParams.get("state") || "";
-    const [storeId, type = "CALENDAR"] = stateParam.split(":");
+    const [stateNonce, rawType = "CALENDAR"] = stateParam.split(":");
+    const type = parseGoogleAuthType(rawType);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     const redirectSettingsUrl = `${appUrl}/admin/store-settings`;
 
     if (errorParam) {
       console.error("Google OAuth error parameter:", errorParam);
-      return NextResponse.redirect(`${redirectSettingsUrl}?error=google_denied`);
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=google_denied`);
     }
 
-    if (!code || !storeId) {
-      return NextResponse.redirect(`${redirectSettingsUrl}?error=missing_auth_params`);
+    // CSRF protection: `state` must match the nonce issued to this browser by /initiate
+    const expectedNonce = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
+    if (!nonceMatches(expectedNonce, stateNonce) || !type) {
+      console.error("Google OAuth state mismatch or invalid type");
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=invalid_oauth_state`);
+    }
+
+    // The account is linked to the logged-in admin's own store (never a store from the URL)
+    const user = await getCurrentUser();
+    if (!user || !isAdminRole(user.role)) {
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=unauthorized`);
+    }
+    const storeId = user.storeId;
+
+    if (!code) {
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=missing_auth_params`);
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -26,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     if (!clientId || !clientSecret || clientId === "YOUR_GOOGLE_CLIENT_ID") {
       console.error("Google credentials are not configured properly in .env");
-      return NextResponse.redirect(`${redirectSettingsUrl}?error=server_configuration_error`);
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=server_configuration_error`);
     }
 
     const redirectUri = `${appUrl}/api/auth/google/callback`;
@@ -47,7 +81,7 @@ export async function GET(req: NextRequest) {
     if (!tokenRes.ok) {
       const errorText = await tokenRes.text();
       console.error("Failed to exchange auth code for tokens:", errorText);
-      return NextResponse.redirect(`${redirectSettingsUrl}?error=token_exchange_failed`);
+      return redirectWithClearedState(`${redirectSettingsUrl}?error=token_exchange_failed`);
     }
 
     const tokens = await tokenRes.json();
@@ -55,18 +89,9 @@ export async function GET(req: NextRequest) {
     // Hitung tanggal kedaluwarsa token (sekarang + expires_in detik)
     const expiryDate = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
 
-    // Cari tahu apakah store ini ada
-    const storeExists = await prisma.store.findUnique({
-      where: { id: storeId },
-    });
-
-    if (!storeExists) {
-      console.error("Store not found for ID:", storeId);
-      return NextResponse.redirect(`${redirectSettingsUrl}?error=store_not_found`);
-    }
-
     // Upsert token Google OAuth toko ke database berdasarkan (storeId, type)
-    await prisma.storeGoogleAuth.upsert({
+    await prisma.$transaction(async (tx) => {
+     await tx.storeGoogleAuth.upsert({
       where: {
         storeId_type: { storeId, type },
       },
@@ -84,13 +109,22 @@ export async function GET(req: NextRequest) {
         refreshToken: tokens.refresh_token || "",
         expiryDate,
       },
+     });
+     // Token Google tidak pernah dicatat
+     await logActivity(tx, {
+       actor: user,
+       action: "SETTING_CHANGE",
+       entityType: "StoreGoogleAuth",
+       entityId: storeId,
+       summary: `Menghubungkan akun Google ${type === "GMAIL" ? "Gmail (Flip)" : "Calendar"}`,
+       after: { type },
+     });
     });
-
     const successFlag = type === "GMAIL" ? "gmail_connected" : "google_connected";
-    return NextResponse.redirect(`${redirectSettingsUrl}?success=${successFlag}`);
+    return redirectWithClearedState(`${redirectSettingsUrl}?success=${successFlag}`);
   } catch (error: any) {
     console.error("Error in Google OAuth callback handler:", error);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-    return NextResponse.redirect(`${appUrl}/admin/store-settings?error=callback_internal_error`);
+    return redirectWithClearedState(`${appUrl}/admin/store-settings?error=callback_internal_error`);
   }
 }

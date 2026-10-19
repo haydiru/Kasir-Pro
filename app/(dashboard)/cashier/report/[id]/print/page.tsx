@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { PrintClient } from "./print-client";
+import { SAFE_USER_SELECT, SAFE_STORE_SELECT } from "@/lib/auth-guard";
 
 export default async function PrintReportPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -19,8 +20,8 @@ export default async function PrintReportPage({ params }: { params: Promise<{ id
   const report = await prisma.shiftReport.findUnique({
     where: { id: reportId },
     include: {
-      user: true,
-      store: true,
+      user: { select: SAFE_USER_SELECT },
+      store: { select: SAFE_STORE_SELECT },
       digitalTransactions: true,
       expenditures: true,
     }

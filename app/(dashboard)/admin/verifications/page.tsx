@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { VerificationsClient } from "./verifications-client";
+import { SAFE_USER_SELECT, SAFE_STORE_SELECT } from "@/lib/auth-guard";
 
 export default async function AdminVerificationsPage() {
   const session = await auth();
@@ -30,9 +31,9 @@ export default async function AdminVerificationsPage() {
       status: { in: ["Submitted", "Verified"] }
     },
     include: {
-      user: true,
-      verifiedBy: true,
-      store: true,
+      user: { select: SAFE_USER_SELECT },
+      verifiedBy: { select: SAFE_USER_SELECT },
+      store: { select: SAFE_STORE_SELECT },
       digitalTransactions: true,
       expenditures: true
     },
