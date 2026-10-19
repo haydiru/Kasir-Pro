@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { serialize, ActionResponse } from "@/lib/serialize";
 import { getTZDateRange, formatTime } from "@/lib/utils";
@@ -52,6 +53,30 @@ const SAFE_REPORT_INCLUDE = {
 function toAmount(value: unknown): number {
   const num = Number(value ?? 0);
   return Number.isFinite(num) ? Math.round(num) : 0;
+}
+
+const REPORT_CONFLICT_CODE = "REPORT_CONFLICT";
+
+/** The client tried to save on top of an outdated copy of the report (stale tab/device). */
+class ReportConflictError extends UserFacingError {
+  constructor() {
+    super("Laporan ini sudah diubah dari halaman/perangkat lain. Muat ulang halaman agar data terbaru tampil, lalu ulangi perubahan Anda.");
+    this.name = "ReportConflictError";
+  }
+}
+
+/**
+ * Bumps the report's version (updatedAt) when its entries are changed outside the
+ * cashier form, so an open cashier form with an older copy gets a conflict instead
+ * of silently overwriting or resurrecting those entries.
+ */
+async function touchReport(tx: Prisma.TransactionClient, reportId: string) {
+  await tx.shiftReport.update({ where: { id: reportId }, data: { updatedAt: new Date() } });
+}
+
+/** Keeps only string ids from a client-supplied list. */
+function toIdList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && id.length > 0) : [];
 }
 
 /**
@@ -233,7 +258,10 @@ export async function createShiftReport(): Promise<ActionResponse> {
                     gte: start,
                     lt: end
                 }
-            }
+            },
+            // Return the full report so the form never starts from an empty copy of an existing report
+            include: SAFE_REPORT_INCLUDE,
+            orderBy: { createdAt: 'desc' }
         });
 
         if (existing) return { success: true, data: { report: serialize(existing) } };
@@ -281,7 +309,7 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
         const timezone = store?.timezone || "Asia/Jakarta";
 
         // Optimized Transaction with higher timeout to handle pooler issues
-        await prisma.$transaction(async (tx) => {
+        const newVersion = await prisma.$transaction(async (tx) => {
             const existing = await tx.shiftReport.findUnique({
                 where: { id: data.id },
                 include: {
@@ -296,6 +324,18 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                 throw new AccessDeniedError("Anda hanya dapat mengubah laporan milik Anda sendiri.");
             }
             if (existing.status === "Verified") throw new UserFacingError("Laporan sudah diverifikasi admin dan tidak bisa diubah");
+
+            // Optimistic concurrency: the form must be based on the latest version of the report.
+            // Without this, a stale tab/device (e.g. opened before the report was filled in) could
+            // overwrite a submitted report with its outdated, empty state.
+            if (typeof data.baseUpdatedAt !== "string" || existing.updatedAt.toISOString() !== data.baseUpdatedAt) {
+                throw new ReportConflictError();
+            }
+
+            // A submitted report can only be changed through submit/revision (isSubmit), never by a draft save
+            if (existing.status === "Submitted" && !data.isSubmit) {
+                throw new UserFacingError("Laporan sudah dikirim. Gunakan tombol Revisi untuk mengubahnya.");
+            }
 
             // Server-side validation: if saving (submitting or draft), reject any empty supplier names in expenditures
             if (Array.isArray(data.expenditures)) {
@@ -331,14 +371,18 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             // 2. Sync Digital Transactions (Manage Deletions first)
             if (Array.isArray(data.digitalTransactions)) {
                 const incomingIds = data.digitalTransactions.map((d: any) => d.id).filter((id: any) => !!id && typeof id === 'string');
-                
-                // Delete entries in DB for this report that are NOT in the incoming payload
-                await tx.digitalTransaction.deleteMany({
-                    where: {
-                        reportId: data.id,
-                        id: { notIn: incomingIds }
-                    }
-                });
+
+                // Only delete entries this form actually knew about and the user removed.
+                // Entries added meanwhile by others (e.g. pramuniaga, bill payment) are never touched.
+                const removedIds = toIdList(data.knownDigitalTransactionIds).filter((id) => !incomingIds.includes(id));
+                if (removedIds.length > 0) {
+                    await tx.digitalTransaction.deleteMany({
+                        where: {
+                            reportId: data.id,
+                            id: { in: removedIds }
+                        }
+                    });
+                }
 
                 const existingTxMap = new Map(existing.digitalTransactions.map(t => [t.id, t]));
                 for (const d of data.digitalTransactions) {
@@ -398,14 +442,17 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
             // 3. Sync Expenditures (Manage Deletions first)
             if (Array.isArray(data.expenditures)) {
                 const incomingIds = data.expenditures.map((e: any) => e.id).filter((id: any) => !!id && typeof id === 'string');
-                
-                // Delete entries in DB for this report that are NOT in the incoming payload
-                await tx.expenditure.deleteMany({
-                    where: {
-                        reportId: data.id,
-                        id: { notIn: incomingIds }
-                    }
-                });
+
+                // Only delete entries this form actually knew about and the user removed
+                const removedIds = toIdList(data.knownExpenditureIds).filter((id) => !incomingIds.includes(id));
+                if (removedIds.length > 0) {
+                    await tx.expenditure.deleteMany({
+                        where: {
+                            reportId: data.id,
+                            id: { in: removedIds }
+                        }
+                    });
+                }
 
                 const existingExpMap = new Map(existing.expenditures.map(e => [e.id, e]));
                 for (const e of data.expenditures) {
@@ -420,6 +467,8 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                                 amountFromBill: toAmount(e.amountFromBill),
                                 amountFromCashier: toAmount(e.amountFromCashier),
                                 amountFromTransfer: toAmount(e.amountFromTransfer),
+                                // Persist the uploaded receipt photo (previously lost on save)
+                                ...(e.receiptUrl !== undefined ? { receiptUrl: e.receiptUrl ? String(e.receiptUrl) : null } : {}),
                                 lastUpdatedBy: existingExp.createdBy !== currentUser.id ? currentUser.id : existingExp.lastUpdatedBy
                             }
                         });
@@ -433,6 +482,7 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                                 amountFromBill: toAmount(e.amountFromBill),
                                 amountFromCashier: toAmount(e.amountFromCashier),
                                 amountFromTransfer: toAmount(e.amountFromTransfer),
+                                receiptUrl: e.receiptUrl ? String(e.receiptUrl) : null,
                             }
                         });
                     }
@@ -474,6 +524,8 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
                     },
                 });
             }
+
+            return updated.updatedAt.toISOString();
         }, {
             maxWait: 5000,
             timeout: 10000
@@ -482,10 +534,15 @@ export async function saveCashierReport(data: any): Promise<ActionResponse> {
         revalidatePath("/cashier/report");
         revalidatePath("/admin/verifications");
         revalidatePath("/cashier/history");
-        return { success: true };
+        // The client uses this as `baseUpdatedAt` for its next save
+        return { success: true, data: { updatedAt: newVersion } };
     } catch (error: any) {
         console.error("saveCashierReport error:", error);
-        return { success: false, error: safeErrorMessage(error, "Gagal menyimpan laporan") };
+        return {
+            success: false,
+            error: safeErrorMessage(error, "Gagal menyimpan laporan"),
+            ...(error instanceof ReportConflictError ? { code: REPORT_CONFLICT_CODE } : {}),
+        };
     }
 }
 
@@ -636,6 +693,7 @@ export async function updateDigitalEntry(id: string, data: any): Promise<ActionR
           after: diff.after,
         });
       }
+      await touchReport(tx, entry!.reportId);
     });
     revalidatePath("/cashier/report");
     revalidatePath("/pramuniaga/entries");
@@ -678,6 +736,7 @@ export async function updateExpenditureEntry(id: string, data: any): Promise<Act
           after: diff.after,
         });
       }
+      await touchReport(tx, entry!.reportId);
     });
     revalidatePath("/cashier/report");
     revalidatePath("/pramuniaga/entries");
@@ -700,6 +759,7 @@ export async function deleteShiftEntry(type: "digital" | "expenditure", id: stri
       assertCanModifyEntry(entry, currentUser);
       await prisma.$transaction(async (tx) => {
         await tx.digitalTransaction.delete({ where: { id } });
+        await touchReport(tx, entry!.reportId);
         await logActivity(tx, {
           actor: currentUser,
           action: "DELETE",
@@ -717,6 +777,7 @@ export async function deleteShiftEntry(type: "digital" | "expenditure", id: stri
       assertCanModifyEntry(entry, currentUser);
       await prisma.$transaction(async (tx) => {
         await tx.expenditure.delete({ where: { id } });
+        await touchReport(tx, entry!.reportId);
         await logActivity(tx, {
           actor: currentUser,
           action: "DELETE",

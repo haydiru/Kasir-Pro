@@ -33,4 +33,6 @@ export interface ActionResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+  /** Machine-readable error code, e.g. "REPORT_CONFLICT" */
+  code?: string;
 }
