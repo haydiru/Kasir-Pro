@@ -247,6 +247,22 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
 
 ## 💰 Phase 5: Form Laporan Kasir, Verifikasi Admin & Arus Kas (Cashflow)
 
+### [DONE-BUG-06] Laporan Kasir yang Sudah Dikirim Tiba-tiba Jadi Draft & Kosong (Insiden Family Mart, Shift Malam 18 Okt 2026)
+- **Status**: ✅ **COMPLETED** (19 Oktober 2026)
+- **Masalah Yang Diatasi**:
+  - Halaman laporan kasir yang dibuka lebih awal (tab/perangkat kedua, atau tab yang dipulihkan browser) menyimpan state lamanya (sering masih kosong). Auto-save dari halaman itu menimpa laporan: status kembali ke `Draft`, semua nominal jadi 0, dan semua entri yang tidak ada di halaman itu dihapus permanen.
+  - Mekanisme yang sama diam-diam menghapus entri yang ditambahkan pramuniaga selagi form kasir terbuka.
+  - Auto-save yang sedang berjalan bisa balapan dengan tombol Kirim, dan foto nota pengeluaran dari form kasir tidak pernah tersimpan ke database.
+- **Hasil Pekerjaan**:
+  1. `saveCashierReport` mewajibkan versi laporan (`baseUpdatedAt`) yang menjadi dasar form; simpanan dari salinan lama ditolak dengan kode `REPORT_CONFLICT`.
+  2. Laporan `Submitted` tidak bisa disimpan sebagai draft (hanya lewat Kirim/Revisi).
+  3. Hanya entri yang diketahui form dan memang dihapus pengguna yang dihapus; entri dari pramuniaga/pembayaran tagihan tidak tersentuh. Edit/hapus entri dan pelunasan tagihan menaikkan versi laporan.
+  4. Client: simpanan diantrekan (auto-save tidak pernah bertabrakan dengan Kirim), auto-save berhenti saat konflik dan muncul tombol **Muat ulang**; `createShiftReport` mengembalikan laporan lengkap.
+  5. `receiptUrl` pengeluaran ikut tersimpan.
+- **Verifikasi**: Uji dua tab di DB dev (tab basi ditolak, laporan tetap Submitted & utuh) dan uji entri pramuniaga saat form kasir terbuka (entri tetap ada, auto-save tetap jalan).
+- **Catatan Data**: Entri laporan 18 Okt sudah terhapus permanen sebelum log aktivitas aktif, sehingga harus diisi ulang dari catatan kasir/daftar transaksi Flip. Mulai 19 Okt, setiap penghapusan entri tercatat lengkap di `ActivityLog`.
+- **File Referensi**: [app/actions/report.ts](app/actions/report.ts), [app/(dashboard)/cashier/report/page.tsx](app/(dashboard)/cashier/report/page.tsx), [app/actions/bill.ts](app/actions/bill.ts)
+
 ### [DONE-BILL-MONEY] Pemulihan Field Uang Tagihan Diterima (`billMoneyReceived`)
 - **Status**: ✅ **COMPLETED & VERIFIED IN PRODUCTION** (16 Agustus 2026)
 - **Masalah Yang Diatasi**:
