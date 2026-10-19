@@ -108,11 +108,11 @@ function SummaryCard({
 }) {
   return (
     <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">{title}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-snug line-clamp-2">{title}</p>
           <p className="mt-1 text-2xl font-black tracking-tight text-foreground truncate">{value}</p>
-          {subtext && <p className="mt-0.5 text-xs text-muted-foreground truncate">{subtext}</p>}
+          {subtext && <p className="mt-0.5 text-xs text-muted-foreground leading-snug line-clamp-2">{subtext}</p>}
         </div>
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-2xs ${colorClass}`}>
           <Icon className="h-5 w-5" />
@@ -252,7 +252,7 @@ export function DashboardClient({
     <div className="space-y-6">
 
       {/* ── Summary Cards Row 1 ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard title="Omzet Hari Ini" value={formatCurrency(summary.todayOmzet)} icon={DollarSign} colorClass="bg-primary/10 text-primary" subtext="Khusus transaksi POS hari ini" />
         <SummaryCard title="Pegawai Aktif" value={String(activeAttendances.length)} icon={Users} colorClass="bg-blue-500/10 text-blue-600" subtext="Sedang bertugas saat ini" />
         <SummaryCard title="Menunggu Verifikasi" value={String(submittedCount)} icon={ClipboardCheck} colorClass="bg-amber-500/10 text-amber-600" subtext="Shift menunggu approval" />
@@ -676,30 +676,30 @@ export function DashboardClient({
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-base font-bold tracking-tight">Grafik Growth & Trend Penjualan</h3>
-          <div className="flex gap-1.5 bg-muted p-1 rounded-xl">
+          <div className="flex w-full gap-1.5 bg-muted p-1 rounded-xl sm:w-auto">
             <Button
               size="sm"
               variant={chartMode === "daily" ? "default" : "ghost"}
               onClick={() => setChartMode("daily")}
-              className="text-xs h-7 rounded-lg"
+              className="text-xs h-7 rounded-lg flex-1 sm:flex-none"
             >
-              Harian (Daily)
+              Harian<span className="hidden sm:inline">&nbsp;(Daily)</span>
             </Button>
             <Button
               size="sm"
               variant={chartMode === "weekly" ? "default" : "ghost"}
               onClick={() => setChartMode("weekly")}
-              className="text-xs h-7 rounded-lg"
+              className="text-xs h-7 rounded-lg flex-1 sm:flex-none"
             >
-              Per Minggu (Weekly)
+              Per Minggu<span className="hidden sm:inline">&nbsp;(Weekly)</span>
             </Button>
             <Button
               size="sm"
               variant={chartMode === "monthly" ? "default" : "ghost"}
               onClick={() => setChartMode("monthly")}
-              className="text-xs h-7 rounded-lg"
+              className="text-xs h-7 rounded-lg flex-1 sm:flex-none"
             >
-              Per Bulan (Monthly)
+              Per Bulan<span className="hidden sm:inline">&nbsp;(Monthly)</span>
             </Button>
           </div>
         </div>
