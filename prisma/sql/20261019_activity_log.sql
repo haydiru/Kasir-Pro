@@ -41,7 +41,8 @@ CREATE OR REPLACE FUNCTION activity_log_block_mutation() RETURNS trigger AS $$
 BEGIN
   RAISE EXCEPTION 'ActivityLog bersifat append-only: % tidak diizinkan', TG_OP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = '';
 
 DROP TRIGGER IF EXISTS activity_log_no_update_delete ON "ActivityLog";
 CREATE TRIGGER activity_log_no_update_delete
@@ -52,3 +53,7 @@ DROP TRIGGER IF EXISTS activity_log_no_truncate ON "ActivityLog";
 CREATE TRIGGER activity_log_no_truncate
   BEFORE TRUNCATE ON "ActivityLog"
   FOR EACH STATEMENT EXECUTE FUNCTION activity_log_block_mutation();
+
+-- 4. Row Level Security: blokir akses lewat Supabase Data API (anon/authenticated key).
+--    Prisma terhubung sebagai pemilik tabel sehingga tidak terpengaruh RLS.
+ALTER TABLE "ActivityLog" ENABLE ROW LEVEL SECURITY;
