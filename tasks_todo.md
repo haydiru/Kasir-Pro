@@ -61,8 +61,9 @@ Setiap task diatur dengan cakupan yang **terukur & fungsional** (maksimal 1 hala
 ### 🗄️ [TODO-BE-03] Background Cleanup Job untuk Mutasi Flip Webhook & Log Lama
 - **Cakupan Fitur**: Scheduled Database Optimization
 - **Rincian Fitur Detail**:
-  - [ ] Cron endpoint untuk membersihkan log `FlipWebhook` dan audit log yang sudah berusia lebih dari 90 hari.
+  - [ ] Cron endpoint untuk membersihkan log `FlipWebhook` yang sudah berusia lebih dari 90 hari.
   - [ ] Pengarsipan data berkala tanpa memengaruhi laporan historis shift kasir.
+  - [ ] **Catatan**: `ActivityLog` sengaja append-only (trigger DB menolak DELETE) dan **tidak** ikut dibersihkan. Jika kelak perlu retensi, buat proses arsip terpisah yang disetujui owner.
 
 ---
 
@@ -79,6 +80,35 @@ Setiap task diatur dengan cakupan yang **terukur & fungsional** (maksimal 1 hala
 - **Rincian Fitur Detail**:
   - [ ] Implementasi Next.js `unstable_cache` / React `cache` pada query statistik dashboard all-time agar waktu muat di bawah 300ms.
   - [ ] Optimasi penarikan data Prisma `shiftReport` dengan indeks gabungan `[storeId, status, date]`.
+
+---
+
+## 🛡️ Phase 4: Lanjutan Keamanan (Sisa Temuan Audit Medium/Low, 19 Okt 2026)
+
+### 🔐 [TODO-SEC-01] Migrasi Database Terkelola (Prisma Migrate)
+- [ ] Buat baseline migrasi dari database production, simpan di `prisma/migrations`, dan masukkan SQL trigger `ActivityLog` ke dalam migrasi.
+- [ ] Ubah build menjadi `prisma generate && prisma migrate deploy && next build` agar setiap deploy otomatis menerapkan migrasi baru.
+
+### 🔐 [TODO-SEC-02] Penguatan Login & PIN
+- [ ] Rate limit login berbasis storage bersama (mis. tabel DB / Upstash), karena rate limiter in-memory tidak efektif di serverless.
+- [ ] Wajib ganti PIN saat login pertama / setelah reset ke `123456`; minimal PIN 6 digit.
+- [ ] Opsi menonaktifkan pengguna (soft disable) tanpa menghapus akun.
+
+### 🔐 [TODO-SEC-03] Validasi & Konsistensi Data Keuangan
+- [ ] `createFinancialTransaction`: pindahkan cek saldo ke dalam transaksi (cegah race condition), validasi `type`/`amount` dengan zod, larang mendebit kas pegangan admin lain.
+- [ ] Hapus laporan `Verified`: wajib batal verifikasi dulu agar saldo Buku Kas ikut dikoreksi.
+- [ ] Soft delete (`deletedAt`, `deletedById`) untuk data keuangan alih-alih hard delete.
+
+### 🔐 [TODO-SEC-04] Integrasi & Dependensi
+- [ ] Query Gmail `(from:flip.id OR "flip.id")` menerima email apa pun yang memuat teks "flip.id"; batasi ke pengirim resmi Flip untuk mencegah transaksi palsu.
+- [ ] Enkripsi token Google (`StoreGoogleAuth`) dan `flipApiKey` di database.
+- [ ] Ganti `xlsx@0.18.5` (CVE prototype pollution & ReDoS) dengan build SheetJS resmi terbaru atau ExcelJS.
+- [ ] `scanReceiptWithAi`: hapus parameter `bypassToggle` dari client & batasi jumlah item hasil AI.
+
+### 🔐 [TODO-SEC-05] Cakupan Log & Validasi Minor
+- [ ] Tambah log aktivitas untuk barang retur, barang kosong (termasuk tautan publik), dan webhook email Flip.
+- [ ] Validasi status (allowlist) di `retur.ts` dan batasi hapus retur untuk admin.
+- [ ] Batasi `limit` pada `getNotifications` dan validasi `shiftType` saat check-in.
 
 ---
 

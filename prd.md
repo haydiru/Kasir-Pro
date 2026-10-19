@@ -1,5 +1,5 @@
 # 🛒 PRD — KasirPro (Aplikasi Kasir, Laporan Shift & Manajemen Keuangan Minimarket)
-**Versi Dokumen:** 3.0 (Terbaru - Oktober 2026)  
+**Versi Dokumen:** 3.1 (19 Oktober 2026 — Security Hardening & Log Aktivitas)  
 **Status Sistem:** Production Live ([kasir-pro-three.vercel.app](https://kasir-pro-three.vercel.app))  
 **Tech Stack:** Next.js 16 (App Router + Turbopack), TypeScript, Tailwind CSS v4, Prisma ORM v6, PostgreSQL Supabase, OpenRouter Vision AI (GPT Luna), SheetJS (`xlsx`), Google Calendar & Gmail OAuth API.
 
@@ -68,9 +68,15 @@ Sistem mengadopsi *Role-Based Access Control* (RBAC) yang ketat dan terisolasi p
 | **Dashboard Analytics & Leaderboard** | ✅ Full | ✅ Toko | ❌ | ❌ |
 | **Verifikasi Setoran Kasir** | ✅ Full | ✅ Toko | ❌ | ❌ |
 | **Buku Kas Toko (`/admin/cashflow`)** | ✅ Full | ✅ Toko | ❌ | ❌ |
-| **Master Data Barang (`/products`)** | ✅ Full | ✅ Full | ✅ Tambah/Lihat | ✅ Tambah/Lihat |
-| **Import / Export Excel Barang** | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
-| **Form Laporan Shift (`/cashier/report`)** | ✅ Audit | ✅ Audit | ✅ Full (Shift Sendiri) | ✅ Jika Override Role |
+| **Master Data Barang (`/products`)** | ✅ Full | ✅ Full | 👁️ Lihat + Scan Nota AI | 👁️ Lihat + Scan Nota AI |
+| **Import Excel Barang** | ✅ Full | ✅ Full | ❌ | ❌ |
+| **Export Excel Barang** | ✅ | ✅ | ✅ | ✅ |
+| **Form Laporan Shift (`/cashier/report`)** | ✅ Audit | ✅ Audit | ✅ Full (Laporan Sendiri) | ✅ Jika Override Role |
+| **Edit Entri Setelah Laporan Dikirim** | ✅ (kecuali Verified) | ✅ (kecuali Verified) | ❌ (lewat revisi) | ❌ |
+| **Kelola Akun Super Admin (buat/edit/reset PIN)** | ✅ | ❌ | ❌ | ❌ |
+| **Rekap Gaji Pegawai** | ✅ | ✅ | ❌ (hanya data sendiri) | ❌ (hanya data sendiri) |
+| **Log Aktivitas (`/admin/audit-log`)** | ✅ Lihat | ✅ Lihat | ❌ | ❌ |
+| **Hubungkan / Putus Google (Calendar, Gmail)** | ✅ | ✅ | ❌ | ❌ |
 | **Cetak Struk Termal (58mm/80mm)** | ✅ | ✅ | ✅ | ✅ |
 | **Presensi Clock-In / Clock-Out** | ✅ | ✅ | ✅ | ✅ |
 | **Kas Kecil Belanja (`/shopping-funds`)** | ✅ Hapus/Koreksi | ✅ Catat | ✅ Catat Belanja | ✅ Catat Belanja |
@@ -81,7 +87,7 @@ Sistem mengadopsi *Role-Based Access Control* (RBAC) yang ketat dan terisolasi p
 
 ---
 
-## 4. Pemetaan Lengkap 18 Modul & 41 Rute Halaman
+## 4. Pemetaan Lengkap 19 Modul & Rute Halaman
 
 ### Modul 1: Otentikasi & Setup Toko
 - **`/register`**: Pendaftaran awal untuk toko baru dan akun Super Admin pertama.
@@ -116,7 +122,8 @@ Sistem mengadopsi *Role-Based Access Control* (RBAC) yang ketat dan terisolasi p
 
 ### Modul 6: Riwayat Laporan Kasir & Revisi Berizin (`/cashier/history`)
 - Menampilkan seluruh arsip laporan shift kasir.
-- Laporan yang belum diverifikasi dapat diperbaiki dengan mencatat **Alasan Revisi**, yang disimpan permanen ke dalam tabel `AuditLog`.
+- Laporan yang sudah dikirim (`Submitted`) tetapi belum diverifikasi dapat direvisi dengan mencatat **Alasan Revisi** (ditambahkan ke catatan kasir dan tercatat di `ActivityLog` beserta nilai sebelum/sesudah). Status tidak bisa kembali ke Draft.
+- Non-admin hanya dapat membuka laporan miliknya sendiri; laporan `Verified` terkunci.
 
 ### Modul 7: Transaksi Flip & Email Sync Webhook (`/admin/flip-transactions`)
 - Menampilkan riwayat transaksi digital yang diekstrak otomatis dari email konfirmasi `flip.id`.
@@ -190,9 +197,16 @@ Sistem mengadopsi *Role-Based Access Control* (RBAC) yang ketat dan terisolasi p
 - Modul SOP interaktif: Prosedur pembukaan shift, transaksi digital Flip, pencatatan nota, dan penutupan kasir.
 - Form entri checklist tugas kebersihan dan penataan rak pramuniaga.
 
+### Modul 19: Log Aktivitas / Audit Trail (`/admin/audit-log`)
+- Jejak permanen **siapa mengubah apa dan kapan**, dengan snapshot nilai sebelum & sesudah (PIN, hash, dan token tidak pernah disimpan).
+- Aksi tercatat: `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `CREATE`, `UPDATE`, `DELETE` (dengan snapshot penuh data yang dihapus), `STATUS_CHANGE`, `VERIFY`, `UNVERIFY`, `PIN_RESET`, `PIN_CHANGE`, `ROLE_CHANGE`, `SETTING_CHANGE`, `IMPORT`.
+- Cakupan: pengguna & role, laporan shift beserta entri digital/pengeluaran, verifikasi, tagihan, buku kas, kas kecil, produk & import Excel, scan nota AI, presensi, pengaturan toko & shift, integrasi Google & Flip, supplier.
+- Append-only di level database (trigger menolak `UPDATE`/`DELETE`/`TRUNCATE`) dan RLS aktif. Filter: tanggal, pengguna, entitas, aksi, ID data. Akses: Admin & Super Admin.
+- Belum dicatat (prioritas rendah): barang retur, barang kosong (termasuk tautan publik), notifikasi, webhook email Flip.
+
 ---
 
-## 5. Skema Relasi Database (18 Model Prisma)
+## 5. Skema Relasi Database (Model Prisma)
 
 ```mermaid
 erDiagram
@@ -228,7 +242,18 @@ erDiagram
     Bill ||--o{ Expenditure : "settled_via"
 
     ReceiptAiScan ||--o{ ReceiptScannedItem : "extracts"
+
+    ActivityLog {
+        string storeId
+        string actorId
+        string action
+        string entityType
+        json before
+        json after
+    }
 ```
+
+> `ActivityLog` sengaja tanpa relasi/foreign key agar log tetap utuh walaupun data yang dicatat dihapus. Model lama `AuditLog` (khusus ShiftReport) tidak dipakai lagi oleh aplikasi.
 
 ### Rincian Model Data Kunci:
 1. **`Store`**: Profil cabang toko, timezone (`Asia/Jakarta`, WITA, WIT), flag `enableAiReceiptScan`, dan relasi multi-tenant.
@@ -245,10 +270,11 @@ erDiagram
 12. **`ReturnedItem`**: Catatan barang cacat/rusak dengan status retur (`PENDING`, `RETURNED`, `RESOLVED`).
 13. **`EmptyItem`**: Catatan barang habis di rak minimarket.
 14. **`EmployeeShoppingFund` & `EmployeeShoppingExpense`**: Dana kas kecil operasional belanja pegawai.
-15. **`StoreGoogleAuth`**: Token OAuth terenkripsi untuk integrasi Google Calendar dan Gmail Flip.
+15. **`StoreGoogleAuth`**: Token OAuth (access & refresh) untuk integrasi Google Calendar dan Gmail Flip. Disimpan di database tanpa enkripsi aplikasi dan tidak pernah dikirim ke browser.
 16. **`FlipWebhook`**: Penampung mutasi email transaksi Flip hasil web scraping / Gmail API.
 17. **`ShiftSetting`**: Konfigurasi dinamis jadwal shift operasional per hari.
 18. **`Notification`**: Pusat notifikasi lonceng sistem bagi pengguna.
+19. **`ActivityLog`**: Log aktivitas append-only (actor, aksi, entitas, ringkasan, nilai sebelum/sesudah, alasan). Dibuat lewat `prisma/sql/20261019_activity_log.sql`.
 
 ---
 
@@ -257,4 +283,9 @@ erDiagram
 1. **Auto-Save Debounced State**: Form kasir menerapkan auto-save 5 detik dengan perbandingan snapshot data guna mencegah redundansi request dan memastikan input kasir tidak hilang saat koneksi terputus.
 2. **Shift Window Flip Matching**: Peringatan transaksi Flip dibatasi ketat pada jam operasional shift kasir (`getTZShiftRange`) dan mengecualikan transaksi yang sudah dilaporkan di shift lain, mencegah duplikasi peringatan.
 3. **Safety Auto-Timeout**: Seluruh proses asinkron berat (seperti sinkronisasi Gmail API dan ekstraksi nota AI OpenRouter) dilengkapi *safety timer* sisi klien (10–15 detik) untuk mencegah UI macet (*stuck*) jika terjadi kendala jaringan pihak ketiga.
-4. **Isolasi Multi-Tenant Mutlak**: Seluruh query Prisma ORM membatasi akses pada tingkat toko (`where: { storeId }`), menjamin tidak ada kebocoran data antar cabang.
+4. **Isolasi Multi-Tenant & Kepemilikan**: Setiap aksi yang menerima ID dari client memverifikasi `storeId` record sama dengan toko pengguna (helper `assertSameStore`), dan untuk non-admin juga kepemilikan data (laporan, entri, presensi).
+5. **Otorisasi Server-Side**: Role & `storeId` dibaca ulang dari database pada setiap aksi (`requireUser` / `requireAdmin` di `lib/auth-guard.ts`). JWT di-refresh dari database tiap 5 menit dan tidak menerima perubahan role dari client (`POST /api/auth/session`).
+6. **Perlindungan Data Sensitif**: Hash PIN, token Google, dan pesan error mentah server tidak pernah dikirim ke browser.
+7. **Validasi Upload & Input**: Foto maks. 10 MB dengan deteksi tipe dari isi file; nominal keuangan divalidasi (angka finite, tidak negatif, alokasi tagihan = nominal tagihan); import Excel maks. 5 MB / 10.000 baris.
+8. **Integrasi Aman**: Google OAuth memakai `state` acak + cookie httpOnly; cron Gmail wajib `CRON_SECRET` (fail-closed); sinkronisasi Gmail per toko tidak bisa dipanggil langsung dari browser.
+9. **Audit Trail Permanen**: Seluruh perubahan penting tercatat di `ActivityLog` yang tidak bisa diubah/dihapus (lihat Modul 19).
