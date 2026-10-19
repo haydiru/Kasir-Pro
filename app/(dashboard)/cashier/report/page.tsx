@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,6 +138,62 @@ export default function CashierReportPage() {
   const [isAiScanEnabled, setIsAiScanEnabled] = useState(false);
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
 
+  // Concurrency guards for saving:
+  // - reportVersionRef: version (updatedAt) of the report this form is based on. The server
+  //   rejects saves from an outdated form (e.g. a second tab/device opened earlier), which
+  //   previously could overwrite a submitted report with empty data.
+  // - known*IdsRef: entry ids the server has confirmed; only these can be deleted by this form,
+  //   so entries added meanwhile by pramuniaga/bill payments are never wiped.
+  // - saveQueueRef: saves run one at a time (auto-save never races with submit).
+  const reportVersionRef = useRef<string | null>(null);
+  const knownDigitalIdsRef = useRef<string[]>([]);
+  const knownExpenditureIdsRef = useRef<string[]>([]);
+  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const [hasConflict, setHasConflict] = useState(false);
+
+  const syncFromServerReport = (report: {
+    updatedAt?: string;
+    digitalTransactions?: { id: string }[];
+    expenditures?: { id: string }[];
+  }) => {
+    reportVersionRef.current = report.updatedAt ?? null;
+    knownDigitalIdsRef.current = (report.digitalTransactions || []).map((t) => t.id);
+    knownExpenditureIdsRef.current = (report.expenditures || []).map((e) => e.id);
+  };
+
+  const persistReport = (
+    payload: { digitalTransactions: { id: string }[]; expenditures: { id: string }[] } & Record<string, unknown>
+  ) => {
+    const run = saveQueueRef.current.then(async () => {
+      const res = await saveCashierReport({
+        ...payload,
+        baseUpdatedAt: reportVersionRef.current,
+        knownDigitalTransactionIds: knownDigitalIdsRef.current,
+        knownExpenditureIds: knownExpenditureIdsRef.current,
+      });
+      if (res.success) {
+        if (res.data?.updatedAt) reportVersionRef.current = res.data.updatedAt;
+        knownDigitalIdsRef.current = payload.digitalTransactions.map((d) => d.id);
+        knownExpenditureIdsRef.current = payload.expenditures.map((e) => e.id);
+      } else if (res.code === "REPORT_CONFLICT") {
+        setHasConflict(true);
+      }
+      return res;
+    });
+    // Keep the queue alive even if one save throws
+    saveQueueRef.current = run.catch(() => undefined);
+    return run;
+  };
+
+  useEffect(() => {
+    if (!hasConflict) return;
+    toast.error("Laporan diubah dari halaman/perangkat lain", {
+      description: "Penyimpanan otomatis dihentikan agar data terbaru tidak tertimpa. Muat ulang halaman untuk melanjutkan.",
+      duration: Infinity,
+      action: { label: "Muat ulang", onClick: () => window.location.reload() },
+    });
+  }, [hasConflict]);
+
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -181,6 +237,7 @@ export default function CashierReportPage() {
 
         const { report } = reportRes.data;
         if (report) {
+          syncFromServerReport(report);
           setReportId(report.id);
           setShiftType(report.shiftType as any);
           setStartingCash(report.startingCash);
@@ -250,10 +307,11 @@ export default function CashierReportPage() {
   const variance = Math.round(manualCashCount - expectedCash);
 
   // Auto-save: debounce 5s, tracks ALL form fields, skips if nothing changed
-  const lastSavedRef = useCallback(() => ({ current: "" }), [])();
+  const lastSavedRef = useRef("");
 
   useEffect(() => {
-    if (status === "Submitted" || !reportId) return;
+    // Only Draft reports are auto-saved; never after a version conflict
+    if (status !== "Draft" || !reportId || hasConflict) return;
 
     // Skip auto-saving if there's any empty supplier name to prevent database clutter/validation errors
     const hasEmptySupplier = expenditures.some((ex) => !ex.supplierName || ex.supplierName.trim() === "");
@@ -274,7 +332,7 @@ export default function CashierReportPage() {
       handleSave(true);
     }, 5000);
     return () => clearTimeout(timer);
-  }, [posCash, posDebit, startingCash, billMoneyReceived, manualCashCount, digitalTx, expenditures, status, reportId]);
+  }, [posCash, posDebit, startingCash, billMoneyReceived, manualCashCount, digitalTx, expenditures, status, reportId, hasConflict]);
 
 
   // Digital transaction handlers
@@ -338,7 +396,7 @@ export default function CashierReportPage() {
     }
 
     setIsLoading(true);
-    const res = await saveCashierReport({
+    const res = await persistReport({
         id: reportId,
         startingCash,
         posCash,
@@ -365,6 +423,7 @@ export default function CashierReportPage() {
   const handleSave = async (isAuto = false, isRevisionSubmit = false) => {
     // Prevent auto-save if already submitted and not in revision mode
     if (!reportId || (status === "Submitted" && !isRevising)) return;
+    if (isAuto && hasConflict) return;
 
     // Validation for manual save or revision submit
     if (!isAuto) {
@@ -383,7 +442,7 @@ export default function CashierReportPage() {
     // we want to maintain the Submitted status if it was already submitted.
     // However, the action will set it to Draft if isSubmit is false.
     // So if isRevisionSubmit is true, we pass isSubmit: true.
-    const res = await saveCashierReport({
+    const res = await persistReport({
         id: reportId,
         startingCash,
         posCash,
@@ -418,9 +477,25 @@ export default function CashierReportPage() {
       const res = await createShiftReport();
       if (res.success && res.data?.report) {
         const { report } = res.data;
+        syncFromServerReport(report);
         setReportId(report.id);
         setShiftType(report.shiftType);
         setStartingCash(report.startingCash);
+        setPosCash(report.posCash ?? 0);
+        setPosDebit(report.posDebit ?? 0);
+        setBillMoneyReceived(report.billMoneyReceived ?? 0);
+        setManualCashCount(report.manualCashCount ?? 0);
+        type ServerRow = { creator?: { name: string } | null; updater?: { name: string } | null };
+        setDigitalTx((report.digitalTransactions || []).map((t: DigitalTransaction & ServerRow) => ({
+          ...t,
+          createdByName: t.creator?.name,
+          updatedByName: t.updater?.name
+        })));
+        setExpenditures((report.expenditures || []).map((e: Expenditure & ServerRow) => ({
+          ...e,
+          createdByName: e.creator?.name,
+          updatedByName: e.updater?.name
+        })));
         setStatus(report.status);
         setReportOwnerName(report.user?.name || "");
         setNoActiveReport(false);

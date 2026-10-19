@@ -392,12 +392,19 @@ export async function updateBillStatus(
               billId: bill.id,
             }
           });
+          // Bump the report version so an open cashier form reloads instead of missing this entry
+          await tx.shiftReport.update({ where: { id: lunasPayload.reportId }, data: { updatedAt: new Date() } });
         }
       } else if (newStatus === "BELUM_BAYAR") {
         // Hapus pengeluaran terkait jika tagihan dibatalkan menjadi belum lunas
         await tx.expenditure.deleteMany({
           where: { billId }
         });
+        // Bump affected report versions so an open cashier form does not re-create the removed entry
+        const affectedReportIds = [...new Set(removedExpenditures.map((e) => e.reportId))];
+        if (affectedReportIds.length > 0) {
+          await tx.shiftReport.updateMany({ where: { id: { in: affectedReportIds } }, data: { updatedAt: new Date() } });
+        }
       }
 
       await logActivity(tx, {
