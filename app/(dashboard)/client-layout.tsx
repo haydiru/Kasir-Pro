@@ -18,12 +18,12 @@ export function DashboardClientLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop sidebar */}
-      <Sidebar className="hidden md:flex" user={user} actingAsCashier={actingAsCashier} />
+      {/* Desktop sidebar: icon rail on lg, full width from xl */}
+      <Sidebar className="hidden lg:flex" variant="responsive" user={user} actingAsCashier={actingAsCashier} />
 
-      {/* Mobile sidebar */}
+      {/* Mobile & tablet sidebar (below lg) */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="p-0 data-[side=left]:w-64 data-[side=left]:max-w-[85vw]">
           <Sidebar 
             onNavigate={() => setMobileOpen(false)} 
             user={user} 

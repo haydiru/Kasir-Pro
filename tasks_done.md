@@ -110,6 +110,16 @@ Dokumen ini mencatat seluruh task yang telah **SELESAI DIKERJAKAN** & terverifik
      - Upwork stat cards dan list table dengan status pill badges (`upwork-badge-emerald`, `upwork-badge-amber`, `upwork-badge-slate`).
   7. **Build Verification & Deployment**: Seluruh rute Next.js berhasil dikompilasi dengan `npm run build` tanpa error TypeScript.
 
+### 🎨 [DONE-UI-02] Tata Letak Responsif Layar Medium (Tablet & Laptop Kecil, 19 Oktober 2026)
+- **Masalah Yang Diatasi**: Sidebar 256px sudah tampil sejak lebar 768px, sehingga di tablet konten hanya ±512px: tombol filter terpotong, halaman bisa digeser ke samping, dan kartu ringkasan memotong teks hingga lebar 1280px.
+- **Hasil Pekerjaan**:
+  1. **< 1024px**: sidebar disembunyikan, dibuka lewat tombol menu (panel 256px, pas dengan isi).
+  2. **1024–1279px**: sidebar menjadi *rail* ikon 72px (nama menu di tooltip, avatar & tombol PIN/keluar ditumpuk), konten melebar dari 768px ke 952px.
+  3. **≥ 1280px**: sidebar penuh seperti sebelumnya.
+  4. Dashboard Admin: kartu ringkasan 2 kolom sampai 1280px dan label boleh 2 baris (tidak lagi terpotong "…"); tombol mode grafik muat di ponsel.
+- **Verifikasi**: Seluruh 23 halaman diukur otomatis di 768px & 1024px (0 elemen meluber, 0 teks terpotong), dicek ulang di 1280px dan 375px.
+- **File Referensi**: [components/sidebar.tsx](components/sidebar.tsx), [app/(dashboard)/client-layout.tsx](app/(dashboard)/client-layout.tsx), [components/topbar.tsx](components/topbar.tsx), [app/(dashboard)/admin/dashboard/dashboard-client.tsx](app/(dashboard)/admin/dashboard/dashboard-client.tsx)
+
 ### 🎨 [DONE-BRAND-FAVICON] Penyelarasan Favicon & Brand Identity Toko Emerald Green
 - **Status**: ✅ **COMPLETED & VERIFIED** (16 Oktober 2026)
 - **Masalah Yang Diatasi**:

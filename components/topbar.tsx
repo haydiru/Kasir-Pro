@@ -40,7 +40,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden shrink-0 rounded-xl"
+        className="lg:hidden shrink-0 rounded-xl"
         onClick={onMenuClick}
       >
         <Menu className="h-5 w-5" />
